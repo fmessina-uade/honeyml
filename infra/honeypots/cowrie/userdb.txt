@@ -1,0 +1,45 @@
+# userdb.txt - Cowrie accepted credentials
+# Format: username:x:password  (field 2 is unused, kept as 'x')
+# '!' prefix on password = deny that password
+# '*' = wildcard (any username or password)
+# ASCII-only: Cowrie reads this file with ascii codec
+#
+# Weak and default credentials commonly seen in brute-force attacks.
+# These are FAKE credentials inside Cowrie's controlled environment.
+# Cowrie never grants real access to the host system.
+
+root:x:root
+root:x:123456
+root:x:password
+root:x:toor
+root:x:admin
+root:x:1234
+root:x:12345
+root:x:123456789
+root:x:qwerty
+root:x:pass
+root:x:test
+root:x:root123
+root:x:changeme
+root:x:alpine
+root:x:ubnt
+root:x:admin123
+root:x:support
+admin:x:admin
+admin:x:password
+admin:x:1234
+admin:x:admin123
+pi:x:raspberry
+pi:x:pi
+ubuntu:x:ubuntu
+user:x:user
+user:x:password
+guest:x:guest
+oracle:x:oracle
+postgres:x:postgres
+deploy:x:deploy
+ansible:x:ansible
+test:x:test
+nagios:x:nagios
+zabbix:x:zabbix
+ftpuser:x:ftpuser

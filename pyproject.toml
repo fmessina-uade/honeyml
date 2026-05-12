@@ -1,0 +1,27 @@
+[project]
+name = "honeyml"
+version = "0.1.0"
+description = "HoneyML — Plataforma de inteligencia de amenazas con honeypots y Agentic AI"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "integration: requiere contenedores corriendo (make dev-up)",
+]
+addopts = "--tb=short -q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true

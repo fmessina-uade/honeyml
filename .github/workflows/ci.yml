@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # --------------------------------------------------------------------------
+  # 1. Linting: shellcheck + yamllint + docker compose config
+  # --------------------------------------------------------------------------
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: shellcheck — scripts de VPS
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: ./infra/vps/scripts
+          severity: warning
+
+      - name: shellcheck — scripts del proyecto
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: ./scripts
+          severity: warning
+
+      - name: yamllint — archivos de configuración
+        run: |
+          pip install yamllint --quiet
+          yamllint \
+            infra/honeypots/docker-compose.yml \
+            infra/honeypots/docker-compose.dev.yml \
+            .github/workflows/ci.yml
+
+      - name: Docker Compose config — validar sintaxis
+        run: |
+          docker compose \
+            -f infra/honeypots/docker-compose.yml \
+            config --quiet
+          docker compose \
+            -f infra/honeypots/docker-compose.yml \
+            -f infra/honeypots/docker-compose.dev.yml \
+            config --quiet
+
+  # --------------------------------------------------------------------------
+  # 2. Tests unitarios (no requieren Docker)
+  # --------------------------------------------------------------------------
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Instalar dependencias de test
+        run: pip install pytest
+
+      - name: pytest — tests unitarios
+        run: pytest tests/unit/ -v --tb=short
+
+  # --------------------------------------------------------------------------
+  # 3. Validación de configuración de honeypots
+  # --------------------------------------------------------------------------
+  config-validation:
+    name: Config Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: userdb.txt — encoding ASCII puro
+        run: |
+          python3 -c "
+          with open('infra/honeypots/cowrie/userdb.txt', 'rb') as f:
+              data = f.read()
+          bad = [(i, b) for i, b in enumerate(data) if b > 127]
+          if bad:
+              print(f'FAIL: byte no-ASCII 0x{bad[0][1]:02x} en posición {bad[0][0]}')
+              exit(1)
+          print('OK: userdb.txt es ASCII puro')
+          "
+
+      - name: cowrie.cfg — paths internos correctos
+        run: |
+          python3 -c "
+          import configparser, sys
+          cfg = configparser.ConfigParser()
+          cfg.read('infra/honeypots/cowrie/cowrie.cfg')
+          errors = []
+          if cfg.get('honeypot', 'contents_path', fallback='') != 'honeyfs':
+              errors.append('contents_path debe ser honeyfs')
+          if cfg.get('honeypot', 'txtcmds_path', fallback='') != 'src/cowrie/data/txtcmds':
+              errors.append('txtcmds_path debe ser src/cowrie/data/txtcmds')
+          if errors:
+              print('FAIL:', errors)
+              sys.exit(1)
+          print('OK: cowrie.cfg paths correctos')
+          "
+
+      - name: .gitignore — patrones sensibles presentes
+        run: |
+          python3 -c "
+          import sys
+          content = open('.gitignore').read()
+          required = ['*.pkl', '*.pem', '*.key', '*.pcap', '.env', 'id_rsa']
+          missing = [p for p in required if p not in content]
+          if missing:
+              print('FAIL: .gitignore no cubre:', missing)
+              sys.exit(1)
+          print('OK: .gitignore cubre todos los patrones sensibles')
+          "

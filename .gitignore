@@ -1,0 +1,271 @@
+# =============================================================================
+# Python
+# =============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# =============================================================================
+# Entornos virtuales
+# =============================================================================
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.python-version
+
+# =============================================================================
+# Variables de entorno y secretos — NUNCA COMMITEAR
+# =============================================================================
+.env*
+!.env.example
+*.secret
+secrets/
+*.key
+*.pem
+*.crt
+*.cert
+*.p12
+*.pfx
+*.der
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+id_ecdsa
+id_ecdsa.pub
+authorized_keys
+known_hosts
+*.vault
+ansible-vault-password
+vault_pass.txt
+
+# =============================================================================
+# Docker — datos locales y overrides de entorno
+# =============================================================================
+docker-compose.override.yml
+docker-compose.local.yml
+.docker/
+
+# =============================================================================
+# DATOS DE HONEYPOTS — CRÍTICO: nunca subir malware ni credenciales capturadas
+# =============================================================================
+infra/honeypots/data/
+infra/honeypots/logs/
+infra/honeypots/volumes/
+
+# Cowrie
+infra/honeypots/cowrie/downloads/
+infra/honeypots/cowrie/data/
+infra/honeypots/cowrie/tty/
+infra/honeypots/cowrie/dl/
+
+# Dionaea
+infra/honeypots/dionaea/binaries/
+infra/honeypots/dionaea/roots/
+infra/honeypots/dionaea/bistreams/
+infra/honeypots/dionaea/log/
+
+# Capturas de red
+*.pcap
+*.pcapng
+*.cap
+
+# Muestras de malware
+*.malware
+*.sample
+*.bin
+*.exe
+*.elf
+
+# =============================================================================
+# Elastic Stack — datos persistentes
+# =============================================================================
+infra/elastic/data/
+infra/elastic/logs/
+infra/elastic/snapshot/
+infra/kibana/data/
+
+# =============================================================================
+# Logs generales
+# =============================================================================
+*.log
+*.log.*
+logs/
+/var/log/
+
+# =============================================================================
+# Testing
+# =============================================================================
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.py,cover
+junit.xml
+test-results/
+
+# =============================================================================
+# Linters y type checkers
+# =============================================================================
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
+
+# =============================================================================
+# IDEs y editores
+# =============================================================================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V1
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# =============================================================================
+# Jupyter Notebooks
+# =============================================================================
+.ipynb_checkpoints/
+
+# =============================================================================
+# Terraform / Infraestructura como Código
+# =============================================================================
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+*.auto.tfvars
+
+# =============================================================================
+# Archivos de construcción y distribución
+# =============================================================================
+*.tar.gz
+*.zip
+*.tar.bz2
+
+# =============================================================================
+# Modelos de Machine Learning (scikit-learn, PyTorch, HuggingFace, llama.cpp)
+# Los modelos entrenados se distribuyen por otros medios (DVC, S3, HF Hub, etc.)
+# =============================================================================
+# scikit-learn / joblib
+*.pkl
+*.pickle
+*.joblib
+# PyTorch
+*.pt
+*.pth
+# TensorFlow / Keras
+*.h5
+*.hdf5
+*.keras
+# ONNX (formato de intercambio entre frameworks)
+*.onnx
+# HuggingFace Safetensors (modelos grandes tipo LLM)
+*.safetensors
+# llama.cpp / Ollama (modelos cuantizados locales)
+*.gguf
+*.ggml
+*.bin
+# Numpy arrays (embeddings, features)
+*.npy
+*.npz
+# Directorios de modelos y checkpoints
+models/
+checkpoints/
+model_cache/
+hf_cache/
+.cache/huggingface/
+
+# =============================================================================
+# Bases de datos vectoriales (RAG, búsqueda semántica)
+# =============================================================================
+# ChromaDB
+chroma/
+chromadb/
+# FAISS
+*.faiss
+faiss_index/
+# LanceDB
+lancedb/
+# Qdrant local
+qdrant_storage/
+
+# =============================================================================
+# LangGraph / LangChain — estado persistido y trazas
+# =============================================================================
+# LangGraph checkpoints (SQLite local de estado de agentes)
+langgraph.db
+*.langgraph.db
+# LangSmith trazas locales
+langsmith/
+
+# =============================================================================
+# Datasets y datos de entrenamiento
+# =============================================================================
+data/raw/
+data/processed/
+data/external/
+*.csv
+*.parquet
+*.arrow
+*.jsonl.gz
+
+# =============================================================================
+# Artefactos de CI/CD locales
+# =============================================================================
+.act/
+
+# =============================================================================
+# Referencia a IP del VPS (no exponer en repo público)
+# =============================================================================
+.vps_ip
+.domain
+infra/vps/.env
+
+# =============================================================================
+# Documentación local — notas de trabajo, no entregables del repo
+# El documento académico final se entrega como PDF por fuera del repositorio.
+# =============================================================================
+*.md
+docs/
+informe/
+contexto.md

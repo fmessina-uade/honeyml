@@ -1,0 +1,58 @@
+# sshd_config hardened — HoneyML VPS
+# Aplicar con: cp sshd_config /etc/ssh/sshd_config && systemctl restart ssh
+# Verificar sintaxis con: sshd -t
+
+# Puerto no estándar para reducir ruido de bots (22 va a Cowrie)
+Port 2200
+
+Protocol 2
+
+# Solo IPv4, IPv6 deshabilitado en sysctl
+AddressFamily inet
+
+# Autenticación solo por clave pública
+PermitRootLogin no
+PasswordAuthentication no
+ChallengeResponseAuthentication no
+PubkeyAuthentication yes
+AuthorizedKeysFile .ssh/authorized_keys
+
+KerberosAuthentication no
+GSSAPIAuthentication no
+UsePAM yes
+
+LoginGraceTime 30
+MaxAuthTries 3
+MaxSessions 5
+
+# Solo el usuario administrador del proyecto
+AllowUsers honeyml
+
+# Sin reenvío de puertos ni tunneling
+AllowTcpForwarding no
+AllowStreamLocalForwarding no
+GatewayPorts no
+X11Forwarding no
+PermitTunnel no
+PermitUserEnvironment no
+
+# Keepalive a nivel de aplicación (no TCP para evitar falsos positivos)
+ClientAliveInterval 300
+ClientAliveCountMax 2
+TCPKeepAlive no
+
+SyslogFacility AUTH
+LogLevel VERBOSE
+
+# Solo algoritmos modernos
+KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org,diffie-hellman-group14-sha256,diffie-hellman-group16-sha512
+Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com
+MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com
+
+PrintMotd no
+PrintLastLog yes
+Banner /etc/ssh/banner_honeyml
+AcceptEnv LANG LC_*
+
+# SFTP deshabilitado
+# Subsystem sftp /usr/lib/openssh/sftp-server
