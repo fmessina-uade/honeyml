@@ -96,8 +96,27 @@ if ! iptables -C DOCKER-USER -s "$HONEYPOT_NET" -d "$HONEYPOT_NET" -j ACCEPT 2>/
     log "  Tráfico intra-honeypot habilitado."
 fi
 
-# Persistir reglas iptables
-netfilter-persistent save 2>/dev/null || iptables-save > /etc/iptables/rules.v4
+mkdir -p /etc/iptables
+iptables-save > /etc/iptables/rules.v4
+
+cat > /etc/systemd/system/honeyml-iptables.service << 'SYSTEMD_EOF'
+[Unit]
+Description=HoneyML - Restaurar reglas DOCKER-USER al inicio
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c "iptables-restore --noflush < /etc/iptables/rules.v4"
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+SYSTEMD_EOF
+
+systemctl daemon-reload
+systemctl enable honeyml-iptables.service
+log "  Reglas iptables guardadas en /etc/iptables/rules.v4"
 
 log ""
 log "=== Configuración de firewall completada ==="

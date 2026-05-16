@@ -32,7 +32,8 @@ log "SO detectado: $(lsb_release -ds 2>/dev/null || uname -r)"
 log "[1/12] Actualizando paquetes del sistema..."
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get upgrade -y -qq
+apt-get dist-upgrade -y -qq
+apt-get -f install -y -qq
 apt-get autoremove -y -qq
 apt-get autoclean -qq
 
@@ -40,6 +41,8 @@ apt-get autoclean -qq
 # 2. Herramientas de seguridad y utilidades
 # ---------------------------------------------------------------------------
 log "[2/12] Instalando herramientas de seguridad..."
+echo "postfix postfix/main_mailer_type select No configuration" | debconf-set-selections
+echo "postfix postfix/mailname string $(hostname -f)" | debconf-set-selections
 apt-get install -y -qq \
     fail2ban \
     ufw \
@@ -56,8 +59,7 @@ apt-get install -y -qq \
     htop \
     vim \
     net-tools \
-    tcpdump \
-    iptables-persistent
+    tcpdump
 
 # ---------------------------------------------------------------------------
 # 3. Crear usuario administrador no-root
@@ -76,6 +78,10 @@ mkdir -p "/home/$ADMIN_USER/.ssh"
 chmod 700 "/home/$ADMIN_USER/.ssh"
 chown "$ADMIN_USER:$ADMIN_USER" "/home/$ADMIN_USER/.ssh"
 log "  Directorio .ssh creado. IMPORTANTE: copiar clave pública antes de continuar."
+
+echo "$ADMIN_USER ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/$ADMIN_USER"
+chmod 440 "/etc/sudoers.d/$ADMIN_USER"
+log "  Sudo NOPASSWD configurado para '$ADMIN_USER'."
 
 # ---------------------------------------------------------------------------
 # 4. Actualizaciones automáticas de seguridad
@@ -244,13 +250,5 @@ aideinit -y -f 2>/dev/null || aide --init 2>/dev/null || log "  AIDE: completar 
 log ""
 log "=== Hardening completado ==="
 log ""
-log "PASOS SIGUIENTES (ejecutar en orden):"
-log "  1. Copiar clave pública SSH al usuario '$ADMIN_USER':"
-log "     ssh-copy-id -i ~/.ssh/id_ed25519.pub ${ADMIN_USER}@<VPS_IP>"
-log "  2. Copiar configuración SSH hardened:"
-log "     cp infra/vps/configs/sshd_config /etc/ssh/sshd_config"
-log "     systemctl restart ssh"
-log "  3. Verificar acceso SSH en puerto 2200 antes de continuar."
-log "  4. Ejecutar: bash 02_firewall.sh"
-log ""
-log "ADVERTENCIA: No cerrar la sesión SSH actual hasta verificar acceso en puerto 2200."
+log "Siguiente: copiar clave publica a '$ADMIN_USER', aplicar sshd_config y ejecutar 02_firewall.sh"
+log "Verificar acceso en puerto 2200 antes de cerrar la sesion actual."
