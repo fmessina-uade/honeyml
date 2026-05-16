@@ -112,7 +112,7 @@ status:
 	@docker network inspect honeypot_net 2>/dev/null | grep -E '"Name"|"IPv4Address"' || echo "Red no creada"
 	@echo ""
 	@echo "=== Últimas entradas Cowrie ==="
-	@docker exec cowrie tail -5 /cowrie/cowrie-git/var/log/cowrie/cowrie.log 2>/dev/null || echo "Contenedor cowrie no activo"
+	@docker exec cowrie cat /cowrie/cowrie-git/var/log/cowrie/cowrie.log 2>/dev/null | tail -5 || echo "Contenedor cowrie no activo"
 
 clean:
 	docker compose -f $(COMPOSE_FILE) down -v
