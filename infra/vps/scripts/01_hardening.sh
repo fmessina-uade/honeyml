@@ -253,10 +253,21 @@ log "[12/13] Configurando SSH en puerto 2200..."
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SSHD_CONFIG_SRC="$SCRIPT_DIR/../configs/sshd_config"
+
+# El banner debe existir antes de que sshd -t lo valide
+cat > /etc/ssh/banner_honeyml << 'EOF'
+
+  Acceso restringido — sistema de investigacion de seguridad.
+  Toda actividad es monitoreada y registrada.
+
+EOF
+
 if [[ -f "$SSHD_CONFIG_SRC" ]]; then
     cp "$SSHD_CONFIG_SRC" /etc/ssh/sshd_config
+    # Actualizar AllowUsers para que coincida con el usuario admin real
+    sed -i "s/^AllowUsers.*/AllowUsers $ADMIN_USER/" /etc/ssh/sshd_config
     sshd -t || die "sshd_config inválido — verificar $SSHD_CONFIG_SRC"
-    log "  sshd_config hardened aplicado (Port 2200)."
+    log "  sshd_config hardened aplicado (Port 2200, AllowUsers $ADMIN_USER)."
 else
     log "  ADVERTENCIA: $SSHD_CONFIG_SRC no encontrado. Aplicar sshd_config manualmente."
 fi
