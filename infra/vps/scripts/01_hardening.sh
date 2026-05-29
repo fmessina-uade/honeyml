@@ -77,7 +77,16 @@ fi
 mkdir -p "/home/$ADMIN_USER/.ssh"
 chmod 700 "/home/$ADMIN_USER/.ssh"
 chown "$ADMIN_USER:$ADMIN_USER" "/home/$ADMIN_USER/.ssh"
-log "  Directorio .ssh creado. IMPORTANTE: copiar clave pública antes de continuar."
+
+# DigitalOcean añade las claves SSH del proyecto a root en el rebuild — las copiamos al admin
+if [[ -f /root/.ssh/authorized_keys ]]; then
+    cp /root/.ssh/authorized_keys "/home/$ADMIN_USER/.ssh/authorized_keys"
+    chmod 600 "/home/$ADMIN_USER/.ssh/authorized_keys"
+    chown "$ADMIN_USER:$ADMIN_USER" "/home/$ADMIN_USER/.ssh/authorized_keys"
+    log "  Clave pública copiada de root a '$ADMIN_USER'."
+else
+    log "  ADVERTENCIA: /root/.ssh/authorized_keys no encontrado. Copiar clave manualmente."
+fi
 
 echo "$ADMIN_USER ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/$ADMIN_USER"
 chmod 440 "/etc/sudoers.d/$ADMIN_USER"
@@ -227,8 +236,7 @@ cat > /etc/docker/daemon.json << 'EOF'
     },
     "no-new-privileges": true,
     "icc": false,
-    "live-restore": true,
-    "userland-proxy": false
+    "live-restore": true
 }
 EOF
 systemctl restart docker || true
@@ -239,16 +247,46 @@ if ! docker compose version &>/dev/null 2>&1; then
 fi
 
 # ---------------------------------------------------------------------------
-# 12. Inicializar AIDE (sistema de detección de intrusiones basado en archivos)
+# 12. SSH — config hardened y sin socket activation (estable en Ubuntu 24.04)
 # ---------------------------------------------------------------------------
-log "[12/12] Inicializando base de datos AIDE..."
+log "[12/13] Configurando SSH en puerto 2200..."
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SSHD_CONFIG_SRC="$SCRIPT_DIR/../configs/sshd_config"
+if [[ -f "$SSHD_CONFIG_SRC" ]]; then
+    cp "$SSHD_CONFIG_SRC" /etc/ssh/sshd_config
+    sshd -t || die "sshd_config inválido — verificar $SSHD_CONFIG_SRC"
+    log "  sshd_config hardened aplicado (Port 2200)."
+else
+    log "  ADVERTENCIA: $SSHD_CONFIG_SRC no encontrado. Aplicar sshd_config manualmente."
+fi
+
+# Ubuntu 24.04 usa socket activation para SSH por defecto, lo cual es frágil al reboot
+# cuando Docker también modifica iptables. Usamos el servicio directo para mayor estabilidad.
+systemctl stop ssh.socket 2>/dev/null || true
+systemctl disable ssh.socket 2>/dev/null || true
+systemctl unmask ssh 2>/dev/null || true
+systemctl enable ssh
+systemctl restart ssh
+sleep 2
+if ss -tlnp | grep -q ':2200 '; then
+    log "  OK — sshd escucha en puerto 2200 (servicio directo, sin socket activation)."
+else
+    log "  ADVERTENCIA — sshd no detectado en puerto 2200. Verificar manualmente antes de continuar."
+fi
+
+# ---------------------------------------------------------------------------
+# 13. Inicializar AIDE (sistema de detección de intrusiones basado en archivos)
+# ---------------------------------------------------------------------------
+log "[13/13] Inicializando base de datos AIDE..."
 aideinit -y -f 2>/dev/null || aide --init 2>/dev/null || log "  AIDE: completar manualmente con 'aideinit'"
 
 # ---------------------------------------------------------------------------
 # Resumen
 # ---------------------------------------------------------------------------
 log ""
-log "=== Hardening completado ==="
+log "=== Hardening completado (13/13 pasos) ==="
 log ""
-log "Siguiente: copiar clave publica a '$ADMIN_USER', aplicar sshd_config y ejecutar 02_firewall.sh"
-log "Verificar acceso en puerto 2200 antes de cerrar la sesion actual."
+log "SSH listo en puerto 2200. Verificar acceso con otra terminal antes de continuar:"
+log "  ssh -p 2200 -i ~/.ssh/honeyml_ed25519 $ADMIN_USER@<IP>"
+log "Siguiente: ejecutar 02_firewall.sh"

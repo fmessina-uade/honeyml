@@ -96,18 +96,49 @@ if ! iptables -C DOCKER-USER -s "$HONEYPOT_NET" -d "$HONEYPOT_NET" -j ACCEPT 2>/
     log "  Tráfico intra-honeypot habilitado."
 fi
 
-mkdir -p /etc/iptables
-iptables-save > /etc/iptables/rules.v4
+# Script dedicado: solo aplica las reglas custom de DOCKER-USER, sin tocar las de Docker.
+# iptables-save/restore completo genera conflictos al reboot porque Docker regenera sus
+# propias reglas y quedan duplicadas o en orden incorrecto con las restauradas.
+cat > /usr/local/bin/honeyml-docker-rules.sh << RULES_EOF
+#!/bin/bash
+HONEYPOT_NET="${HONEYPOT_NET}"
+
+# Esperar hasta que Docker cree la cadena DOCKER-USER (máx 30s)
+for i in \$(seq 1 15); do
+    iptables -L DOCKER-USER -n &>/dev/null && break
+    sleep 2
+done
+
+if ! iptables -L DOCKER-USER -n &>/dev/null; then
+    echo "ERROR: DOCKER-USER chain no disponible tras 30s" >&2
+    exit 1
+fi
+
+# Permitir tráfico intra-honeypot (requerido para sidecar de Fase 2)
+if ! iptables -C DOCKER-USER -s "\$HONEYPOT_NET" -d "\$HONEYPOT_NET" -j ACCEPT 2>/dev/null; then
+    iptables -I DOCKER-USER 1 -s "\$HONEYPOT_NET" -d "\$HONEYPOT_NET" -j ACCEPT
+fi
+
+# Bloquear egress de la red honeypot hacia internet (evita uso como pivot)
+if ! iptables -C DOCKER-USER -s "\$HONEYPOT_NET" -o eth0 -j DROP 2>/dev/null; then
+    iptables -I DOCKER-USER 2 -s "\$HONEYPOT_NET" -o eth0 -j DROP
+fi
+
+echo "HoneyML DOCKER-USER rules applied OK"
+RULES_EOF
+
+chmod +x /usr/local/bin/honeyml-docker-rules.sh
+/usr/local/bin/honeyml-docker-rules.sh
 
 cat > /etc/systemd/system/honeyml-iptables.service << 'SYSTEMD_EOF'
 [Unit]
-Description=HoneyML - Restaurar reglas DOCKER-USER al inicio
+Description=HoneyML - Reglas de aislamiento DOCKER-USER
 After=docker.service
 Requires=docker.service
 
 [Service]
 Type=oneshot
-ExecStart=/bin/sh -c "iptables-restore --noflush < /etc/iptables/rules.v4"
+ExecStart=/usr/local/bin/honeyml-docker-rules.sh
 RemainAfterExit=yes
 
 [Install]
@@ -116,7 +147,7 @@ SYSTEMD_EOF
 
 systemctl daemon-reload
 systemctl enable honeyml-iptables.service
-log "  Reglas iptables guardadas en /etc/iptables/rules.v4"
+log "  Reglas DOCKER-USER aplicadas y servicio de persistencia configurado."
 
 log ""
 log "=== Configuración de firewall completada ==="
