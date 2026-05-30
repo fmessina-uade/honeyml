@@ -86,7 +86,7 @@ log "[5/5] Aplicando reglas de aislamiento Docker..."
 # DOCKER-USER se evalúa antes que las reglas de Docker y no se sobreescribe al reiniciar el daemon
 # Bloquear egress de la red honeypot (evita que un atacante use el contenedor como pivot)
 if ! iptables -C DOCKER-USER -s "$HONEYPOT_NET" -o eth0 -j DROP 2>/dev/null; then
-    iptables -I DOCKER-USER 1 -s "$HONEYPOT_NET" -o eth0 -j DROP
+    iptables -I DOCKER-USER 3 -s "$HONEYPOT_NET" -o eth0 -j DROP
     log "  Regla de egress honeypot aplicada."
 fi
 
@@ -94,6 +94,13 @@ fi
 if ! iptables -C DOCKER-USER -s "$HONEYPOT_NET" -d "$HONEYPOT_NET" -j ACCEPT 2>/dev/null; then
     iptables -I DOCKER-USER 1 -s "$HONEYPOT_NET" -d "$HONEYPOT_NET" -j ACCEPT
     log "  Tráfico intra-honeypot habilitado."
+fi
+
+# Permitir tráfico de RETORNO (ESTABLISHED/RELATED) hacia internet
+# Sin esta regla los SYN-ACK de respuesta son dropeados y el handshake TCP nunca completa.
+if ! iptables -C DOCKER-USER -s "$HONEYPOT_NET" -o eth0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null; then
+    iptables -I DOCKER-USER 2 -s "$HONEYPOT_NET" -o eth0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+    log "  Tráfico de retorno ESTABLISHED/RELATED habilitado."
 fi
 
 # Script dedicado: solo aplica las reglas custom de DOCKER-USER, sin tocar las de Docker.
@@ -119,9 +126,16 @@ if ! iptables -C DOCKER-USER -s "\$HONEYPOT_NET" -d "\$HONEYPOT_NET" -j ACCEPT 2
     iptables -I DOCKER-USER 1 -s "\$HONEYPOT_NET" -d "\$HONEYPOT_NET" -j ACCEPT
 fi
 
-# Bloquear egress de la red honeypot hacia internet (evita uso como pivot)
+# Permitir tráfico de RETORNO (ESTABLISHED/RELATED) de la red honeypot hacia internet
+# Sin esta regla, los SYN-ACK de respuesta a conexiones entrantes son dropeados,
+# impidiendo que se complete el handshake TCP y que Cowrie/Dionaea registren conexiones.
+if ! iptables -C DOCKER-USER -s "\$HONEYPOT_NET" -o eth0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null; then
+    iptables -I DOCKER-USER 2 -s "\$HONEYPOT_NET" -o eth0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+fi
+
+# Bloquear egress NUEVO de la red honeypot hacia internet (evita uso como pivot)
 if ! iptables -C DOCKER-USER -s "\$HONEYPOT_NET" -o eth0 -j DROP 2>/dev/null; then
-    iptables -I DOCKER-USER 2 -s "\$HONEYPOT_NET" -o eth0 -j DROP
+    iptables -I DOCKER-USER 3 -s "\$HONEYPOT_NET" -o eth0 -j DROP
 fi
 
 echo "HoneyML DOCKER-USER rules applied OK"
