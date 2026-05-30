@@ -266,6 +266,7 @@ if [[ -f "$SSHD_CONFIG_SRC" ]]; then
     cp "$SSHD_CONFIG_SRC" /etc/ssh/sshd_config
     # Actualizar AllowUsers para que coincida con el usuario admin real
     sed -i "s/^AllowUsers.*/AllowUsers $ADMIN_USER/" /etc/ssh/sshd_config
+    mkdir -p /run/sshd  # requerido por sshd -t en sistemas recién instalados
     sshd -t || die "sshd_config inválido — verificar $SSHD_CONFIG_SRC"
     log "  sshd_config hardened aplicado (Port 2200, AllowUsers $ADMIN_USER)."
 else
