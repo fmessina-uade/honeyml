@@ -53,6 +53,9 @@ secrets/
 id_rsa
 id_rsa.pub
 id_ed25519
+
+# Helper local para cargar la clave SSH desde secrets/ (tooling personal, no del proyecto)
+scripts/load_ssh_key.sh
 id_ed25519.pub
 id_ecdsa
 id_ecdsa.pub

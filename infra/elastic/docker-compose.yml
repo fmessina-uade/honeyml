@@ -1,0 +1,157 @@
+services:
+
+  # Elasticsearch — almacenamiento e indexación de telemetría normalizada a ECS
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION:-8.17.3}
+    container_name: elasticsearch
+    hostname: elasticsearch
+    restart: unless-stopped
+    environment:
+      - node.name=es01
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      # Seguridad deshabilitada: el acceso es solo por túnel SSH a 127.0.0.1 (dashboard privado,
+      # ver ADR-031). No se expone a internet. En un despliegue público habría que activar xpack.
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - "ES_JAVA_OPTS=-Xms${ES_HEAP:-1g} -Xmx${ES_HEAP:-1g}"
+      - cluster.routing.allocation.disk.threshold_enabled=true
+      - cluster.routing.allocation.disk.watermark.low=90%
+      - cluster.routing.allocation.disk.watermark.high=95%
+      - cluster.routing.allocation.disk.watermark.flood_stage=97%
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    # Bind a loopback: nunca expuesto a la interfaz pública del VPS
+    ports:
+      - "127.0.0.1:9200:9200"
+    networks:
+      - elastic_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health | grep -qE '\"status\":\"(green|yellow)\"'"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+    mem_limit: ${ES_MEM_LIMIT:-2g}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Logstash — normalización semántica de eventos de honeypot al Elastic Common Schema (ECS)
+  logstash:
+    image: docker.elastic.co/logstash/logstash:${ELASTIC_VERSION:-8.17.3}
+    container_name: logstash
+    hostname: logstash
+    restart: unless-stopped
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      # No pasar env vars con nombre de setting de Logstash (p.ej. PIPELINE_WORKERS): el entrypoint
+      # reescribiria logstash.yml, montado de solo lectura. pipeline.workers queda en su default
+      # (nº de CPUs); LS_JAVA_OPTS no es un setting, se aplica directo.
+      - "LS_JAVA_OPTS=-Xmx${LS_HEAP:-512m} -Xms${LS_HEAP:-512m}"
+    volumes:
+      - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+      - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
+    ports:
+      - "127.0.0.1:5044:5044"   # beats input
+    networks:
+      - elastic_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9600/_node/pipelines | grep -q main || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    mem_limit: ${LS_MEM_LIMIT:-1g}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Kibana — dashboard analítico con fines educativos (OE6). Acceso privado por túnel SSH.
+  kibana:
+    image: docker.elastic.co/kibana/kibana:${ELASTIC_VERSION:-8.17.3}
+    container_name: kibana
+    hostname: kibana
+    restart: unless-stopped
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PUBLICBASEURL=http://localhost:5601
+      - TELEMETRY_OPTIN=false
+      - TELEMETRY_ENABLED=false
+    ports:
+      - "127.0.0.1:5601:5601"
+    networks:
+      - elastic_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5601/api/status | grep -q '\"level\":\"available\"' || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 15
+      start_period: 90s
+    mem_limit: ${KB_MEM_LIMIT:-1g}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Filebeat — shipper: tail de los logs JSON de los honeypots hacia Logstash
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:${ELASTIC_VERSION:-8.17.3}
+    container_name: filebeat
+    hostname: filebeat
+    restart: unless-stopped
+    user: root
+    depends_on:
+      logstash:
+        condition: service_healthy
+    command: ["--strict.perms=false"]
+    volumes:
+      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - filebeat_data:/usr/share/filebeat/data
+      # Volúmenes de logs de los honeypots (definidos externamente por infra/honeypots)
+      - honeypots_cowrie_logs:/logs/cowrie:ro
+      - honeypots_dionaea_var:/logs/dionaea:ro
+    networks:
+      - elastic_net
+    mem_limit: ${FB_MEM_LIMIT:-256m}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  elastic_net:
+    name: elastic_net
+    driver: bridge
+
+volumes:
+  es_data:
+    name: elastic_es_data
+  filebeat_data:
+    name: elastic_filebeat_data
+  # Volúmenes creados por infra/honeypots/docker-compose.yml — se consumen en modo lectura
+  honeypots_cowrie_logs:
+    external: true
+    name: honeypots_cowrie_logs
+  honeypots_dionaea_var:
+    external: true
+    name: honeypots_dionaea_var

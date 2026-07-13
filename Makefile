@@ -1,10 +1,15 @@
-.PHONY: help up down logs status ps clean deploy-vps dev-up dev-down dev-logs validate lint test
+.PHONY: help up down logs status ps clean deploy-vps dev-up dev-down dev-logs validate lint test \
+        elastic-up elastic-down elastic-logs elastic-dev-up elastic-dev-down elastic-dev-logs \
+        es-bootstrap validate-indexing pull-logs
 
 COMPOSE_FILE = infra/honeypots/docker-compose.yml
 COMPOSE_DEV  = infra/honeypots/docker-compose.dev.yml
+ELASTIC_FILE = infra/elastic/docker-compose.yml
+ELASTIC_DEV  = infra/elastic/docker-compose.dev.yml
 VPS_IP       ?= $(shell cat .vps_ip 2>/dev/null || echo "")
 SSH_PORT     ?= 2200
 SSH_USER     ?= honeyml
+SSH_KEY      ?= ~/.ssh/honeyml_ed25519_v2
 
 help:
 	@echo ""
@@ -19,6 +24,14 @@ help:
 	@echo "    make dev-up    Levantar honeypots en local (Cowrie:2222, Dionaea:8080)"
 	@echo "    make dev-down  Detener entorno local"
 	@echo "    make dev-logs  Ver logs del entorno local"
+	@echo ""
+	@echo "  Pipeline de datos (Fase 2 — Elastic Stack + ECS):"
+	@echo "    make pull-logs        Bajar logs reales del VPS a data/logs/"
+	@echo "    make elastic-dev-up   Levantar Elastic Stack en local (ES/Kibana/Logstash/Filebeat)"
+	@echo "    make elastic-dev-down Detener el stack local"
+	@echo "    make es-bootstrap     Aplicar plantilla componible ECS a Elasticsearch"
+	@echo "    make validate-indexing  Validar indexación y normalización ECS"
+	@echo "    make elastic-up       Levantar el stack en el VPS (producción)"
 	@echo ""
 	@echo "  Producción (VPS):"
 	@echo "    make up        Iniciar contenedores en el VPS (puertos reales)"
@@ -128,3 +141,58 @@ endif
 		$(SSH_USER)@$(VPS_IP):/home/$(SSH_USER)/honeyml/infra/
 	@echo "Archivos de infraestructura copiados al VPS $(VPS_IP)"
 	@echo "Siguiente paso: ssh -p $(SSH_PORT) $(SSH_USER)@$(VPS_IP)"
+
+# --- Pipeline de datos: Elastic Stack + ECS (Fase 2) ---
+
+# Baja los logs crudos de Cowrie desde el volumen Docker del VPS a data/logs/cowrie/.
+# Requiere clave SSH admin. Usa sudo remoto para leer el volumen (owner root).
+pull-logs:
+ifndef VPS_IP
+	$(error VPS_IP no definido. Crear archivo .vps_ip o exportar: export VPS_IP=<ip>)
+endif
+	@mkdir -p data/logs/cowrie data/logs/dionaea
+	rsync -avz --progress --rsync-path="sudo rsync" \
+		-e "ssh -p $(SSH_PORT) -i $(SSH_KEY) -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
+		$(SSH_USER)@$(VPS_IP):/var/lib/docker/volumes/honeypots_cowrie_logs/_data/ \
+		data/logs/cowrie/
+	@echo "Logs de Cowrie descargados en data/logs/cowrie/"
+
+elastic-dev-up:
+	@if [ ! -f infra/elastic/.env ]; then cp infra/elastic/.env.example infra/elastic/.env; echo "Creado infra/elastic/.env desde el ejemplo."; fi
+	# Arrancar almacenamiento/procesado y aplicar la plantilla ECS ANTES de Filebeat,
+	# para que los índices se creen con los tipos ECS correctos (evita el race de mapeo).
+	docker compose --env-file infra/elastic/.env -f $(ELASTIC_FILE) -f $(ELASTIC_DEV) up -d elasticsearch logstash kibana
+	@ES_URL=http://localhost:9200 bash infra/elastic/scripts/es_bootstrap.sh
+	docker compose --env-file infra/elastic/.env -f $(ELASTIC_FILE) -f $(ELASTIC_DEV) up -d filebeat
+	@echo ""
+	@echo "Elastic Stack local iniciado:"
+	@echo "  Elasticsearch → http://localhost:9200"
+	@echo "  Kibana        → http://localhost:5601"
+	@echo ""
+	@echo "Siguiente: make validate-indexing"
+
+elastic-dev-down:
+	docker compose -f $(ELASTIC_FILE) -f $(ELASTIC_DEV) down --remove-orphans
+
+elastic-dev-logs:
+	docker compose -f $(ELASTIC_FILE) -f $(ELASTIC_DEV) logs -f --tail=80
+
+elastic-up:
+	@if [ ! -f infra/elastic/.env ]; then cp infra/elastic/.env.example infra/elastic/.env; fi
+	docker compose --env-file infra/elastic/.env -f $(ELASTIC_FILE) up -d elasticsearch logstash kibana
+	@ES_URL=http://localhost:9200 bash infra/elastic/scripts/es_bootstrap.sh
+	docker compose --env-file infra/elastic/.env -f $(ELASTIC_FILE) up -d filebeat
+	@echo "Elastic Stack iniciado en el VPS. Acceso privado por túnel SSH:"
+	@echo "  ssh -L 5601:localhost:5601 -L 9200:localhost:9200 -p $(SSH_PORT) $(SSH_USER)@$(VPS_IP)"
+
+elastic-down:
+	docker compose -f $(ELASTIC_FILE) down
+
+elastic-logs:
+	docker compose -f $(ELASTIC_FILE) logs -f --tail=100
+
+es-bootstrap:
+	@ES_URL=$${ES_URL:-http://localhost:9200} bash infra/elastic/scripts/es_bootstrap.sh
+
+validate-indexing:
+	@python3 infra/elastic/scripts/validate_indexing.py --es-url $${ES_URL:-http://localhost:9200}

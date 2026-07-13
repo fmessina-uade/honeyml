@@ -65,6 +65,8 @@ services:
     volumes:
       # Montar /opt/dionaea/var/ completo: init_lib/init_log del entrypoint necesitan
       # encontrar el directorio vacío para crear la estructura con ownership dionaea:dionaea
+      # Config personalizada (logging acotado, log_json, SIP/pptp off) horneada en la imagen
+      # vía el Dockerfile (COPY al template/). No bind-montar sobre /opt/dionaea/etc: rompe init_etc.
       - dionaea_var:/opt/dionaea/var
     healthcheck:
       # nc no está en la imagen; bash /dev/tcp no necesita binario externo

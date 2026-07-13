@@ -1,0 +1,48 @@
+# Filebeat — producción. Tail de los logs JSON de los honeypots hacia Logstash.
+# Los volúmenes de honeypot se montan en modo lectura (ver docker-compose.yml).
+
+filebeat.inputs:
+  # Cowrie — SSH/Telnet honeypot. Su salida jsonlog escribe un evento por línea.
+  - type: filestream
+    id: cowrie-json
+    enabled: true
+    paths:
+      - /logs/cowrie/cowrie.json
+      - /logs/cowrie/cowrie.json.*
+    parsers:
+      - ndjson:
+          target: ""
+          overwrite_keys: true
+          add_error_key: true
+    fields_under_root: true
+    fields:
+      honeypot: cowrie
+
+  # Dionaea — multiprotocolo. El ihandler log_json viene habilitado en la imagen (Dockerfile).
+  # Si el archivo aún no existe, este input simplemente no encuentra nada (no falla).
+  - type: filestream
+    id: dionaea-json
+    enabled: true
+    paths:
+      # El volumen honeypots_dionaea_var (=/opt/dionaea/var) se monta en /logs/dionaea.
+      # log_json escribe en var/lib/dionaea/dionaea.json -> /logs/dionaea/lib/dionaea/dionaea.json
+      - /logs/dionaea/lib/dionaea/dionaea.json
+    parsers:
+      - ndjson:
+          target: ""
+          overwrite_keys: true
+          add_error_key: true
+    fields_under_root: true
+    fields:
+      honeypot: dionaea
+
+# Filebeat solo transporta; la normalización ECS se hace en Logstash.
+output.logstash:
+  hosts: ["logstash:5044"]
+
+logging.level: info
+logging.to_files: false
+
+# Sin autoconfiguración de índices/dashboards: el modelado lo controla Logstash + la plantilla.
+setup.ilm.enabled: false
+setup.template.enabled: false

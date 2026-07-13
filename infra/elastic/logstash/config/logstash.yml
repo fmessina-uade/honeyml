@@ -1,0 +1,6 @@
+http.host: "0.0.0.0"
+# Deshabilitar monitoring por X-Pack (seguridad off, entorno privado)
+xpack.monitoring.enabled: false
+# El pipeline principal se define por archivos en /usr/share/logstash/pipeline
+pipeline.ordered: auto
+log.level: info

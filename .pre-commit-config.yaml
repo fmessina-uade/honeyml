@@ -6,7 +6,8 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
-        args: [--allow-multiple-documents]
+        # --unsafe: valida sintaxis sin construir tags custom (docker-compose usa !override)
+        args: [--allow-multiple-documents, --unsafe]
       - id: check-json
       - id: check-toml
       - id: check-merge-conflict

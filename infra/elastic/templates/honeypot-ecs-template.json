@@ -1,0 +1,107 @@
+{
+  "index_patterns": ["honeypot-*"],
+  "priority": 200,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "refresh_interval": "5s"
+    },
+    "mappings": {
+      "dynamic_templates": [
+        {
+          "strings_as_keyword": {
+            "match_mapping_type": "string",
+            "mapping": { "type": "keyword", "ignore_above": 8191 }
+          }
+        }
+      ],
+      "properties": {
+        "@timestamp":   { "type": "date" },
+        "message":      { "type": "text" },
+        "honeypot":     { "type": "keyword" },
+
+        "ecs":          { "properties": { "version": { "type": "keyword" } } },
+
+        "event": {
+          "properties": {
+            "module":   { "type": "keyword" },
+            "dataset":  { "type": "keyword" },
+            "kind":     { "type": "keyword" },
+            "category": { "type": "keyword" },
+            "type":     { "type": "keyword" },
+            "action":   { "type": "keyword" },
+            "outcome":  { "type": "keyword" },
+            "provider": { "type": "keyword" },
+            "duration": { "type": "long" }
+          }
+        },
+
+        "source": {
+          "properties": {
+            "ip":   { "type": "ip" },
+            "port": { "type": "long" }
+          }
+        },
+        "destination": {
+          "properties": {
+            "ip":   { "type": "ip" },
+            "port": { "type": "long" }
+          }
+        },
+        "network": {
+          "properties": {
+            "protocol":  { "type": "keyword" },
+            "transport": { "type": "keyword" }
+          }
+        },
+        "observer": {
+          "properties": {
+            "type":   { "type": "keyword" },
+            "vendor": { "type": "keyword" },
+            "name":   { "type": "keyword" }
+          }
+        },
+        "user": {
+          "properties": {
+            "name": { "type": "keyword" }
+          }
+        },
+        "related": {
+          "properties": {
+            "ip":   { "type": "ip" },
+            "user": { "type": "keyword" }
+          }
+        },
+        "process": {
+          "properties": {
+            "command_line": { "type": "wildcard" }
+          }
+        },
+        "url": {
+          "properties": {
+            "original": { "type": "wildcard" }
+          }
+        },
+        "file": {
+          "properties": {
+            "name": { "type": "keyword" },
+            "hash": { "properties": { "sha256": { "type": "keyword" } } }
+          }
+        },
+
+        "cowrie": {
+          "properties": {
+            "session":          { "type": "keyword" },
+            "uuid":             { "type": "keyword" },
+            "password":         { "type": "keyword", "ignore_above": 1024 },
+            "client_version":   { "type": "keyword", "ignore_above": 1024 },
+            "hassh":            { "type": "keyword" },
+            "outfile":          { "type": "keyword", "ignore_above": 2048 },
+            "duration_seconds": { "type": "float" }
+          }
+        }
+      }
+    }
+  }
+}

@@ -28,12 +28,23 @@ jobs:
           scandir: ./scripts
           severity: warning
 
+      - name: shellcheck — scripts del Elastic Stack
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: ./infra/elastic/scripts
+          severity: warning
+
       - name: yamllint — archivos de configuración
         run: |
           pip install yamllint --quiet
           yamllint \
             infra/honeypots/docker-compose.yml \
             infra/honeypots/docker-compose.dev.yml \
+            infra/elastic/docker-compose.yml \
+            infra/elastic/docker-compose.dev.yml \
+            infra/elastic/filebeat/filebeat.yml \
+            infra/elastic/filebeat/filebeat.dev.yml \
+            infra/elastic/logstash/config/logstash.yml \
             .github/workflows/ci.yml
 
       - name: Docker Compose config — validar sintaxis
@@ -44,6 +55,11 @@ jobs:
           docker compose \
             -f infra/honeypots/docker-compose.yml \
             -f infra/honeypots/docker-compose.dev.yml \
+            config --quiet
+          docker compose \
+            --env-file infra/elastic/.env.example \
+            -f infra/elastic/docker-compose.yml \
+            -f infra/elastic/docker-compose.dev.yml \
             config --quiet
 
   # --------------------------------------------------------------------------
