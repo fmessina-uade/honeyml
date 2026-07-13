@@ -250,6 +250,9 @@ data/external/
 *.csv
 *.parquet
 *.arrow
+
+# Figuras generadas por el EDA (reproducibles con src/honeyml/eda/honeypot_eda.py)
+reports/figures/
 *.jsonl.gz
 
 # =============================================================================
