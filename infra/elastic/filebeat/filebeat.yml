@@ -1,8 +1,8 @@
-# Filebeat — producción. Tail de los logs JSON de los honeypots hacia Logstash.
-# Los volúmenes de honeypot se montan en modo lectura (ver docker-compose.yml).
+# Filebeat, production. Tails the honeypots' JSON logs into Logstash.
+# The honeypot volumes are mounted read-only (see docker-compose.yml).
 
 filebeat.inputs:
-  # Cowrie — SSH/Telnet honeypot. Su salida jsonlog escribe un evento por línea.
+  # Cowrie SSH/Telnet honeypot. Its jsonlog output writes one event per line.
   - type: filestream
     id: cowrie-json
     enabled: true
@@ -18,14 +18,14 @@ filebeat.inputs:
     fields:
       honeypot: cowrie
 
-  # Dionaea — multiprotocolo. El ihandler log_json viene habilitado en la imagen (Dockerfile).
-  # Si el archivo aún no existe, este input simplemente no encuentra nada (no falla).
+  # Dionaea, multiprotocol. The log_json ihandler is baked into the image (Dockerfile).
+  # If the file doesn't exist yet, this input just finds nothing (no failure).
   - type: filestream
     id: dionaea-json
     enabled: true
     paths:
-      # El volumen honeypots_dionaea_var (=/opt/dionaea/var) se monta en /logs/dionaea.
-      # log_json escribe en var/lib/dionaea/dionaea.json -> /logs/dionaea/lib/dionaea/dionaea.json
+      # the honeypots_dionaea_var volume (=/opt/dionaea/var) is mounted at /logs/dionaea.
+      # log_json writes to var/lib/dionaea/dionaea.json -> /logs/dionaea/lib/dionaea/dionaea.json
       - /logs/dionaea/lib/dionaea/dionaea.json
     parsers:
       - ndjson:
@@ -36,13 +36,13 @@ filebeat.inputs:
     fields:
       honeypot: dionaea
 
-# Filebeat solo transporta; la normalización ECS se hace en Logstash.
+# Filebeat only ships; the ECS normalization happens in Logstash.
 output.logstash:
   hosts: ["logstash:5044"]
 
 logging.level: info
 logging.to_files: false
 
-# Sin autoconfiguración de índices/dashboards: el modelado lo controla Logstash + la plantilla.
+# no auto index/dashboard setup: Logstash + the template own the mapping.
 setup.ilm.enabled: false
 setup.template.enabled: false

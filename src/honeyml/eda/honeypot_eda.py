@@ -1,10 +1,10 @@
-"""Análisis exploratorio de la telemetría de honeypots normalizada a ECS (Fase 2, Obj. 2).
+"""Exploratory analysis of the ECS-normalized honeypot telemetry.
 
-Cubre las tareas del Gantt: limpieza (duplicados, nulos, outliers), distribución de clases de
-ataque y matriz de correlación. Trabaja sobre el parquet extraído de Elasticsearch
-(data/processed/honeypot_events.parquet) y guarda figuras en reports/figures/.
+Cleaning (dups, nulls, outliers), attack class distribution and a correlation matrix. Reads the
+parquet extracted from Elasticsearch (data/processed/honeypot_events.parquet) and writes figures
+to reports/figures/. Report text and figure labels stay in Spanish since they feed the thesis.
 
-Uso:
+Usage:
     python -m src.honeyml.eda.honeypot_eda
 """
 
@@ -14,7 +14,7 @@ from pathlib import Path
 
 import matplotlib
 
-matplotlib.use("Agg")  # backend sin display, para guardar figuras
+matplotlib.use("Agg")  # headless backend, we only save figures
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
@@ -22,8 +22,8 @@ import seaborn as sns
 PARQUET = Path("data/processed/honeypot_events.parquet")
 FIG_DIR = Path("reports/figures")
 
-# Mapeo de acciones de Cowrie a etapas de ataque (taxonomía simplificada, previa a MITRE ATT&CK,
-# que se aplica formalmente sobre UWF-ZeekData24 para el modelo supervisado del Obj. 4).
+# Cowrie actions grouped into attack stages. Rough taxonomy, before the real MITRE ATT&CK labels
+# that come from UWF-ZeekData24 for the supervised model. Spanish labels on purpose (thesis).
 STAGE_BY_ACTION = {
     "session-connect": "Reconocimiento",
     "session-closed": "Reconocimiento",
@@ -40,7 +40,7 @@ STAGE_BY_ACTION = {
 }
 
 
-LOCAL_IP = "127.0.0.1"  # healthchecks del propio contenedor (no son tráfico de atacantes)
+LOCAL_IP = "127.0.0.1"  # the container's own healthchecks, not attacker traffic
 
 
 def load() -> pd.DataFrame:
@@ -50,18 +50,18 @@ def load() -> pd.DataFrame:
 
 
 def clean(df: pd.DataFrame) -> pd.DataFrame:
-    """Aplica y reporta la limpieza; devuelve el DataFrame depurado."""
+    """Run and report the cleaning; return the cleaned DataFrame."""
     print("\n" + "=" * 70)
     print("LIMPIEZA DE DATOS")
     print("=" * 70)
     print(f"Eventos crudos:             {len(df):,}")
 
-    # 1. Healthchecks locales: conexiones del contenedor a sí mismo, no son ataques.
+    # 1. local healthchecks: container talking to itself, not attacks
     hc = (df["source.ip"] == LOCAL_IP).sum()
     df = df[df["source.ip"] != LOCAL_IP].copy()
     print(f"Healthchecks 127.0.0.1:     -{hc:,} eliminados")
 
-    # 2. Duplicados exactos residuales (el pipeline ya deduplica por fingerprint/document_id).
+    # 2. leftover exact dups (the pipeline already dedups by fingerprint/document_id)
     dup = df.duplicated().sum()
     df = df.drop_duplicates().reset_index(drop=True)
     print(f"Duplicados exactos:         -{dup:,} eliminados")
@@ -69,13 +69,13 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
     print(f"Eventos de ataque limpios:  {len(df):,}")
     print(f"Rango temporal:             {df['@timestamp'].min()}  ->  {df['@timestamp'].max()}")
 
-    # Nulos: esperables y semánticos (cada tipo de evento puebla distintos campos).
+    # nulls are expected and semantic: each event type fills different fields
     print("\nNulos por campo (%):")
     nulls = (df.isna().mean() * 100).round(1).sort_values(ascending=False)
     for col, pct in nulls.items():
         print(f"  {col:<24} {pct:5.1f}%")
 
-    # Outliers de duración de sesión (solo eventos session-closed con duración).
+    # session-duration outliers (only session-closed events carry a duration)
     dur = df.loc[df["event.duration"].notna(), "event.duration"] / 1e9  # ns -> s
     if len(dur):
         q1, q3 = dur.quantile(0.25), dur.quantile(0.75)
@@ -107,7 +107,7 @@ def class_distribution(df: pd.DataFrame) -> None:
     for stage, n in stages.items():
         print(f"  {n:>7,}  ({n / len(df) * 100:4.1f}%)  {stage}")
 
-    # Figura: distribución por etapa
+    # figure: events per attack stage
     FIG_DIR.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(figsize=(8, 4.5))
     stages.sort_values().plot.barh(ax=ax, color="#D4860A")
@@ -137,7 +137,7 @@ def attacker_summary(df: pd.DataFrame) -> None:
 
 
 def correlation_matrix(df: pd.DataFrame) -> None:
-    """Matriz de correlación sobre features agregadas por IP (base del feature engineering)."""
+    """Correlation matrix over per-IP features (the base for feature engineering)."""
     print("\n" + "=" * 70)
     print("MATRIZ DE CORRELACIÓN (features agregadas por IP)")
     print("=" * 70)

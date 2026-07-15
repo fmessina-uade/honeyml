@@ -1,7 +1,7 @@
-"""Carga de los logs crudos JSON de Cowrie hacia un DataFrame de pandas.
+"""Load Cowrie's raw JSON logs into a pandas DataFrame.
 
-Lee los archivos cowrie.json* capturados por el honeypot (un evento JSON por línea) sin depender
-de que el stack de Elasticsearch esté corriendo. Es la fuente ground-truth para el EDA offline.
+Reads the cowrie.json* files the honeypot writes (one JSON event per line) without needing the
+Elastic Stack up. This is the ground-truth source for offline EDA.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from typing import Any
 
 import pandas as pd
 
-# Campos relevantes de Cowrie para el análisis (el resto se descarta para no inflar memoria).
+# Cowrie fields we care about (the rest is dropped to keep memory down).
 FIELDS = [
     "eventid",
     "timestamp",
@@ -37,13 +37,13 @@ def load_cowrie(
     pattern: str = "cowrie.json*",
     drop_local: bool = True,
 ) -> pd.DataFrame:
-    """Lee todos los cowrie.json* de un directorio a un DataFrame.
+    """Read all cowrie.json* files in a directory into a DataFrame.
 
     Parameters
     ----------
-    logs_dir : directorio con los archivos cowrie.json*.
-    pattern : glob de archivos a leer.
-    drop_local : si True, descarta eventos de 127.0.0.1 (healthchecks del contenedor).
+    logs_dir : directory holding the cowrie.json* files.
+    pattern : glob of files to read.
+    drop_local : if True, drop 127.0.0.1 events (the container's own healthchecks).
     """
     logs_dir = Path(logs_dir)
     rows: list[dict[str, Any]] = []
@@ -68,7 +68,7 @@ def load_cowrie(
 
 if __name__ == "__main__":
     df = load_cowrie()
-    print(f"Eventos externos cargados: {len(df):,}")
-    print(f"Rango temporal: {df['timestamp'].min()}  ->  {df['timestamp'].max()}")
-    print(f"IPs únicas: {df['src_ip'].nunique():,}")
+    print(f"External events loaded: {len(df):,}")
+    print(f"Time range: {df['timestamp'].min()}  ->  {df['timestamp'].max()}")
+    print(f"Unique IPs: {df['src_ip'].nunique():,}")
     print(df["eventid"].value_counts().head(10))

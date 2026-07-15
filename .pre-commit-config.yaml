@@ -1,12 +1,12 @@
 repos:
-  # Hooks estándar de pre-commit
+  # standard pre-commit hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
-        # --unsafe: valida sintaxis sin construir tags custom (docker-compose usa !override)
+        # --unsafe: check syntax without building custom tags (docker-compose uses !override)
         args: [--allow-multiple-documents, --unsafe]
       - id: check-json
       - id: check-toml
@@ -15,7 +15,7 @@ repos:
       - id: check-added-large-files
         args: [--maxkb=500]
 
-  # shellcheck — linting de scripts bash (usa el binario del sistema: brew install shellcheck)
+  # shellcheck: lints bash scripts (uses the system binary: brew install shellcheck)
   - repo: local
     hooks:
       - id: shellcheck
@@ -25,14 +25,14 @@ repos:
         args: [--severity=warning]
         files: \.sh$
 
-  # yamllint — validación de YAML
+  # yamllint: YAML validation
   - repo: https://github.com/adrienverge/yamllint
     rev: v1.35.1
     hooks:
       - id: yamllint
         args: [--config-file=.yamllint.yml]
 
-  # ruff — linting y formato Python (reemplaza flake8 + isort + pyupgrade)
+  # ruff - linting y formato Python (reemplaza flake8 + isort + pyupgrade)
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.9.10
     hooks:
@@ -40,7 +40,7 @@ repos:
         args: [--fix]
       - id: ruff-format
 
-  # mypy — verificación de tipos Python
+  # mypy: Python type checking
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.13.0
     hooks:
@@ -48,22 +48,22 @@ repos:
         additional_dependencies: [types-requests]
         pass_filenames: false
         args: [--ignore-missing-imports, src/]
-        # Solo corre cuando haya archivos en src/ (Fase 2+)
+        # only runs when there are files under src/
         files: ^src/
 
-  # Conventional Commits — valida el mensaje del commit
+  # Conventional Commits: validates the commit message
   - repo: https://github.com/compilerla/conventional-pre-commit
     rev: v3.4.0
     hooks:
       - id: conventional-pre-commit
         stages: [commit-msg]
         args:
-          - feat      # nueva funcionalidad
-          - fix       # corrección de bug
-          - docs      # solo documentación
-          - style     # formato, sin cambio de lógica
-          - refactor  # refactoring sin nueva funcionalidad ni fix
-          - test      # agregar o corregir tests
-          - chore     # mantenimiento (deps, CI, tooling)
-          - infra     # cambios de infraestructura (scripts VPS, Docker)
-          - perf      # mejoras de rendimiento
+          - feat      # new feature
+          - fix       # bug fix
+          - docs      # docs only
+          - style     # formatting, no logic change
+          - refactor  # refactor, no new feature or fix
+          - test      # add or fix tests
+          - chore     # maintenance (deps, CI, tooling)
+          - infra     # infrastructure changes (VPS scripts, Docker)
+          - perf      # performance improvements

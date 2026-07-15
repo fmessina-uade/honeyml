@@ -1,11 +1,11 @@
 [project]
 name = "honeyml"
 version = "0.1.0"
-description = "HoneyML — Plataforma de inteligencia de amenazas con honeypots y Agentic AI"
+description = "HoneyML - open-source threat intelligence platform: honeypots + Agentic AI"
 requires-python = ">=3.11"
 
 [project.optional-dependencies]
-# Análisis exploratorio y feature engineering (Fase 2). Instalar con: pip install -e ".[analysis]"
+# EDA and feature engineering. Install with: pip install -e ".[analysis]"
 analysis = [
     "pandas>=2.2",
     "numpy>=1.26",

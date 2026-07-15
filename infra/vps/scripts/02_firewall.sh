@@ -1,9 +1,9 @@
 #!/bin/bash
 # 02_firewall.sh
-# Configuración del firewall UFW y reglas iptables de aislamiento para HoneyML.
-# Debe ejecutarse DESPUÉS de 01_hardening.sh y de verificar acceso SSH en puerto 2200.
+# UFW firewall + iptables isolation rules for HoneyML.
+# Run AFTER 01_hardening.sh and after confirming SSH access on port 2200.
 #
-# Uso: sudo bash 02_firewall.sh
+# Usage: sudo bash 02_firewall.sh
 
 set -euo pipefail
 
@@ -22,42 +22,34 @@ die() {
 
 [[ $EUID -eq 0 ]] || die "Este script debe ejecutarse como root."
 
-log "=== HoneyML — Configuración de Firewall y Aislamiento de Red ==="
+log "=== HoneyML - Configuración de Firewall y Aislamiento de Red ==="
 
-# ---------------------------------------------------------------------------
-# Verificación previa: confirmar que SSH en 2200 es accesible
-# ---------------------------------------------------------------------------
+# pre-check: make sure SSH on 2200 is reachable
 log "Verificando que sshd escucha en puerto $SSH_ADMIN_PORT..."
 if ! ss -tlnp | grep -q ":$SSH_ADMIN_PORT "; then
     die "sshd no escucha en puerto $SSH_ADMIN_PORT. Configurar sshd_config primero."
 fi
-log "  OK — sshd escucha en $SSH_ADMIN_PORT"
+log "  OK - sshd escucha en $SSH_ADMIN_PORT"
 
-# ---------------------------------------------------------------------------
-# 1. Reset y políticas base de UFW
-# ---------------------------------------------------------------------------
+# 1. reset UFW and set base policies
 log "[1/5] Reseteando UFW y aplicando políticas base..."
 ufw --force reset
 ufw default deny incoming
 ufw default allow outgoing
 ufw default deny routed
 
-# ---------------------------------------------------------------------------
-# 2. Reglas de acceso administrativo
-# ---------------------------------------------------------------------------
+# 2. admin access rules
 log "[2/5] Configurando acceso administrativo..."
-ufw limit "${SSH_ADMIN_PORT}/tcp" comment 'SSH Admin — rate limited'
+ufw limit "${SSH_ADMIN_PORT}/tcp" comment 'SSH Admin - rate limited'
 
-# ---------------------------------------------------------------------------
-# 3. Puertos de honeypots (tráfico de atacantes)
-# ---------------------------------------------------------------------------
+# 3. honeypot ports (attacker traffic)
 log "[3/5] Habilitando puertos de honeypots..."
 
-# Cowrie — SSH y Telnet honeypot
+# Cowrie SSH and Telnet honeypot
 ufw allow 22/tcp   comment 'Cowrie SSH honeypot'
 ufw allow 23/tcp   comment 'Cowrie Telnet honeypot'
 
-# Dionaea — captura multiprotocolo
+# Dionaea multiprotocol capture
 ufw allow 21/tcp   comment 'Dionaea FTP'
 ufw allow 80/tcp   comment 'Dionaea HTTP'
 ufw allow 443/tcp  comment 'Dionaea HTTPS'
@@ -68,9 +60,7 @@ ufw allow 5060/tcp comment 'Dionaea SIP TCP'
 ufw allow 5060/udp comment 'Dionaea SIP UDP'
 ufw allow 1433/tcp comment 'Dionaea MSSQL honeypot'
 
-# ---------------------------------------------------------------------------
-# 4. Activar UFW con logging
-# ---------------------------------------------------------------------------
+# 4. enable UFW with logging
 log "[4/5] Activando UFW..."
 ufw logging on
 ufw --force enable
@@ -78,39 +68,37 @@ ufw --force enable
 log "Estado del firewall:"
 ufw status verbose | tee -a "$LOG_FILE"
 
-# ---------------------------------------------------------------------------
-# 5. Reglas iptables para aislamiento de contenedores honeypot
-# ---------------------------------------------------------------------------
+# 5. iptables rules to isolate the honeypot containers
 log "[5/5] Aplicando reglas de aislamiento Docker..."
 
-# DOCKER-USER se evalúa antes que las reglas de Docker y no se sobreescribe al reiniciar el daemon
-# Bloquear egress de la red honeypot (evita que un atacante use el contenedor como pivot)
+# DOCKER-USER is evaluated before Docker's own rules and survives a daemon restart.
+# Block the honeypot network's egress (stops an attacker using the container as a pivot).
 if ! iptables -C DOCKER-USER -s "$HONEYPOT_NET" -o eth0 -j DROP 2>/dev/null; then
     iptables -I DOCKER-USER 3 -s "$HONEYPOT_NET" -o eth0 -j DROP
     log "  Regla de egress honeypot aplicada."
 fi
 
-# Excepción: permitir tráfico intra-red (honeypot <-> filebeat sidecar en Fase 2)
+# exception: allow intra-network traffic (honeypot <-> filebeat sidecar in phase 2)
 if ! iptables -C DOCKER-USER -s "$HONEYPOT_NET" -d "$HONEYPOT_NET" -j ACCEPT 2>/dev/null; then
     iptables -I DOCKER-USER 1 -s "$HONEYPOT_NET" -d "$HONEYPOT_NET" -j ACCEPT
     log "  Tráfico intra-honeypot habilitado."
 fi
 
-# Permitir tráfico de RETORNO (ESTABLISHED/RELATED) hacia internet
-# Sin esta regla los SYN-ACK de respuesta son dropeados y el handshake TCP nunca completa.
+# allow RETURN traffic (ESTABLISHED/RELATED) out to the internet.
+# without this the reply SYN-ACKs get dropped and the TCP handshake never completes.
 if ! iptables -C DOCKER-USER -s "$HONEYPOT_NET" -o eth0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null; then
     iptables -I DOCKER-USER 2 -s "$HONEYPOT_NET" -o eth0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
     log "  Tráfico de retorno ESTABLISHED/RELATED habilitado."
 fi
 
-# Script dedicado: solo aplica las reglas custom de DOCKER-USER, sin tocar las de Docker.
-# iptables-save/restore completo genera conflictos al reboot porque Docker regenera sus
-# propias reglas y quedan duplicadas o en orden incorrecto con las restauradas.
+# dedicated script: applies only our custom DOCKER-USER rules, leaving Docker's alone.
+# a full iptables-save/restore conflicts on reboot because Docker regenerates its own rules and
+# they end up duplicated or in the wrong order relative to the restored ones.
 cat > /usr/local/bin/honeyml-docker-rules.sh << RULES_EOF
 #!/bin/bash
 HONEYPOT_NET="${HONEYPOT_NET}"
 
-# Esperar hasta que Docker cree la cadena DOCKER-USER (máx 30s)
+# wait until Docker creates the DOCKER-USER chain (max 30s)
 for i in \$(seq 1 15); do
     iptables -L DOCKER-USER -n &>/dev/null && break
     sleep 2
@@ -121,19 +109,19 @@ if ! iptables -L DOCKER-USER -n &>/dev/null; then
     exit 1
 fi
 
-# Permitir tráfico intra-honeypot (requerido para sidecar de Fase 2)
+# allow intra-honeypot traffic (needed for the phase 2 sidecar)
 if ! iptables -C DOCKER-USER -s "\$HONEYPOT_NET" -d "\$HONEYPOT_NET" -j ACCEPT 2>/dev/null; then
     iptables -I DOCKER-USER 1 -s "\$HONEYPOT_NET" -d "\$HONEYPOT_NET" -j ACCEPT
 fi
 
-# Permitir tráfico de RETORNO (ESTABLISHED/RELATED) de la red honeypot hacia internet
-# Sin esta regla, los SYN-ACK de respuesta a conexiones entrantes son dropeados,
-# impidiendo que se complete el handshake TCP y que Cowrie/Dionaea registren conexiones.
+# allow RETURN traffic (ESTABLISHED/RELATED) from the honeypot network out to the internet.
+# without it the reply SYN-ACKs to inbound connections get dropped, so the TCP handshake never
+# completes and Cowrie/Dionaea never record the connection.
 if ! iptables -C DOCKER-USER -s "\$HONEYPOT_NET" -o eth0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null; then
     iptables -I DOCKER-USER 2 -s "\$HONEYPOT_NET" -o eth0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 fi
 
-# Bloquear egress NUEVO de la red honeypot hacia internet (evita uso como pivot)
+# block NEW egress from the honeypot network to the internet (no pivoting)
 if ! iptables -C DOCKER-USER -s "\$HONEYPOT_NET" -o eth0 -j DROP 2>/dev/null; then
     iptables -I DOCKER-USER 3 -s "\$HONEYPOT_NET" -o eth0 -j DROP
 fi

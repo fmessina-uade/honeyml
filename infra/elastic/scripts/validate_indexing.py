@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""Validación de la indexación ECS en Elasticsearch (Fase 2 — OE2).
+"""Validate the ECS indexing in Elasticsearch.
 
-Verifica que la telemetría de los honeypots quedó correctamente indexada y normalizada:
-recuento por índice, cobertura de campos ECS clave, ausencia de eventos sin enrutar y de
-fallos de parseo de fecha, y un resumen de la distribución de eventos. No requiere
-dependencias externas (solo stdlib).
+Checks the honeypot telemetry was indexed and normalized correctly: per-index counts, coverage of
+the key ECS fields, no unrouted events or date-parse failures, and a quick event distribution.
+No external deps (stdlib only).
 
-Uso:
+Usage:
     python3 validate_indexing.py [--es-url http://localhost:9200]
 """
 
@@ -81,7 +80,7 @@ def main() -> int:
 
     checks_ok = True
 
-    # --- Eventos sin enrutar ---
+    # unrouted events
     print("\n=== Integridad de enrutamiento ===")
     try:
         unrouted = count(url, "honeypot-unrouted-*")
@@ -93,7 +92,7 @@ def main() -> int:
         print(f"  {FAIL} {unrouted} eventos en honeypot-unrouted-* (revisar filebeat/logstash)")
         checks_ok = False
 
-    # --- Cobertura de campos ECS ---
+    # ECS field coverage
     print(f"\n=== Cobertura de campos ECS (sobre {total} docs) ===")
     ecs_fields = [
         "@timestamp",
@@ -107,13 +106,13 @@ def main() -> int:
         n = count(url, args.index, {"exists": {"field": field}})
         pct = (n / total * 100) if total else 0
         mark = OK if pct >= 99 else (WARN if pct >= 50 else FAIL)
-        # source.ip no aplica a todos los eventos: se informa sin penalizar
+        # source.ip isn't in every event: report it without penalizing
         note = "  (esperable <100%)" if field == "source.ip" else ""
         print(f"  {mark} {field:<18} {n:>8} ({pct:5.1f}%){note}")
         if field in ("@timestamp", "event.category", "observer.type") and pct < 99:
             checks_ok = False
 
-    # --- Fallos de parseo de fecha ---
+    # date parse failures
     datefail = count(
         url,
         args.index,
@@ -124,7 +123,7 @@ def main() -> int:
     if datefail:
         checks_ok = False
 
-    # --- Distribución de eventos (semilla de EDA) ---
+    # event distribution (seeds the EDA)
     print("\n=== Distribución por event.action ===")
     for key, n in terms(url, args.index, "event.action", 15):
         print(f"  {n:>8}  {key}")

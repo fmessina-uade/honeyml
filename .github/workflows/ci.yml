@@ -1,5 +1,9 @@
 name: CI
 
+# Runs on every push/PR to main. Keeps infra + configs honest before they reach the VPS.
+# Covered: shell/yaml/compose linting, python unit tests, honeypot config sanity checks.
+# Not yet: integration tests (need Docker + live honeypots) and the ML/agent code (still ahead).
+
 on:
   push:
     branches: [main, develop]
@@ -7,34 +11,32 @@ on:
     branches: [main]
 
 jobs:
-  # --------------------------------------------------------------------------
-  # 1. Linting: shellcheck + yamllint + docker compose config
-  # --------------------------------------------------------------------------
+  # everything that isn't python: shell scripts, yaml, compose files
   lint:
     name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: shellcheck — scripts de VPS
+      - name: shellcheck (VPS scripts)
         uses: ludeeus/action-shellcheck@master
         with:
           scandir: ./infra/vps/scripts
           severity: warning
 
-      - name: shellcheck — scripts del proyecto
+      - name: shellcheck (project scripts)
         uses: ludeeus/action-shellcheck@master
         with:
           scandir: ./scripts
           severity: warning
 
-      - name: shellcheck — scripts del Elastic Stack
+      - name: shellcheck (Elastic Stack scripts)
         uses: ludeeus/action-shellcheck@master
         with:
           scandir: ./infra/elastic/scripts
           severity: warning
 
-      - name: yamllint — archivos de configuración
+      - name: yamllint
         run: |
           pip install yamllint --quiet
           yamllint \
@@ -47,7 +49,7 @@ jobs:
             infra/elastic/logstash/config/logstash.yml \
             .github/workflows/ci.yml
 
-      - name: Docker Compose config — validar sintaxis
+      - name: compose files parse
         run: |
           docker compose \
             -f infra/honeypots/docker-compose.yml \
@@ -62,9 +64,7 @@ jobs:
             -f infra/elastic/docker-compose.dev.yml \
             config --quiet
 
-  # --------------------------------------------------------------------------
-  # 2. Tests unitarios (no requieren Docker)
-  # --------------------------------------------------------------------------
+  # python unit tests, no Docker needed
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -77,15 +77,13 @@ jobs:
           python-version: "3.11"
           cache: pip
 
-      - name: Instalar dependencias de test
+      - name: install pytest
         run: pip install pytest
 
-      - name: pytest — tests unitarios
+      - name: pytest
         run: pytest tests/unit/ -v --tb=short
 
-  # --------------------------------------------------------------------------
-  # 3. Validación de configuración de honeypots
-  # --------------------------------------------------------------------------
+  # honeypot config gotchas that break things silently if wrong
   config-validation:
     name: Config Validation
     runs-on: ubuntu-latest
@@ -94,22 +92,22 @@ jobs:
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
 
-      - name: userdb.txt — encoding ASCII puro
+      # cowrie only loads userdb.txt if it's plain ascii
+      - name: userdb.txt is pure ascii
         run: |
           python3 -c "
           with open('infra/honeypots/cowrie/userdb.txt', 'rb') as f:
               data = f.read()
           bad = [(i, b) for i, b in enumerate(data) if b > 127]
           if bad:
-              print(f'FAIL: byte no-ASCII 0x{bad[0][1]:02x} en posición {bad[0][0]}')
+              print(f'FAIL: non-ascii byte 0x{bad[0][1]:02x} at position {bad[0][0]}')
               exit(1)
-          print('OK: userdb.txt es ASCII puro')
+          print('OK: userdb.txt is pure ascii')
           "
 
-      - name: cowrie.cfg — paths internos correctos
+      # these must match cowrie's working dir, or the honeypot boots empty
+      - name: cowrie.cfg paths
         run: |
           python3 -c "
           import configparser, sys
@@ -117,16 +115,17 @@ jobs:
           cfg.read('infra/honeypots/cowrie/cowrie.cfg')
           errors = []
           if cfg.get('honeypot', 'contents_path', fallback='') != 'honeyfs':
-              errors.append('contents_path debe ser honeyfs')
+              errors.append('contents_path should be honeyfs')
           if cfg.get('honeypot', 'txtcmds_path', fallback='') != 'src/cowrie/data/txtcmds':
-              errors.append('txtcmds_path debe ser src/cowrie/data/txtcmds')
+              errors.append('txtcmds_path should be src/cowrie/data/txtcmds')
           if errors:
               print('FAIL:', errors)
               sys.exit(1)
-          print('OK: cowrie.cfg paths correctos')
+          print('OK: cowrie.cfg paths look right')
           "
 
-      - name: .gitignore — patrones sensibles presentes
+      # never leak keys or captured malware into the repo
+      - name: .gitignore covers secrets
         run: |
           python3 -c "
           import sys
@@ -134,7 +133,7 @@ jobs:
           required = ['*.pkl', '*.pem', '*.key', '*.pcap', '.env', 'id_rsa']
           missing = [p for p in required if p not in content]
           if missing:
-              print('FAIL: .gitignore no cubre:', missing)
+              print('FAIL: .gitignore missing:', missing)
               sys.exit(1)
-          print('OK: .gitignore cubre todos los patrones sensibles')
+          print('OK: .gitignore covers the sensitive patterns')
           "

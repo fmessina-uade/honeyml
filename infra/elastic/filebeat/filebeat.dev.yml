@@ -1,5 +1,5 @@
-# Filebeat — desarrollo local. Lee datos reales bajados del VPS (data/logs/ -> /logs).
-# Reprocesa archivos históricos completos para iterar la normalización ECS.
+# Filebeat, local dev. Reads real data pulled from the VPS (data/logs/ -> /logs).
+# Reprocesses whole historical files so we can iterate the ECS normalization.
 
 filebeat.inputs:
   - type: filestream
@@ -16,11 +16,11 @@ filebeat.inputs:
     fields_under_root: true
     fields:
       honeypot: cowrie
-    # En dev queremos leer archivos históricos desde el principio.
+    # in dev we want to read historical files from the start
     ignore_older: 0
     prospector.scanner.check_interval: 5s
 
-  # Dionaea (muestra real bajada del contenedor) para validar la normalización ECS.
+  # Dionaea (a real sample pulled from the container) to validate the ECS normalization.
   - type: filestream
     id: dionaea-json-dev
     enabled: true

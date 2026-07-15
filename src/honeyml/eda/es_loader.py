@@ -1,7 +1,7 @@
-"""Carga de eventos normalizados a ECS desde Elasticsearch hacia un DataFrame de pandas.
+"""Load ECS-normalized events from Elasticsearch into a pandas DataFrame.
 
-Usa la API scroll con urllib (sin el cliente elasticsearch, para evitar acoplarse a su versión)
-y aplana los campos ECS anidados a columnas planas listas para el análisis exploratorio.
+Uses the scroll API over urllib (no elasticsearch client, so we don't pin to its version) and
+flattens the nested ECS fields into flat columns ready for the EDA.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from typing import Any
 
 import pandas as pd
 
-# Campos ECS que se traen de cada evento. Se piden explícitamente para no cargar payloads pesados.
+# ECS fields pulled per event. Asked for explicitly so we don't drag heavy payloads along.
 DEFAULT_FIELDS = [
     "@timestamp",
     "honeypot",
@@ -47,7 +47,7 @@ def _post(url: str, path: str, body: dict[str, Any]) -> dict[str, Any]:
 
 
 def _first(value: Any) -> Any:
-    """ECS admite arrays (p.ej. event.category=[network,authentication]); toma el primer valor."""
+    """ECS allows arrays (e.g. event.category=[network,authentication]); take the first value."""
     if isinstance(value, list):
         return value[0] if value else None
     return value
@@ -60,15 +60,15 @@ def load_events(
     page_size: int = 5000,
     max_docs: int | None = None,
 ) -> pd.DataFrame:
-    """Trae todos los eventos del índice a un DataFrame con columnas ECS planas.
+    """Pull every event of the index into a DataFrame with flat ECS columns.
 
     Parameters
     ----------
-    es_url : URL base de Elasticsearch.
-    index : patrón de índice (honeypot-*, honeypot-cowrie-*, ...).
-    fields : lista de campos ECS a traer; por defecto DEFAULT_FIELDS.
-    page_size : tamaño de página del scroll.
-    max_docs : tope opcional de documentos (para pruebas).
+    es_url : Elasticsearch base URL.
+    index : index pattern (honeypot-*, honeypot-cowrie-*, ...).
+    fields : ECS fields to fetch; defaults to DEFAULT_FIELDS.
+    page_size : scroll page size.
+    max_docs : optional doc cap (handy for quick tests).
     """
     url = es_url.rstrip("/")
     fields = fields or DEFAULT_FIELDS
@@ -86,7 +86,7 @@ def load_events(
             src = h["_source"]
             row = {}
             for f in fields:
-                # Recorre la ruta punteada (event.category -> src["event"]["category"])
+                # walk the dotted path (event.category -> src["event"]["category"])
                 node = src
                 for part in f.split("."):
                     if isinstance(node, dict):
@@ -102,7 +102,7 @@ def load_events(
         res = _post(url, "/_search/scroll", {"scroll": "2m", "scroll_id": scroll_id})
         scroll_id = res.get("_scroll_id")
 
-    # Liberar el scroll context
+    # free the scroll context
     if scroll_id:
         try:
             req = urllib.request.Request(
@@ -123,6 +123,6 @@ def load_events(
 
 if __name__ == "__main__":
     df = load_events()
-    print(f"Eventos cargados: {len(df):,}")
+    print(f"Events loaded: {len(df):,}")
     print(df.dtypes)
     print(df.head())

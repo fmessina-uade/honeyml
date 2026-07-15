@@ -1,11 +1,11 @@
 #!/bin/bash
 # 03_monitoring.sh
-# Monitoreo básico de salud del VPS para la Fase 1 de HoneyML.
-# Instala un script de health-check con alertas vía webhook (Slack/Discord/custom).
-# En la Fase 2, este monitoreo será absorbido por el Elastic Stack (Metricbeat).
+# Basic VPS health monitoring for HoneyML's phase 1.
+# Installs a health-check script with webhook alerts (Slack/Discord/custom).
+# In phase 2 this gets absorbed by the Elastic Stack (Metricbeat).
 #
-# Uso: sudo bash 03_monitoring.sh <webhook_url>
-# Ejemplo: sudo bash 03_monitoring.sh "https://hooks.slack.com/services/..."
+# Usage: sudo bash 03_monitoring.sh <webhook_url>
+# Example: sudo bash 03_monitoring.sh "https://hooks.slack.com/services/..."
 
 set -euo pipefail
 
@@ -23,16 +23,13 @@ log() {
 
 [[ $EUID -eq 0 ]] || { echo "Ejecutar como root." >&2; exit 1; }
 
-log "=== HoneyML — Configuración de Monitoreo de Salud ==="
+log "=== HoneyML - Configuración de Monitoreo de Salud ==="
 
-# ---------------------------------------------------------------------------
-# 1. Script principal de health check
-# ---------------------------------------------------------------------------
+# 1. main health-check script
 log "[1/3] Creando script de health check en $HEALTHCHECK_SCRIPT..."
 cat > "$HEALTHCHECK_SCRIPT" << HEALTH_SCRIPT
 #!/usr/bin/env bash
-# honeyml_health.sh — Verificación periódica de métricas del VPS.
-# Ejecutado por cron cada 5 minutos.
+# honeyml_health.sh - periodic VPS metric check, run by cron every 5 minutes.
 
 set -euo pipefail
 
@@ -68,7 +65,7 @@ send_alert() {
     fi
 }
 
-# --- CPU ---
+# CPU
 CPU_IDLE=\$(top -bn1 | grep 'Cpu(s)' | awk '{print \$8}' | tr -d '%id,' 2>/dev/null || echo "0")
 CPU_USED=\$(echo "100 - \$CPU_IDLE" | bc 2>/dev/null || echo "0")
 CPU_INT=\${CPU_USED%.*}
@@ -76,7 +73,7 @@ if [[ "\${CPU_INT:-0}" -ge "\$THRESHOLD_CPU" ]]; then
     send_alert "WARNING" "CPU al \${CPU_USED}% (umbral: \${THRESHOLD_CPU}%)"
 fi
 
-# --- Memoria ---
+# memory
 MEM_INFO=\$(free | grep Mem)
 MEM_TOTAL=\$(echo "\$MEM_INFO" | awk '{print \$2}')
 MEM_USED=\$(echo "\$MEM_INFO" | awk '{print \$3}')
@@ -85,7 +82,7 @@ if [[ "\$MEM_PCT" -ge "\$THRESHOLD_MEM" ]]; then
     send_alert "WARNING" "Memoria al \${MEM_PCT}% (umbral: \${THRESHOLD_MEM}%)"
 fi
 
-# --- Disco ---
+# disk
 while IFS= read -r line; do
     PCT=\$(echo "\$line" | awk '{print \$5}' | tr -d '%')
     MOUNT=\$(echo "\$line" | awk '{print \$6}')
@@ -94,7 +91,7 @@ while IFS= read -r line; do
     fi
 done < <(df -h | tail -n +2 | grep -v tmpfs)
 
-# --- Contenedores honeypot ---
+# honeypot containers
 for container in cowrie dionaea; do
     if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^\${container}\$"; then
         STATUS=\$(docker inspect --format='{{.State.Status}}' "\$container" 2>/dev/null || echo "unknown")
@@ -104,31 +101,29 @@ for container in cowrie dionaea; do
     fi
 done
 
-# --- Servicio SSH admin ---
+# admin SSH service
 if ! ss -tlnp | grep -q ":2200 "; then
-    send_alert "CRITICAL" "sshd no escucha en puerto 2200 — pérdida de acceso administrativo"
+    send_alert "CRITICAL" "sshd no escucha en puerto 2200 - pérdida de acceso administrativo"
 fi
 
-log_entry "Health check completado — CPU:\${CPU_USED}% MEM:\${MEM_PCT}% OK"
+log_entry "Health check completado - CPU:\${CPU_USED}% MEM:\${MEM_PCT}% OK"
 HEALTH_SCRIPT
 
 chmod +x "$HEALTHCHECK_SCRIPT"
 log "  Script creado."
 
-# ---------------------------------------------------------------------------
-# 2. Script de reporte diario
-# ---------------------------------------------------------------------------
+# 2. daily report script
 DAILY_REPORT_SCRIPT="/usr/local/bin/honeyml_daily_report.sh"
 cat > "$DAILY_REPORT_SCRIPT" << 'DAILY_SCRIPT'
 #!/usr/bin/env bash
-# honeyml_daily_report.sh — Resumen diario de actividad de honeypots.
+# honeyml_daily_report.sh - daily honeypot activity summary.
 set -euo pipefail
 
 WEBHOOK_URL="${WEBHOOK_URL:-}"
 DATE=$(date '+%Y-%m-%d')
 COWRIE_LOG="/var/lib/docker/volumes/honeypots_cowrie_logs/_data/cowrie.json"
 
-# Contadores de actividad de Cowrie
+# Cowrie activity counters
 SSH_ATTEMPTS=0
 SUCCESSFUL_LOGINS=0
 UNIQUE_IPS=0
@@ -143,7 +138,7 @@ UPTIME=$(uptime -p 2>/dev/null || uptime)
 MEM_FREE=$(free -h | grep Mem | awk '{print $4}')
 DISK_FREE=$(df -h / | tail -1 | awk '{print $4}')
 
-REPORT="📊 *HoneyML Reporte Diario — ${DATE}*
+REPORT="📊 *HoneyML Reporte Diario - ${DATE}*
 *Sistema:* Uptime: ${UPTIME} | RAM libre: ${MEM_FREE} | Disco libre: ${DISK_FREE}
 *Cowrie (SSH):* Intentos fallidos: ${SSH_ATTEMPTS} | Logins exitosos: ${SUCCESSFUL_LOGINS} | IPs únicas: ${UNIQUE_IPS}"
 
@@ -158,24 +153,22 @@ DAILY_SCRIPT
 
 chmod +x "$DAILY_REPORT_SCRIPT"
 
-# ---------------------------------------------------------------------------
-# 3. Registrar en cron
-# ---------------------------------------------------------------------------
+# 3. register cron jobs
 log "[3/3] Registrando tareas en cron..."
 
 CRON_FILE="/etc/cron.d/honeyml-monitoring"
 cat > "$CRON_FILE" << CRONEOF
-# HoneyML — Monitoreo de salud del VPS
+# HoneyML - VPS health monitoring
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 
-# Health check cada 5 minutos
+# health check every 5 minutes
 */5 * * * * root $HEALTHCHECK_SCRIPT >> $HEALTHCHECK_LOG 2>&1
 
-# Reporte diario a las 07:00 ART (UTC-3 = 10:00 UTC)
+# daily report at 07:00 ART (UTC-3 = 10:00 UTC)
 0 10 * * * root $DAILY_REPORT_SCRIPT >> $HEALTHCHECK_LOG 2>&1
 
-# Rotación semanal del log de actividad de honeypots (hasta disponer de Logstash)
+# weekly rotation of the honeypot activity log (until Logstash is in place)
 0 3 * * 0 root find /var/log -name "honeyml_*.log" -mtime +30 -delete 2>/dev/null || true
 CRONEOF
 

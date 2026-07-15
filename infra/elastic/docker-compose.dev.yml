@@ -1,13 +1,13 @@
-# Override de desarrollo local.
+# Local dev override.
 #
-# Diferencias con producción:
-#   - Heaps reducidos para correr en la Mac junto a otras cosas.
-#   - Filebeat NO lee los volúmenes de los honeypots: lee un directorio local
-#     (data/logs/) con datos reales bajados del VPS, para iterar la normalización
-#     ECS sin depender de contenedores de honeypot corriendo en local.
+# Differences from prod:
+#   - smaller heaps so it runs on the Mac alongside other stuff.
+#   - Filebeat does NOT read the honeypot volumes: it reads a local dir (data/logs/) with real
+#     data pulled from the VPS, so we can iterate the ECS normalization without honeypot
+#     containers running locally.
 #
-# Uso:  docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
-#       (o `make elastic-dev-up` desde la raíz del repo)
+# Usage:  docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#         (or `make elastic-dev-up` from the repo root)
 
 services:
 
@@ -28,10 +28,10 @@ services:
     depends_on:
       logstash:
         condition: service_healthy
-    # !override reemplaza la lista de volúmenes de base en lugar de fusionarla: así en dev
-    # NO se montan los volúmenes externos de honeypot (que en local pueden no existir).
+    # !override replaces the base volume list instead of merging it, so in dev we skip the
+    # external honeypot volumes (which may not exist locally).
     volumes: !override
       - ./filebeat/filebeat.dev.yml:/usr/share/filebeat/filebeat.yml:ro
       - filebeat_data:/usr/share/filebeat/data
-      # Datos reales bajados del VPS (make pull-logs). Sustituye a los volúmenes de honeypot.
+      # real data pulled from the VPS (make pull-logs). Stands in for the honeypot volumes.
       - ../../data/logs:/logs:ro

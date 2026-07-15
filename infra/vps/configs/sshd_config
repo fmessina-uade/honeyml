@@ -1,8 +1,8 @@
-# sshd_config hardened — HoneyML VPS
-# Aplicar con: cp sshd_config /etc/ssh/sshd_config && systemctl restart ssh
-# Verificar sintaxis con: sshd -t
+# sshd_config hardened - HoneyML VPS
+# Apply with: cp sshd_config /etc/ssh/sshd_config && systemctl restart ssh
+# Check syntax with: sshd -t
 
-# Puerto no estándar para reducir ruido de bots (22 va a Cowrie)
+# non-standard port to cut bot noise (22 goes to Cowrie)
 Port 2200
 
 Protocol 2
@@ -10,7 +10,7 @@ Protocol 2
 # Solo IPv4, IPv6 deshabilitado en sysctl
 AddressFamily inet
 
-# Autenticación solo por clave pública
+# public-key auth only
 PermitRootLogin no
 PasswordAuthentication no
 ChallengeResponseAuthentication no
@@ -25,10 +25,10 @@ LoginGraceTime 30
 MaxAuthTries 3
 MaxSessions 5
 
-# Solo el usuario administrador del proyecto
+# only the project's admin user
 AllowUsers honeyml
 
-# Sin reenvío de puertos ni tunneling
+# no port forwarding or tunneling
 AllowTcpForwarding no
 AllowStreamLocalForwarding no
 GatewayPorts no
@@ -36,7 +36,7 @@ X11Forwarding no
 PermitTunnel no
 PermitUserEnvironment no
 
-# Keepalive a nivel de aplicación (no TCP para evitar falsos positivos)
+# app-level keepalive (not TCP, to avoid false positives)
 ClientAliveInterval 300
 ClientAliveCountMax 2
 TCPKeepAlive no

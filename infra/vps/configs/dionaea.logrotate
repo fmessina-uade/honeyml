@@ -1,9 +1,9 @@
-# logrotate para los logs de Dionaea. Instalar en /etc/logrotate.d/dionaea en el VPS.
+# logrotate for Dionaea's logs. Install to /etc/logrotate.d/dionaea on the VPS.
 #
-# copytruncate es necesario: Dionaea mantiene los archivos abiertos y no los reabre ante señales,
-# por lo que hay que copiar y truncar in-place (rename + create dejaria a Dionaea escribiendo en el
-# inode viejo). La reingesta por Filebeat es idempotente (document_id = fingerprint), asi que una
-# relectura tras el truncate no genera duplicados en Elasticsearch.
+# copytruncate is needed: Dionaea keeps the files open and won't reopen them on a signal, so we
+# copy and truncate in place (rename + create would leave Dionaea writing to the old inode). Filebeat
+# re-ingestion is idempotent (document_id = fingerprint), so a re-read after the truncate doesn't
+# create duplicates in Elasticsearch.
 
 /var/lib/docker/volumes/honeypots_dionaea_var/_data/log/dionaea/*.log
 /var/lib/docker/volumes/honeypots_dionaea_var/_data/lib/dionaea/dionaea.json

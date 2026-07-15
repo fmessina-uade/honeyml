@@ -13,7 +13,7 @@ SSH_KEY      ?= ~/.ssh/honeyml_ed25519_v2
 
 help:
 	@echo ""
-	@echo "  HoneyML — Comandos de infraestructura"
+	@echo "  HoneyML - Comandos de infraestructura"
 	@echo ""
 	@echo "  Calidad y validación:"
 	@echo "    make validate  Validación completa: config, contenedores, conectividad"
@@ -25,7 +25,7 @@ help:
 	@echo "    make dev-down  Detener entorno local"
 	@echo "    make dev-logs  Ver logs del entorno local"
 	@echo ""
-	@echo "  Pipeline de datos (Fase 2 — Elastic Stack + ECS):"
+	@echo "  Pipeline de datos (Fase 2 - Elastic Stack + ECS):"
 	@echo "    make pull-logs        Bajar logs reales del VPS a data/logs/"
 	@echo "    make elastic-dev-up   Levantar Elastic Stack en local (ES/Kibana/Logstash/Filebeat)"
 	@echo "    make elastic-dev-down Detener el stack local"
@@ -47,7 +47,7 @@ help:
 	@echo "    SSH_USER  Usuario SSH (default: honeyml)"
 	@echo ""
 
-# --- Calidad y validación ---
+# quality & validation
 
 validate:
 	@/bin/bash scripts/validate_local.sh
@@ -89,10 +89,10 @@ dev-up:
 	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_DEV) up -d
 	@echo ""
 	@echo "Honeypots locales iniciados:"
-	@echo "  Cowrie SSH    → ssh -p 2222 -o StrictHostKeyChecking=no root@localhost"
-	@echo "  Cowrie Telnet → telnet localhost 2323"
-	@echo "  Dionaea HTTP  → curl http://localhost:8080"
-	@echo "  Dionaea SMB   → localhost:4445"
+	@echo "  Cowrie SSH    -> ssh -p 2222 -o StrictHostKeyChecking=no root@localhost"
+	@echo "  Cowrie Telnet -> telnet localhost 2323"
+	@echo "  Dionaea HTTP  -> curl http://localhost:8080"
+	@echo "  Dionaea SMB   -> localhost:4445"
 	@echo ""
 	@echo "Logs: make dev-logs"
 
@@ -102,7 +102,7 @@ dev-down:
 dev-logs:
 	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_DEV) logs -f --tail=50
 
-# --- Producción (VPS) ---
+# production (VPS)
 
 up:
 	docker compose -f $(COMPOSE_FILE) up -d
@@ -142,10 +142,10 @@ endif
 	@echo "Archivos de infraestructura copiados al VPS $(VPS_IP)"
 	@echo "Siguiente paso: ssh -p $(SSH_PORT) $(SSH_USER)@$(VPS_IP)"
 
-# --- Pipeline de datos: Elastic Stack + ECS (Fase 2) ---
+# data pipeline: Elastic Stack + ECS
 
-# Baja los logs crudos de Cowrie desde el volumen Docker del VPS a data/logs/cowrie/.
-# Requiere clave SSH admin. Usa sudo remoto para leer el volumen (owner root).
+# Pull Cowrie's raw logs from the VPS Docker volume to data/logs/cowrie/.
+# Needs the admin SSH key. Uses remote sudo to read the volume (owned by root).
 pull-logs:
 ifndef VPS_IP
 	$(error VPS_IP no definido. Crear archivo .vps_ip o exportar: export VPS_IP=<ip>)
@@ -159,15 +159,15 @@ endif
 
 elastic-dev-up:
 	@if [ ! -f infra/elastic/.env ]; then cp infra/elastic/.env.example infra/elastic/.env; echo "Creado infra/elastic/.env desde el ejemplo."; fi
-	# Arrancar almacenamiento/procesado y aplicar la plantilla ECS ANTES de Filebeat,
-	# para que los índices se creen con los tipos ECS correctos (evita el race de mapeo).
+	# bring up storage/processing and apply the ECS template BEFORE Filebeat,
+	# so indices get the right ECS types (avoids the mapping race).
 	docker compose --env-file infra/elastic/.env -f $(ELASTIC_FILE) -f $(ELASTIC_DEV) up -d elasticsearch logstash kibana
 	@ES_URL=http://localhost:9200 bash infra/elastic/scripts/es_bootstrap.sh
 	docker compose --env-file infra/elastic/.env -f $(ELASTIC_FILE) -f $(ELASTIC_DEV) up -d filebeat
 	@echo ""
 	@echo "Elastic Stack local iniciado:"
-	@echo "  Elasticsearch → http://localhost:9200"
-	@echo "  Kibana        → http://localhost:5601"
+	@echo "  Elasticsearch -> http://localhost:9200"
+	@echo "  Kibana        -> http://localhost:5601"
 	@echo ""
 	@echo "Siguiente: make validate-indexing"
 

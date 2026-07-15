@@ -1,20 +1,20 @@
 FROM dinotools/dionaea:latest
 
 LABEL maintainer="HoneyML Project"
-LABEL description="Dionaea multiprotocol honeypot — SMB, HTTP, FTP, MySQL, MSSQL"
+LABEL description="Dionaea multiprotocol honeypot - SMB, HTTP, FTP, MySQL, MSSQL"
 
-# El entrypoint inicializa /opt/dionaea/etc copiando desde /opt/dionaea/template/etc en el primer
-# arranque, solo si etc/dionaea no existe. Por eso la config se hornea en el template y no se
-# bind-montea: un mount sobre etc/ crearia el directorio y el entrypoint saltearia esa copia,
-# dejando los servicios sin cargar.
+# The entrypoint seeds /opt/dionaea/etc by copying from /opt/dionaea/template/etc on first boot,
+# only if etc/dionaea doesn't exist. So we bake the config into the template instead of
+# bind-mounting: a mount over etc/ would create the dir and the entrypoint would skip that copy,
+# leaving the services unloaded.
 
-# 1. Logging de texto acotado a warning+; la telemetria de eventos sale por log_json (JSON).
+# 1. Text logging trimmed to warning+; event telemetry goes out via log_json (JSON).
 COPY dionaea.cfg /opt/dionaea/template/etc/dionaea/dionaea.cfg
 
-# 2. Salida estructurada JSON para el pipeline ECS (Filebeat la tail-ea).
+# 2. Structured JSON output for the ECS pipeline (Filebeat tails it).
 COPY log_json.yaml /opt/dionaea/template/etc/dionaea/ihandlers-enabled/log_json.yaml
 
-# 3. Desactivar SIP (inestable: falla con sqlite "database is locked") y pptp (ruidoso).
+# 3. Disable SIP (flaky: fails with sqlite "database is locked") and pptp (noisy).
 RUN rm -f /opt/dionaea/template/etc/dionaea/services-enabled/sip.yaml \
           /opt/dionaea/template/etc/dionaea/services-enabled/pptp.yaml
 

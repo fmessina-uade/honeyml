@@ -1,12 +1,12 @@
-# Habilita la salida estructurada JSON de Dionaea (un evento por linea) para el pipeline ECS.
-# El Dockerfile copia este archivo a ihandlers-enabled/ del template de la imagen.
-# Salida: /opt/dionaea/var/lib/dionaea/dionaea.json  (Filebeat lo tail-ea).
-# NOTA: ASCII puro obligatorio; el lector YAML de Dionaea usa codec ascii y falla con acentos.
+# Turn on Dionaea's structured JSON output (one event per line) for the ECS pipeline.
+# The Dockerfile copies this file to ihandlers-enabled/ in the image template.
+# Output: /opt/dionaea/var/lib/dionaea/dionaea.json  (Filebeat tails it).
+# NOTE: pure ASCII required; Dionaea's YAML reader uses the ascii codec and dies on accents.
 - name: log_json
   config:
-    # flat_data aplana listas de objetos para que indexen bien en Elasticsearch/ELK.
+    # flat_data flattens object lists so they index cleanly in Elasticsearch/ELK.
     flat_data: true
-    # Path ABSOLUTO con file:// + 3 barras: con dos barras, urlparse interpreta el primer
-    # segmento como host y el archivo no se crea.
+    # ABSOLUTE path with file:// + 3 slashes: with two slashes urlparse reads the first segment
+    # as a host and the file never gets created.
     handlers:
       - file:///opt/dionaea/var/lib/dionaea/dionaea.json

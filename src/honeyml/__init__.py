@@ -1,3 +1,3 @@
-"""HoneyML — plataforma de inteligencia de amenazas con honeypots y Agentic AI."""
+"""HoneyML - open-source threat intelligence platform: honeypots + Agentic AI."""
 
 __version__ = "0.1.0"

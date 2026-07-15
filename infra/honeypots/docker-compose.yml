@@ -1,6 +1,6 @@
 services:
 
-  # Cowrie SSH/Telnet honeypot — captura credenciales y TTPs de atacantes
+  # Cowrie SSH/Telnet honeypot: captures credentials and attacker TTPs
   cowrie:
     image: cowrie/cowrie:latest
     container_name: cowrie
@@ -12,14 +12,14 @@ services:
       - "0.0.0.0:22:2222/tcp"   # SSH honeypot
       - "0.0.0.0:23:2223/tcp"   # Telnet honeypot
     volumes:
-      # CWD del proceso = /cowrie/cowrie-git (no /cowrie), todos los paths van desde ahí
+      # process CWD = /cowrie/cowrie-git (not /cowrie), every path hangs off that
       - ./cowrie/cowrie.cfg:/cowrie/cowrie-git/etc/cowrie.cfg:ro
       - ./cowrie/userdb.txt:/cowrie/cowrie-git/etc/userdb.txt:ro
       - cowrie_logs:/cowrie/cowrie-git/var/log/cowrie
       - cowrie_downloads:/cowrie/cowrie-git/var/lib/cowrie/downloads
       - cowrie_tty:/cowrie/cowrie-git/var/lib/cowrie/tty
     healthcheck:
-      # La imagen no tiene /bin/sh ni nc, pero sí python3 en el virtualenv
+      # the image has no /bin/sh or nc, but python3 is there in the virtualenv
       test: ["CMD", "python3", "-c", "import socket; s=socket.socket(); s.settimeout(3); s.connect(('127.0.0.1', 2222)); s.close()"]
       interval: 30s
       timeout: 5s
@@ -42,7 +42,7 @@ services:
         max-size: "10m"
         max-file: "5"
 
-  # Dionaea multiprotocolo — SMB, HTTP, FTP, MySQL, MSSQL, SIP
+  # Dionaea multiprotocolo - SMB, HTTP, FTP, MySQL, MSSQL, SIP
   dionaea:
     build:
       context: ./dionaea
@@ -63,13 +63,13 @@ services:
       - "0.0.0.0:5060:5060/tcp"  # SIP TCP
       - "0.0.0.0:5060:5060/udp"  # SIP UDP
     volumes:
-      # Montar /opt/dionaea/var/ completo: init_lib/init_log del entrypoint necesitan
-      # encontrar el directorio vacío para crear la estructura con ownership dionaea:dionaea
-      # Config personalizada (logging acotado, log_json, SIP/pptp off) horneada en la imagen
-      # vía el Dockerfile (COPY al template/). No bind-montar sobre /opt/dionaea/etc: rompe init_etc.
+      # mount the whole /opt/dionaea/var/: the entrypoint's init_lib/init_log need to find the
+      # empty dir to build the structure with dionaea:dionaea ownership
+      # custom config (trimmed logging, log_json, SIP/pptp off) baked into the image via the
+      # Dockerfile (COPY to template/). Don't bind-mount over /opt/dionaea/etc: it breaks init_etc.
       - dionaea_var:/opt/dionaea/var
     healthcheck:
-      # nc no está en la imagen; bash /dev/tcp no necesita binario externo
+      # nc isn't in the image; bash /dev/tcp needs no external binary
       test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/80' && bash -c '</dev/tcp/127.0.0.1/445'"]
       interval: 30s
       timeout: 5s
@@ -77,8 +77,8 @@ services:
       start_period: 20s
     security_opt:
       - no-new-privileges:true
-    # cap_drop:ALL no va con Dionaea: el entrypoint necesita escribir dirs con ownership dionaea:dionaea
-    # La imagen es de 2020 y asume caps de root. El egress está bloqueado por iptables DOCKER-USER.
+    # cap_drop:ALL doesn't work with Dionaea: the entrypoint writes dirs owned by dionaea:dionaea.
+    # The image is from 2020 and assumes root caps. Egress is blocked by iptables DOCKER-USER.
     mem_limit: 1g
     cpus: "1.0"
     logging:
@@ -87,8 +87,8 @@ services:
         max-size: "10m"
         max-file: "5"
 
-# Red bridge interna para los honeypots.
-# inbound habilitado (recibe ataques desde internet), egress bloqueado via iptables DOCKER-USER (02_firewall.sh)
+# internal bridge network for the honeypots.
+# inbound allowed (receives attacks from the internet), egress blocked via iptables DOCKER-USER (02_firewall.sh)
 networks:
   honeypot_net:
     name: honeypot_net
@@ -103,7 +103,7 @@ networks:
       com.docker.network.bridge.enable_icc: "true"
       com.docker.network.bridge.enable_ip_masquerade: "true"
 
-# IMPORTANTE: estos volúmenes pueden contener malware capturado, no subir al repo
+# IMPORTANT: these volumes can hold captured malware, never commit them
 volumes:
   cowrie_logs:
     name: honeypots_cowrie_logs
