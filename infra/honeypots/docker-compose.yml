@@ -69,12 +69,14 @@ services:
       # Dockerfile (COPY to template/). Don't bind-mount over /opt/dionaea/etc: it breaks init_etc.
       - dionaea_var:/opt/dionaea/var
     healthcheck:
-      # nc isn't in the image; bash /dev/tcp needs no external binary
+      # nc isn't in the image; bash /dev/tcp needs no external binary.
+      # generous timeout/retries: under heavy attack load Dionaea pegs a core and can be slow to
+      # answer the probe, which used to flag it unhealthy while it was actually capturing fine.
       test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/80' && bash -c '</dev/tcp/127.0.0.1/445'"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
+      interval: 45s
+      timeout: 20s
+      retries: 5
+      start_period: 60s
     security_opt:
       - no-new-privileges:true
     # cap_drop:ALL doesn't work with Dionaea: the entrypoint writes dirs owned by dionaea:dionaea.
