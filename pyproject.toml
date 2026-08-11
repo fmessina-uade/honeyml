@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "honeyml"
 version = "0.1.0"
@@ -14,6 +18,14 @@ analysis = [
     "scikit-learn>=1.4",
     "pyarrow>=15",
 ]
+# API that feeds the educational dashboard. Install with: pip install -e ".[api]"
+api = [
+    "fastapi>=0.115",
+    "uvicorn>=0.32",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
