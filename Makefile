@@ -1,4 +1,5 @@
 .PHONY: help up down logs status ps clean deploy-vps dev-up dev-down dev-logs validate lint test \
+        api dash replays \
         elastic-up elastic-down elastic-logs elastic-dev-up elastic-dev-down elastic-dev-logs \
         es-bootstrap validate-indexing pull-logs
 
@@ -32,6 +33,11 @@ help:
 	@echo "    make es-bootstrap     Aplicar plantilla componible ECS a Elasticsearch"
 	@echo "    make validate-indexing  Validar indexación y normalización ECS"
 	@echo "    make elastic-up       Levantar el stack en el VPS (producción)"
+	@echo ""
+	@echo "  Panel educativo (demo):"
+	@echo "    make replays   Extraer sesiones de ataque anotadas"
+	@echo "    make api       Levantar la API (FastAPI, puerto 8000)"
+	@echo "    make dash      Levantar el panel (Vite, puerto 5173)"
 	@echo ""
 	@echo "  Producción (VPS):"
 	@echo "    make up        Iniciar contenedores en el VPS (puertos reales)"
@@ -196,3 +202,14 @@ es-bootstrap:
 
 validate-indexing:
 	@python3 infra/elastic/scripts/validate_indexing.py --es-url $${ES_URL:-http://localhost:9200}
+
+# educational dashboard: API + SPA. Run `make api` and `make dash` in two terminals.
+
+replays:
+	@./.venv/bin/python -m honeyml.education.session_replay
+
+api:
+	@./.venv/bin/uvicorn honeyml.api.main:app --port 8000 --reload
+
+dash:
+	@cd dashboard && npm run dev

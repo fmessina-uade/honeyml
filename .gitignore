@@ -37,7 +37,7 @@ venv.bak/
 .python-version
 
 # =============================================================================
-# Variables de entorno y secretos — NUNCA COMMITEAR
+# Variables de entorno y secretos
 # =============================================================================
 .env*
 !.env.example
@@ -54,7 +54,7 @@ id_rsa
 id_rsa.pub
 id_ed25519
 
-# Helper local para cargar la clave SSH desde secrets/ (tooling personal, no del proyecto)
+# Helper local para cargar la clave SSH desde secrets
 scripts/load_ssh_key.sh
 id_ed25519.pub
 id_ecdsa
@@ -73,7 +73,7 @@ docker-compose.local.yml
 .docker/
 
 # =============================================================================
-# DATOS DE HONEYPOTS — CRÍTICO: nunca subir malware ni credenciales capturadas
+# DATOS DE HONEYPOTS — CRÍTICO
 # =============================================================================
 infra/honeypots/data/
 infra/honeypots/logs/
@@ -275,3 +275,11 @@ infra/vps/.env
 docs/
 informe/
 contexto.md
+
+# =============================================================================
+# Frontend (dashboard educativo)
+# =============================================================================
+node_modules/
+dashboard/dist/
+.vite/
+*.tsbuildinfo
