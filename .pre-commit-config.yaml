@@ -45,7 +45,7 @@ repos:
     rev: v1.13.0
     hooks:
       - id: mypy
-        additional_dependencies: [types-requests]
+        additional_dependencies: [types-requests, fastapi]
         pass_filenames: false
         args: [--ignore-missing-imports, src/]
         # only runs when there are files under src/

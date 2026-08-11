@@ -34,7 +34,8 @@ services:
     cap_add:
       - NET_BIND_SERVICE
     read_only: false
-    mem_limit: 512m
+    # 512m left it at 88% after four weeks of capture, too close to an OOM kill
+    mem_limit: 1g
     cpus: "0.5"
     logging:
       driver: "json-file"
@@ -82,6 +83,9 @@ services:
     # cap_drop:ALL doesn't work with Dionaea: the entrypoint writes dirs owned by dionaea:dionaea.
     # The image is from 2020 and assumes root caps. Egress is blocked by iptables DOCKER-USER.
     mem_limit: 1g
+    # the 2020 image leaks threads under sustained load until it cannot fork;
+    # the cap keeps a runaway container from taking the host's PIDs with it
+    pids_limit: 512
     cpus: "1.0"
     logging:
       driver: "json-file"
