@@ -119,6 +119,44 @@ def attack_stages(es_url: str = ES_URL) -> list[dict[str, Any]]:
     return _terms("event.category", 10, es_url)
 
 
+def protocol_detail(es_url: str = ES_URL) -> list[dict[str, Any]]:
+    """Per-protocol traffic on the multiprotocol sensor, with how many distinct sources hit each.
+
+    Event counts alone are misleading here: SMB dominates because a single worm retries endlessly,
+    while HTTP is touched by far more distinct scanners. The two numbers together tell that apart.
+    """
+    body = {
+        "size": 0,
+        "query": {
+            "bool": {
+                "must": [{"term": {"honeypot": "dionaea"}}],
+                "must_not": [{"term": {"source.ip": LOCAL_IP}}],
+            }
+        },
+        "aggs": {
+            "p": {
+                "terms": {"field": "network.protocol", "size": 12},
+                "aggs": {
+                    "ips": {"cardinality": {"field": "source.ip"}},
+                    "port": {"terms": {"field": "destination.port", "size": 1}},
+                },
+            }
+        },
+    }
+    out = []
+    for b in _search(body, es_url)["aggregations"]["p"]["buckets"]:
+        ports = b["port"]["buckets"]
+        out.append(
+            {
+                "protocol": b["key"],
+                "count": b["doc_count"],
+                "sources": b["ips"]["value"],
+                "port": ports[0]["key"] if ports else None,
+            }
+        )
+    return out
+
+
 def snapshot(es_url: str = ES_URL) -> dict[str, Any]:
     """Everything the dashboard needs, in one object (also used for the offline snapshot)."""
     return {
@@ -128,4 +166,5 @@ def snapshot(es_url: str = ES_URL) -> dict[str, Any]:
         "commands": top_commands(es_url),
         "protocols": protocols(es_url),
         "stages": attack_stages(es_url),
+        "protocol_detail": protocol_detail(es_url),
     }

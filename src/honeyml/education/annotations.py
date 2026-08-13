@@ -153,6 +153,67 @@ RULES: list[tuple[re.Pattern[str], Annotation]] = [
             technique="T1083",
         ),
     ),
+    (
+        re.compile(r"\bulimit\b", re.I),
+        Annotation(
+            what="Eleva al máximo la cantidad de archivos y conexiones que el proceso puede abrir.",
+            why="Una botnet necesita miles de sockets simultáneos para escanear o para sumarse a "
+            "un ataque de denegación de servicio. El límite por defecto del sistema se lo "
+            "impediría, así que lo levanta antes de arrancar.",
+            tactic="Evasión de defensas",
+            technique="T1562.001",
+        ),
+    ),
+    (
+        re.compile(r"\blscpu\b|\bnproc\b.*grep|grep.*\bModel\b", re.I),
+        Annotation(
+            what="Consulta el modelo exacto del procesador.",
+            why="Determina la arquitectura para descargar el binario que corresponde: la misma "
+            "botnet mantiene versiones para ARM, MIPS y x86. Es el paso previo a elegir la carga.",
+            tactic="Descubrimiento",
+            technique="T1082",
+        ),
+    ),
+    (
+        re.compile(r"\bdf\b\s+-", re.I),
+        Annotation(
+            what="Mide el espacio disponible en disco.",
+            why="Confirma que hay lugar para descargar la carga maliciosa, y de paso distingue un "
+            "servidor real de un contenedor mínimo o de un señuelo con poco disco.",
+            tactic="Descubrimiento",
+            technique="T1082",
+        ),
+    ),
+    (
+        re.compile(r"\btop\b|\bhtop\b|\bps\b\s+(aux|-ef)", re.I),
+        Annotation(
+            what="Lista los procesos en ejecución y su consumo de recursos.",
+            why="Busca dos cosas: si el equipo ya está infectado por una botnet rival a la que "
+            "conviene matar, y si hay vigilancia corriendo. El cómputo robado no se comparte.",
+            tactic="Descubrimiento",
+            technique="T1057",
+        ),
+    ),
+    (
+        re.compile(r"\bwhich\b|\bcommand\s+-v\b|\btype\s+\w", re.I),
+        Annotation(
+            what="Verifica si una herramienta está instalada y dónde.",
+            why="Antes de depender de wget, curl o python, comprueba que existan. Si el señuelo "
+            "responde que sí a todo, el atacante puede sospechar que no es un sistema real.",
+            tactic="Descubrimiento",
+            technique="T1082",
+        ),
+    ),
+    (
+        re.compile(r"^\s*\./|\bchmod\b.*&&.*\./", re.I),
+        Annotation(
+            what="Ejecuta el binario que acaba de descargar.",
+            why="Es el momento en que el equipo pasa a estar comprometido de verdad: hasta acá "
+            "era reconocimiento, a partir de acá corre código del atacante.",
+            tactic="Ejecución",
+            technique="T1059.004",
+        ),
+    ),
 ]
 
 FALLBACK = Annotation(
