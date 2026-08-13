@@ -1,6 +1,8 @@
 import type { Bucket, Replay } from '../lib/api';
 import { tacticColor } from './SessionReplay';
 import Reveal from './Reveal';
+import Tooltip, { useTooltip } from './Tooltip';
+import { n, pct } from '../lib/format';
 
 // The framework itself is part of the lesson: what each tactic means in plain language.
 const TACTIC_MEANING: Record<string, string> = {
@@ -27,11 +29,13 @@ export default function MitreMatrix({
   for (const r of replays) {
     for (const t of r.tactics) counts.set(t, (counts.get(t) ?? 0) + 1);
   }
+  const tip = useTooltip();
   const tactics = Object.keys(TACTIC_MEANING);
   const maxSessions = Math.max(...tactics.map((t) => counts.get(t) ?? 0), 1);
 
   return (
     <section className="flex flex-col gap-4">
+      <Tooltip content={tip.content} at={tip.at} />
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {tactics.map((t, idx) => {
           const n = counts.get(t) ?? 0;
@@ -88,21 +92,40 @@ export default function MitreMatrix({
           La enorme mayoría del tráfico es reconocimiento y fuerza bruta automatizada. Solo una
           fracción mínima llega a ejecutar comandos: por eso el triaje importa.
         </div>
-        <div className="flex flex-col gap-2">
+        <div className="bar-group flex flex-col gap-2">
           {stages.map((s) => {
             const total = stages.reduce((acc, x) => acc + x.count, 0);
-            const pct = total ? (s.count / total) * 100 : 0;
+            const width = total ? (s.count / total) * 100 : 0;
             return (
-              <div key={s.key} className="flex items-center gap-3">
-                <span className="w-32 text-[11px] text-white/60 shrink-0">{s.key}</span>
-                <div className="flex-1 h-1.5 rounded bg-white/5">
+              <div
+                key={s.key}
+                className="bar-item flex items-center gap-3 transition-opacity duration-200 cursor-default"
+                onMouseMove={(e) =>
+                  tip.show(
+                    e,
+                    <div className="min-w-[170px]">
+                      <div className="text-[11px] text-white/90 capitalize">{s.key}</div>
+                      <div className="font-data text-[15px] text-white mt-0.5">
+                        {n(s.count)}
+                      </div>
+                      <div className="text-[10px] text-white/45 mt-0.5">eventos en esta etapa</div>
+                      <div className="text-[10px] text-white/40 mt-1.5 pt-1.5 border-t border-white/8">
+                        {pct(s.count, total)}% de todo lo capturado
+                      </div>
+                    </div>,
+                  )
+                }
+                onMouseLeave={tip.hide}
+              >
+                <span className="w-32 text-[11px] text-white/60 shrink-0 capitalize">{s.key}</span>
+                <div className="flex-1 h-1.5 rounded bg-white/5 overflow-hidden">
                   <div
-                    className="h-1.5 rounded"
-                    style={{ width: `${pct}%`, background: 'var(--honey-amber)' }}
+                    className="h-1.5 rounded transition-all duration-700"
+                    style={{ width: `${width}%`, background: 'var(--honey-amber)' }}
                   />
                 </div>
                 <span className="font-data text-[10px] text-white/45 w-24 text-right">
-                  {s.count.toLocaleString('es-AR')} ({pct.toFixed(1)}%)
+                  {n(s.count)} ({pct(s.count, total)}%)
                 </span>
               </div>
             );
