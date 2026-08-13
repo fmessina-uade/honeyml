@@ -1,7 +1,7 @@
-import type { ProtocolDetail } from '../lib/api';
-import Reveal from './Reveal';
-import Tooltip, { useTooltip } from './Tooltip';
-import { n, pct } from '../lib/format';
+import type { ProtocolDetail } from '../../lib/api';
+import Reveal from '../Reveal';
+import Tooltip, { useTooltip } from '../Tooltip';
+import { n, pct } from '../../lib/format';
 
 /**
  * What each exposed service is, and why someone knocks on it. The point of the section is that

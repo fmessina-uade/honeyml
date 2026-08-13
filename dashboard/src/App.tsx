@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Radar, Terminal, BookOpen, Grid3x3, Network, AlertTriangle, Archive } from 'lucide-react';
 import { api, type Health, type Replay, type Snapshot } from './lib/api';
-import Pulse from './components/Pulse';
-import SessionReplay from './components/SessionReplay';
-import Dictionary from './components/Dictionary';
-import MitreMatrix from './components/MitreMatrix';
-import Protocols from './components/Protocols';
+import Pulse from './components/sections/Pulse';
+import SessionReplay from './components/sections/SessionReplay';
+import Dictionary from './components/sections/Dictionary';
+import MitreMatrix from './components/sections/MitreMatrix';
+import Protocols from './components/sections/Protocols';
 
 const SECTIONS = [
   {

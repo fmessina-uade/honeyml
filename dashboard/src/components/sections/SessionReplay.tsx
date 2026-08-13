@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Play, Pause, RotateCcw, Terminal, Gauge } from 'lucide-react';
-import type { Replay } from '../lib/api';
+import type { Replay } from '../../lib/api';
 
 // One tactic, one colour, reused across the whole dashboard.
 const TACTIC_COLOR: Record<string, string> = {

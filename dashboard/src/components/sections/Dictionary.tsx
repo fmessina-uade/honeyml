@@ -1,7 +1,7 @@
-import type { Bucket } from '../lib/api';
-import Reveal from './Reveal';
-import Tooltip, { useTooltip } from './Tooltip';
-import { n, pct, dec } from '../lib/format';
+import type { Bucket } from '../../lib/api';
+import Reveal from '../Reveal';
+import Tooltip, { useTooltip } from '../Tooltip';
+import { n, pct, dec } from '../../lib/format';
 
 
 

@@ -1,8 +1,8 @@
-import type { Bucket, Replay } from '../lib/api';
+import type { Bucket, Replay } from '../../lib/api';
 import { tacticColor } from './SessionReplay';
-import Reveal from './Reveal';
-import Tooltip, { useTooltip } from './Tooltip';
-import { n, pct } from '../lib/format';
+import Reveal from '../Reveal';
+import Tooltip, { useTooltip } from '../Tooltip';
+import { n, pct } from '../../lib/format';
 
 // The framework itself is part of the lesson: what each tactic means in plain language.
 const TACTIC_MEANING: Record<string, string> = {

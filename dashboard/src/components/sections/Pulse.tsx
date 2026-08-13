@@ -1,9 +1,9 @@
 import { Activity, Fingerprint, KeyRound, TerminalSquare } from 'lucide-react';
-import type { Overview, TimelinePoint } from '../lib/api';
-import CountUp from './CountUp';
-import Reveal from './Reveal';
-import Tooltip, { useTooltip } from './Tooltip';
-import { n, pct, dec } from '../lib/format';
+import type { Overview, TimelinePoint } from '../../lib/api';
+import CountUp from '../CountUp';
+import Reveal from '../Reveal';
+import Tooltip, { useTooltip } from '../Tooltip';
+import { n, pct, dec } from '../../lib/format';
 
 const SENSOR_COLOR: Record<string, string> = {
   cowrie: 'var(--honey-amber)',
