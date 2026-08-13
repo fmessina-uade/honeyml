@@ -26,6 +26,9 @@ filebeat.inputs:
     enabled: true
     paths:
       - /logs/dionaea/dionaea.json
+      # logrotate rotates this file daily; see the note in filebeat.yml
+      - /logs/dionaea/dionaea.json.[0-9]*
+    exclude_files: ['\.gz$']
     parsers:
       - ndjson:
           target: ""

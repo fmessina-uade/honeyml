@@ -27,6 +27,11 @@ filebeat.inputs:
       # the honeypots_dionaea_var volume (=/opt/dionaea/var) is mounted at /logs/dionaea.
       # log_json writes to var/lib/dionaea/dionaea.json -> /logs/dionaea/lib/dionaea/dionaea.json
       - /logs/dionaea/lib/dionaea/dionaea.json
+      # logrotate rotates this file daily (see /etc/logrotate.d/dionaea). With delaycompress the
+      # most recent rotation stays uncompressed for one cycle, which is the window filestream can
+      # still read it in; compressed ones are excluded below because filestream cannot decompress.
+      - /logs/dionaea/lib/dionaea/dionaea.json.[0-9]*
+    exclude_files: ['\.gz$']
     parsers:
       - ndjson:
           target: ""

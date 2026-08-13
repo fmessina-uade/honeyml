@@ -162,6 +162,15 @@ endif
 		$(SSH_USER)@$(VPS_IP):/var/lib/docker/volumes/honeypots_cowrie_logs/_data/ \
 		data/logs/cowrie/
 	@echo "Logs de Cowrie descargados en data/logs/cowrie/"
+	# Dionaea's log_json writes under var/lib/dionaea/; the dev Filebeat expects it flat
+	# include/exclude instead of a glob: with --rsync-path="sudo rsync" the remote shell
+	# never expands it, and the sibling files (sqlite db, captured binaries) must stay out
+	rsync -avz --progress --rsync-path="sudo rsync" \
+		--include='dionaea.json' --include='dionaea.json.[0-9]*' --exclude='*' \
+		-e "ssh -p $(SSH_PORT) -i $(SSH_KEY) -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
+		$(SSH_USER)@$(VPS_IP):/var/lib/docker/volumes/honeypots_dionaea_var/_data/lib/dionaea/ \
+		data/logs/dionaea/
+	@echo "Logs de Dionaea descargados en data/logs/dionaea/"
 
 elastic-dev-up:
 	@if [ ! -f infra/elastic/.env ]; then cp infra/elastic/.env.example infra/elastic/.env; echo "Creado infra/elastic/.env desde el ejemplo."; fi
@@ -203,7 +212,14 @@ es-bootstrap:
 validate-indexing:
 	@python3 infra/elastic/scripts/validate_indexing.py --es-url $${ES_URL:-http://localhost:9200}
 
+# compact output for the report's screenshots: no per-day index list, no source addresses
+validate-indexing-resumen:
+	@python3 infra/elastic/scripts/validate_indexing.py --es-url $${ES_URL:-http://localhost:9200} --resumen
+
 # educational dashboard: API + SPA. Run `make api` and `make dash` in two terminals.
+
+snapshot:
+	@./.venv/bin/python -m honeyml.api.offline
 
 replays:
 	@./.venv/bin/python -m honeyml.education.session_replay
