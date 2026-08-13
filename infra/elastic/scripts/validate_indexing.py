@@ -50,6 +50,12 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--es-url", default="http://localhost:9200")
     ap.add_argument("--index", default="honeypot-*")
+    ap.add_argument(
+        "--resumen",
+        action="store_true",
+        help="salida compacta para capturas del informe: colapsa la lista de indices y "
+        "omite las direcciones de origen",
+    )
     args = ap.parse_args()
     url = args.es_url.rstrip("/")
 
@@ -72,11 +78,25 @@ def main() -> int:
         print(f"  {WARN} No hay índices que coincidan con {args.index}. ¿Ya se ingirió algo?")
         return 1
     total = 0
+    by_sensor: dict[str, int] = {}
+    size_mb = 0.0
     for idx in sorted(cat, key=lambda i: i["index"]):
         docs = int(idx.get("docs.count") or 0)
         total += docs
-        print(f"  {idx['index']:<32} docs={docs:>8}  size={idx.get('store.size', '?')}mb")
-    print(f"  {'TOTAL':<32} docs={total:>8}")
+        size_mb += float(idx.get("store.size") or 0)
+        # honeypot-<sensor>-<fecha>
+        parts = idx["index"].split("-")
+        if len(parts) >= 2:
+            by_sensor[parts[1]] = by_sensor.get(parts[1], 0) + docs
+        if not args.resumen:
+            print(f"  {idx['index']:<32} docs={docs:>8}  size={idx.get('store.size', '?')}mb")
+    if args.resumen:
+        for sensor, docs in sorted(by_sensor.items()):
+            n_idx = sum(1 for i in cat if i["index"].split("-")[1:2] == [sensor])
+            print(f"  {sensor:<12} {n_idx:>3} indices diarios  docs={docs:>9}")
+        print(f"  {'TOTAL':<12} {len(cat):>3} indices          docs={total:>9}  ({size_mb:.0f} mb)")
+    else:
+        print(f"  {'TOTAL':<32} docs={total:>8}")
 
     checks_ok = True
 
@@ -132,12 +152,13 @@ def main() -> int:
     for key, n in terms(url, args.index, "event.category", 15):
         print(f"  {n:>8}  {key}")
 
-    print("\n=== Top 10 source.ip ===")
-    try:
-        for key, n in terms(url, args.index, "source.ip", 10):
-            print(f"  {n:>8}  {key}")
-    except urllib.error.HTTPError:
-        print("  (sin datos)")
+    if not args.resumen:
+        print("\n=== Top 10 source.ip ===")
+        try:
+            for key, n in terms(url, args.index, "source.ip", 10):
+                print(f"  {n:>8}  {key}")
+        except urllib.error.HTTPError:
+            print("  (sin datos)")
 
     print("\n=== Top credenciales probadas (user.name) ===")
     for key, n in terms(url, args.index, "user.name", 10):

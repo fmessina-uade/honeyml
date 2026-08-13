@@ -10,11 +10,14 @@ Usage:
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
-from sklearn.metrics import classification_report
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
@@ -82,8 +85,32 @@ def main() -> None:
     for name, imp in ranking.head(20).items():
         print(f"  {imp:.4f}  {name}")
 
+    y_pred = pipe.predict(x_te)
     print("\nReporte de clasificación (test held-out):")
-    print(classification_report(y_te, pipe.predict(x_te), zero_division=0))
+    report = classification_report(y_te, y_pred, zero_division=0)
+    print(report)
+
+    print("Matriz de confusión (filas = real, columnas = predicho):")
+    labels = sorted(y.unique())
+    cm = confusion_matrix(y_te, y_pred, labels=labels)
+    ancho = max(len(str(name)) for name in labels) + 2
+    print(" " * ancho + "".join(f"{str(name)[:10]:>12}" for name in labels))
+    for name, fila in zip(labels, cm):
+        print(f"{str(name):<{ancho}}" + "".join(f"{v:>12,}".replace(",", ".") for v in fila))
+
+    # persisted so the report can cite the numbers without re-running the whole selection
+    metrics = {
+        "accuracy": float(accuracy_score(y_te, y_pred)),
+        "report": classification_report(y_te, y_pred, zero_division=0, output_dict=True),
+        "confusion_matrix": {"labels": [str(x) for x in labels], "matrix": cm.tolist()},
+        "n_train": int(len(x_tr)),
+        "n_test": int(len(x_te)),
+        "n_features": int(len(ranking)),
+    }
+    Path("data/processed/uwf_metrics.json").write_text(
+        json.dumps(metrics, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+    print("\n-> métricas: data/processed/uwf_metrics.json")
 
     ranking.to_frame("importance").to_parquet("data/processed/uwf_feature_ranking.parquet")
     print("-> ranking: data/processed/uwf_feature_ranking.parquet")
