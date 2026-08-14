@@ -79,7 +79,7 @@ export default function Fingerprints({ data }: { data: FingerprintData }) {
 
       <Reveal delay={100}>
         <div className="rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-4">
-          <div className="text-[11px] text-white/60 leading-relaxed max-w-3xl">
+          <div className="text-[11px] text-white/60 leading-relaxed">
             {t.fingerprints.lesson}
           </div>
         </div>

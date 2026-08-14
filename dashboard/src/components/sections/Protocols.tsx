@@ -116,7 +116,7 @@ export default function Protocols({ detail }: { detail: ProtocolDetail[] }) {
 
       <Reveal>
         <div className="rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-4">
-          <div className="text-[11px] text-white/60 leading-relaxed max-w-3xl">
+          <div className="text-[11px] text-white/60 leading-relaxed">
             {t.protocols.intro1}{' '}
             <span className="text-white/85">{t.protocols.introStrong}</span>{' '}
             {t.protocols.intro2}
@@ -232,7 +232,7 @@ export default function Protocols({ detail }: { detail: ProtocolDetail[] }) {
           <div className="text-[9px] uppercase tracking-wider text-white/35 mb-2">
             {t.protocols.lessonTitle}
           </div>
-          <div className="text-[11px] text-white/55 leading-relaxed max-w-3xl">
+          <div className="text-[11px] text-white/55 leading-relaxed">
             {t.protocols.lesson}
           </div>
         </div>

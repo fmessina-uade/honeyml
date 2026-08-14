@@ -79,7 +79,7 @@ export default function MitreMatrix({ replays, stages }: { replays: Replay[]; st
               {OBSERVED.length}/{OBSERVED.length + NOT_OBSERVED.length} {t.mitre.observed}
             </span>
           </div>
-          <div className="text-[11px] text-white/45 mt-1.5 leading-relaxed max-w-3xl">
+          <div className="text-[11px] text-white/45 mt-1.5 leading-relaxed">
             {t.mitre.coverageNote}
           </div>
 
@@ -274,7 +274,7 @@ export default function MitreMatrix({ replays, stages }: { replays: Replay[]; st
           <div className="text-[9px] uppercase tracking-wider text-white/35 mb-1">
             {t.mitre.stagesTitle}
           </div>
-          <div className="text-[11px] text-white/45 mb-3 leading-relaxed max-w-3xl">
+          <div className="text-[11px] text-white/45 mb-3 leading-relaxed">
             {t.mitre.stagesNote}
           </div>
           <div className="bar-group flex flex-col gap-2">

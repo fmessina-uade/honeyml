@@ -56,11 +56,11 @@ export default function PasswordCheck() {
           {t.passcheck.title}
         </span>
       </div>
-      <div className="text-[11px] text-white/50 mt-1.5 leading-relaxed max-w-2xl">
+      <div className="text-[11px] text-white/50 mt-1.5 leading-relaxed">
         {t.passcheck.intro}
       </div>
 
-      <form onSubmit={check} className="flex gap-2 mt-3 max-w-md">
+      <form onSubmit={check} className="flex gap-2 mt-3 max-w-xl">
         <input
           type="password"
           value={value}
@@ -108,7 +108,7 @@ export default function PasswordCheck() {
             <div className="text-[12px] text-white/85">
               {result.found ? t.passcheck.foundTitle : t.passcheck.safeTitle}
             </div>
-            <div className="text-[11px] text-white/55 mt-1 leading-relaxed max-w-xl">
+            <div className="text-[11px] text-white/55 mt-1 leading-relaxed">
               {result.found
                 ? t.passcheck.foundBody(n(result.count))
                 : t.passcheck.safeBody}
@@ -118,7 +118,7 @@ export default function PasswordCheck() {
       )}
 
       {/* The mechanism is part of the lesson, so it is stated rather than buried. */}
-      <div className="text-[10px] text-white/30 mt-3 leading-relaxed max-w-2xl">
+      <div className="text-[10px] text-white/30 mt-3 leading-relaxed">
         {t.passcheck.privacy}
       </div>
     </div>
