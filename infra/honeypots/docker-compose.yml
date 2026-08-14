@@ -70,14 +70,23 @@ services:
       # Dockerfile (COPY to template/). Don't bind-mount over /opt/dionaea/etc: it breaks init_etc.
       - dionaea_var:/opt/dionaea/var
     healthcheck:
-      # nc isn't in the image; bash /dev/tcp needs no external binary.
-      # generous timeout/retries: under heavy attack load Dionaea pegs a core and can be slow to
-      # answer the probe, which used to flag it unhealthy while it was actually capturing fine.
-      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/80' && bash -c '</dev/tcp/127.0.0.1/445'"]
-      interval: 45s
-      timeout: 20s
-      retries: 5
-      start_period: 60s
+      # NOT a port probe. Two reasons it cannot work here:
+      #  - Dionaea binds with listen.mode=getifaddrs, which skips loopback, so 127.0.0.1 refuses.
+      #  - Under sustained load it pegs a core and takes over two minutes to complete a handshake,
+      #    even on its own address, while it is still capturing perfectly well.
+      # The observed failure mode is different anyway: the process stays alive and the port keeps
+      # accepting (that is docker-proxy, not Dionaea) while it silently stops processing. The only
+      # signal that catches it is the log going quiet.
+      test:
+        - CMD-SHELL
+        - >-
+          pgrep -x dionaea >/dev/null &&
+          [ $$(( $$(date +%s) - $$(stat -c %Y /opt/dionaea/var/lib/dionaea/dionaea.json) )) -lt 1800 ]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      # the log must have been written recently; after a restart that is inherited from before
+      start_period: 120s
     security_opt:
       - no-new-privileges:true
     # cap_drop:ALL doesn't work with Dionaea: the entrypoint writes dirs owned by dionaea:dionaea.
