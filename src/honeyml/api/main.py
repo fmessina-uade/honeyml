@@ -19,6 +19,7 @@ from urllib.error import URLError
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+from ..education import fingerprints, password_index
 from . import offline, queries
 
 REPLAY_FILE = Path("data/processed/replay_sessions.json")
@@ -123,6 +124,12 @@ def get_stages() -> list[dict[str, Any]]:
     return _live_or_frozen(queries.attack_stages, "stages")
 
 
+@app.get("/api/hourly")
+def get_hourly() -> list[dict[str, Any]]:
+    """Attacks by hour of day: shows the absence of a human rhythm."""
+    return _live_or_frozen(queries.hourly, "hourly")
+
+
 @app.get("/api/snapshot")
 def get_snapshot() -> dict[str, Any]:
     """Everything at once: one round trip for the dashboard's initial load."""
@@ -140,6 +147,35 @@ def get_snapshot() -> dict[str, Any]:
                 ),
             ) from exc
         return frozen
+
+
+@app.get("/api/fingerprints")
+def get_fingerprints() -> dict[str, Any]:
+    """Families of sessions running a byte-identical command sequence."""
+    data = fingerprints.load()
+    if data is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Faltan las familias. Generalas con: make fingerprints",
+        )
+    return data
+
+
+@app.get("/api/password-check")
+def check_password(prefix: str) -> dict[str, Any]:
+    """k-anonymity lookup: takes a hash prefix, never a password.
+
+    See honeyml/education/password_index for why the comparison is split this way.
+    """
+    if not prefix or len(prefix) > 8 or not all(c in "0123456789abcdefABCDEF" for c in prefix):
+        raise HTTPException(status_code=400, detail="Prefijo inválido.")
+    index = password_index.load()
+    if index is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Falta el índice de contraseñas. Generalo con: make passwords",
+        )
+    return password_index.lookup(prefix, index)
 
 
 @app.get("/api/replays")

@@ -221,6 +221,12 @@ validate-indexing-resumen:
 snapshot:
 	@./.venv/bin/python -m honeyml.api.offline
 
+fingerprints:
+	@./.venv/bin/python -m honeyml.education.fingerprints
+
+passwords:
+	@./.venv/bin/python -m honeyml.education.password_index
+
 replays:
 	@./.venv/bin/python -m honeyml.education.session_replay
 

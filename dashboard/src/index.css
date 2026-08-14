@@ -194,3 +194,19 @@ body { background: var(--abyss-black); color: #fff; }
     animation: none !important;
   }
 }
+
+/* ---- capture mode: freeze everything so report screenshots are reproducible ---- */
+:root[data-capture='on'] .reveal {
+  opacity: 1 !important;
+  transform: none !important;
+  transition: none !important;
+}
+:root[data-capture='on'] *,
+:root[data-capture='on'] *::before,
+:root[data-capture='on'] *::after {
+  animation: none !important;
+  transition: none !important;
+}
+:root[data-capture='on'] .terminal-cursor {
+  opacity: 1;
+}

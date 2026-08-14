@@ -27,6 +27,9 @@ export interface ReplayStep {
   command: string;
   what: string;
   why: string;
+  /** English copy, served by the API so the language toggle also covers the replay. */
+  what_en: string;
+  why_en: string;
   tactic: string;
   technique: string;
 }
@@ -47,6 +50,38 @@ export interface ProtocolDetail {
   port: number | null;
 }
 
+export interface HourPoint {
+  hour: number;
+  count: number;
+  logins: number;
+}
+
+export interface Family {
+  label: string;
+  sessions: number;
+  sources: number;
+  commands: string[];
+  truncated: boolean;
+  total_commands: number;
+  tactics: string[];
+  first_seen?: string;
+  last_seen?: string;
+}
+
+export interface FingerprintData {
+  families: Family[];
+  total_sessions: number;
+  families_found: number;
+  grouped_sessions: number;
+}
+
+export interface PasswordCheckResult {
+  prefix: string;
+  matches: { suffix: string; count: number }[];
+  distinct: number;
+  attempts: number;
+}
+
 export interface Health {
   status: string;
   mode: 'live' | 'snapshot' | 'none';
@@ -61,6 +96,7 @@ export interface Snapshot {
   protocols: Bucket[];
   stages: Bucket[];
   protocol_detail: ProtocolDetail[];
+  hourly: HourPoint[];
   generated_at?: string;
 }
 
@@ -75,4 +111,7 @@ export const api = {
   overview: () => get<Overview>('/overview'),
   replays: () => get<Replay[]>('/replays'),
   health: () => get<Health>('/health'),
+  fingerprints: () => get<FingerprintData>('/fingerprints'),
+  passwordCheck: (prefix: string) =>
+    get<PasswordCheckResult>(`/password-check?prefix=${encodeURIComponent(prefix)}`),
 };

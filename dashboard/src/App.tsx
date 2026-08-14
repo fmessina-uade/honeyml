@@ -1,53 +1,49 @@
 import { useEffect, useState } from 'react';
-import { Radar, Terminal, BookOpen, Grid3x3, Network, AlertTriangle, Archive } from 'lucide-react';
-import { api, type Health, type Replay, type Snapshot } from './lib/api';
+import {
+  Radar,
+  Terminal,
+  BookOpen,
+  Grid3x3,
+  Network,
+  Fingerprint,
+  Camera,
+  AlertTriangle,
+  Archive,
+} from 'lucide-react';
+import { api, type FingerprintData, type Health, type Replay, type Snapshot } from './lib/api';
+import { useI18n } from './lib/i18n';
+import LangToggle from './components/LangToggle';
 import Pulse from './components/sections/Pulse';
 import SessionReplay from './components/sections/SessionReplay';
 import Dictionary from './components/sections/Dictionary';
 import MitreMatrix from './components/sections/MitreMatrix';
 import Protocols from './components/sections/Protocols';
+import Fingerprints from './components/sections/Fingerprints';
+import AttackCanvas from './components/AttackCanvas';
 
+// Order is narrative: scale, then one concrete intrusion, then the whole surface, then the
+// evidence behind the advice, and finally the formal framework.
 const SECTIONS = [
-  {
-    id: 'pulso',
-    icon: Radar,
-    label: 'El pulso',
-    lead: 'Un equipo que nadie publicó en ningún lado, expuesto a internet. Esto es lo que recibe.',
-  },
-  {
-    id: 'anatomia',
-    icon: Terminal,
-    label: 'Anatomía de un ataque',
-    lead: 'Una intrusión real capturada, reproducida paso a paso. Cada comando, explicado.',
-  },
-  {
-    id: 'protocolos',
-    icon: Network,
-    label: 'Más allá de SSH',
-    lead: 'SSH es la puerta que todos se acuerdan de cerrar. Estas son las otras, y lo que llegó a cada una.',
-  },
-  {
-    id: 'diccionario',
-    icon: BookOpen,
-    label: 'Diccionario del atacante',
-    lead: 'Qué credenciales prueban y por qué. La evidencia detrás de cada consejo de seguridad.',
-  },
-  {
-    id: 'mitre',
-    icon: Grid3x3,
-    label: 'Tácticas MITRE',
-    lead: 'El marco con el que se clasifica cada acción, iluminado con las capturas propias.',
-  },
+  { id: 'pulso', icon: Radar },
+  { id: 'anatomia', icon: Terminal },
+  { id: 'protocolos', icon: Network },
+  { id: 'diccionario', icon: BookOpen },
+  { id: 'huellas', icon: Fingerprint },
+  { id: 'mitre', icon: Grid3x3 },
 ] as const;
 
 type SectionId = (typeof SECTIONS)[number]['id'];
 
 export default function App() {
+  const { t } = useI18n();
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [health, setHealth] = useState<Health | null>(null);
   const [replays, setReplays] = useState<Replay[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [active, setActive] = useState<SectionId>('pulso');
+  const [families, setFamilies] = useState<FingerprintData | null>(null);
+  // capture mode freezes every animation so report screenshots are reproducible
+  const [capture, setCapture] = useState(false);
 
   useEffect(() => {
     Promise.all([api.snapshot(), api.replays()])
@@ -57,22 +53,35 @@ export default function App() {
       })
       .catch((e) => setError(String(e)));
     // separate call: the panel must still load if health is unavailable
-    api.health().then(setHealth).catch(() => setHealth(null));
+    api
+      .health()
+      .then(setHealth)
+      .catch(() => setHealth(null));
+    api.fingerprints().then(setFamilies).catch(() => setFamilies(null));
   }, []);
 
-  const section = SECTIONS.find((s) => s.id === active)!;
+  useEffect(() => {
+    document.documentElement.dataset.capture = capture ? 'on' : 'off';
+  }, [capture]);
 
   return (
     <div className="min-h-screen flex">
       {/* Sidebar */}
       <aside className="w-56 shrink-0 border-r border-white/5 bg-[#0f141b] p-4 flex flex-col">
-        <div className="flex items-center gap-2 mb-6">
-          <span className="w-7 h-7 rounded-lg bg-[var(--honey-amber)] flex items-center justify-center text-[13px] font-bold text-[#0d1117]">
-            H
-          </span>
+        <div className="flex items-center gap-2.5 mb-6">
+          <img
+            src="/favicon.png"
+            alt=""
+            aria-hidden
+            className="w-8 h-8 rounded-lg shrink-0"
+            width={32}
+            height={32}
+          />
           <div>
-            <div className="text-[13px] font-medium text-white font-mono-display">HoneyML</div>
-            <div className="text-[9px] text-white/40">Panel educativo</div>
+            <div className="text-[13px] font-medium text-white font-mono-display">
+              {t.brand.name}
+            </div>
+            <div className="text-[9px] text-white/40">{t.brand.subtitle}</div>
           </div>
         </div>
 
@@ -89,11 +98,7 @@ export default function App() {
             >
               {active === s.id && (
                 <>
-                  <span
-                    key={`sheen-${s.id}`}
-                    className="nav-sheen"
-                    aria-hidden
-                  />
+                  <span key={`sheen-${s.id}`} className="nav-sheen" aria-hidden />
                   <span
                     className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-full"
                     style={{ background: 'var(--honey-amber)' }}
@@ -101,20 +106,36 @@ export default function App() {
                 </>
               )}
               <s.icon className="w-3.5 h-3.5 shrink-0" />
-              {s.label}
+              {t.nav[s.id]}
             </button>
           ))}
         </nav>
 
-        <div className="mt-auto pt-4 border-t border-white/5">
+        <div className="mt-auto pt-4 border-t border-white/5 flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <LangToggle />
+            <button
+              onClick={() => setCapture((c) => !c)}
+              title={t.capture.hint}
+              aria-pressed={capture}
+              className={`flex items-center justify-center rounded-full p-1.5 transition ${
+                capture
+                  ? 'bg-[var(--honey-amber)]/20 text-[var(--honey-amber)] ring-1 ring-[var(--honey-amber)]/40'
+                  : 'bg-white/5 text-white/35 ring-1 ring-white/10 hover:text-white/70'
+              }`}
+            >
+              <Camera className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
           {health?.mode === 'snapshot' ? (
             <div
               className="flex items-start gap-1.5 text-[10px] text-white/40"
-              title={`Snapshot tomado el ${health.generated_at?.slice(0, 16).replace('T', ' ')}`}
+              title={`${t.footer.frozenTitle} ${health.generated_at?.slice(0, 16).replace('T', ' ')}`}
             >
               <Archive className="w-3 h-3 shrink-0 mt-[1px] text-[var(--honey-amber)]" />
               <span>
-                Snapshot congelado
+                {t.footer.frozen}
                 <span className="block font-data text-[9px] text-white/25">
                   {health.generated_at?.slice(0, 10)}
                 </span>
@@ -123,13 +144,12 @@ export default function App() {
           ) : (
             <div className="flex items-center gap-1.5 text-[10px] text-white/40">
               <span className="w-1.5 h-1.5 rounded-full bg-[var(--neural-teal)] animate-pulse" />
-              Datos reales capturados
+              {t.footer.live}
             </div>
           )}
           {snapshot && (
-            <div className="font-data text-[9px] text-white/25 mt-1">
-              {snapshot.overview.first_event?.slice(0, 10)} a{' '}
-              {snapshot.overview.last_event?.slice(0, 10)}
+            <div className="font-data text-[9px] text-white/25 -mt-2">
+              {snapshot.overview.first_event?.slice(0, 10)} → {snapshot.overview.last_event?.slice(0, 10)}
             </div>
           )}
         </div>
@@ -137,27 +157,30 @@ export default function App() {
 
       {/* Main */}
       <main className="flex-1 p-6 max-w-[1400px]">
-        <header key={`h-${active}`} className="mb-5 section-in">
-          <h1 className="text-xl text-white font-mono-display">{section.label}</h1>
-          <p className="text-[13px] text-white/50 mt-1.5 max-w-2xl leading-relaxed">
-            {section.lead}
-          </p>
+        <header key={`h-${active}`} className="relative mb-5 section-in -mx-6 -mt-6 px-6 pt-6 pb-4">
+          {snapshot && <AttackCanvas intensity={snapshot.timeline.map((d) => d.count)} />}
+          <div className="relative">
+            <h1 className="text-xl text-white font-mono-display">{t.nav[active]}</h1>
+            <p className="text-[13px] text-white/50 mt-1.5 max-w-2xl leading-relaxed">
+              {t.lead[active]}
+            </p>
+          </div>
         </header>
 
         {error && (
           <div className="rounded-xl ring-1 ring-[var(--agent-coral)]/30 bg-[var(--agent-coral)]/5 p-4 flex gap-3">
             <AlertTriangle className="w-4 h-4 text-[var(--agent-coral)] shrink-0 mt-0.5" />
             <div>
-              <div className="text-[13px] text-white/85">No se pudo cargar la telemetría</div>
+              <div className="text-[13px] text-white/85">{t.error.title}</div>
               <div className="font-data text-[11px] text-white/45 mt-1">{error}</div>
               <div className="text-[11px] text-white/45 mt-2">
-                Verificá que la API esté corriendo: <span className="font-data">make api</span>
+                {t.error.hint} <span className="font-data">make api</span>
               </div>
             </div>
           </div>
         )}
 
-        {/* Skeleton rather than a spinner: the snapshot runs six aggregations over 1,8 M
+        {/* Skeleton rather than a spinner: the snapshot runs several aggregations over 1,9 M
             documents and takes a beat, and a layout that does not jump reads as deliberate. */}
         {!snapshot && !error && (
           <div className="flex flex-col gap-3 animate-pulse">
@@ -173,7 +196,11 @@ export default function App() {
         {snapshot && (
           <div key={active} className="section-in">
             {active === 'pulso' && (
-              <Pulse overview={snapshot.overview} timeline={snapshot.timeline} />
+              <Pulse
+                overview={snapshot.overview}
+                timeline={snapshot.timeline}
+                hourly={snapshot.hourly}
+              />
             )}
             {active === 'anatomia' && <SessionReplay replays={replays} />}
             {active === 'diccionario' && (
@@ -183,6 +210,14 @@ export default function App() {
               />
             )}
             {active === 'protocolos' && <Protocols detail={snapshot.protocol_detail} />}
+            {active === 'huellas' &&
+              (families ? (
+                <Fingerprints data={families} />
+              ) : (
+                <div className="rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-8 text-center text-[13px] text-white/50">
+                  {t.error.title}
+                </div>
+              ))}
             {active === 'mitre' && <MitreMatrix replays={replays} stages={snapshot.stages} />}
           </div>
         )}

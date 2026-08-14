@@ -157,6 +157,31 @@ def protocol_detail(es_url: str = ES_URL) -> list[dict[str, Any]]:
     return out
 
 
+def hourly(es_url: str = ES_URL) -> list[dict[str, Any]]:
+    """Attacks by hour of day, in UTC.
+
+    The interesting part is that this distribution is flat. Human activity has office hours;
+    a flat curve is the signature of automation, and it is easier to show than to assert.
+    """
+    body = {
+        "size": 0,
+        "query": NOT_LOCAL,
+        "aggs": {
+            "h": {
+                "date_histogram": {"field": "@timestamp", "calendar_interval": "hour"},
+                "aggs": {"logins": {"filter": {"term": {"event.action": "login"}}}},
+            }
+        },
+    }
+    per_hour = [0] * 24
+    logins_per_hour = [0] * 24
+    for b in _search(body, es_url)["aggregations"]["h"]["buckets"]:
+        hour = int(b["key_as_string"][11:13])
+        per_hour[hour] += b["doc_count"]
+        logins_per_hour[hour] += b["logins"]["doc_count"]
+    return [{"hour": h, "count": per_hour[h], "logins": logins_per_hour[h]} for h in range(24)]
+
+
 def snapshot(es_url: str = ES_URL) -> dict[str, Any]:
     """Everything the dashboard needs, in one object (also used for the offline snapshot)."""
     return {
@@ -167,4 +192,5 @@ def snapshot(es_url: str = ES_URL) -> dict[str, Any]:
         "protocols": protocols(es_url),
         "stages": attack_stages(es_url),
         "protocol_detail": protocol_detail(es_url),
+        "hourly": hourly(es_url),
     }

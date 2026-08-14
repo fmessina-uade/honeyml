@@ -1,9 +1,10 @@
 import { Activity, Fingerprint, KeyRound, TerminalSquare } from 'lucide-react';
-import type { Overview, TimelinePoint } from '../../lib/api';
+import type { HourPoint, Overview, TimelinePoint } from '../../lib/api';
 import CountUp from '../CountUp';
 import Reveal from '../Reveal';
 import Tooltip, { useTooltip } from '../Tooltip';
 import { n, pct, dec } from '../../lib/format';
+import { useI18n } from '../../lib/i18n';
 
 const SENSOR_COLOR: Record<string, string> = {
   cowrie: 'var(--honey-amber)',
@@ -13,9 +14,9 @@ const SENSOR_COLOR: Record<string, string> = {
 
 
 /** Long date for the tooltip: "lunes, 3 de junio". Reads better than an ISO string. */
-function longDate(iso: string): string {
+function longDate(iso: string, lang: 'es' | 'en'): string {
   const [y, m, d] = iso.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('es-AR', {
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(lang === 'en' ? 'en-GB' : 'es-AR', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -32,51 +33,72 @@ function longDate(iso: string): string {
 export default function Pulse({
   overview,
   timeline,
+  hourly,
 }: {
   overview: Overview;
   timeline: TimelinePoint[];
+  hourly: HourPoint[];
 }) {
+  const { t, lang } = useI18n();
   const tip = useTooltip();
-  const days = timeline.filter((t) => t.count > 0).length;
+  const days = timeline.filter((d) => d.count > 0).length;
   const perDay = days ? Math.round(overview.events / days) : 0;
   const peak = timeline.reduce((a, b) => (b.count > a.count ? b : a), timeline[0]);
 
   const tiles = [
     {
       icon: Activity,
-      label: 'Eventos capturados',
+      label: t.pulse.events,
       value: overview.events,
-      sub: `${n(perDay)} por día en promedio`,
+      sub: t.pulse.perDay(n(perDay)),
       glow: 'var(--honey-amber)',
-      detail: `Pico de ${n(peak?.count ?? 0)} eventos el ${peak ? longDate(peak.date) : '—'}.`,
+      detail: t.pulse.peak(n(peak?.count ?? 0), peak ? longDate(peak.date, lang) : '—'),
     },
     {
       icon: Fingerprint,
-      label: 'Direcciones atacantes',
+      label: t.pulse.addresses,
       value: overview.unique_ips,
-      sub: `en ${days} días con captura`,
+      sub: t.pulse.inDays(days),
       glow: 'var(--neural-teal)',
-      detail: `Una dirección distinta cada ${Math.round((days * 24 * 60) / (overview.unique_ips || 1))} minutos.`,
+      detail: t.pulse.oneEvery(Math.round((days * 24 * 60) / (overview.unique_ips || 1))),
     },
     {
       icon: KeyRound,
-      label: 'Intentos de acceso',
+      label: t.pulse.logins,
       value: overview.logins,
-      sub: `${n(overview.logins_success)} lograron entrar`,
+      sub: t.pulse.gotIn(n(overview.logins_success)),
       glow: 'var(--agent-coral)',
-      detail: `${pct(overview.logins_success, overview.logins)}% de los intentos acertó una credencial del señuelo.`,
+      detail: t.pulse.hitRate(pct(overview.logins_success, overview.logins)),
     },
     {
       icon: TerminalSquare,
-      label: 'Comandos ejecutados',
+      label: t.pulse.commands,
       value: overview.commands,
-      sub: 'dentro del señuelo',
+      sub: t.pulse.insideDecoy,
       glow: 'var(--honey-amber)',
-      detail: `${dec(overview.commands / (overview.logins_success || 1))} comandos por sesión que logró entrar.`,
+      detail: t.pulse.perSession(dec(overview.commands / (overview.logins_success || 1))),
     },
   ];
 
-  const max = Math.max(...timeline.map((t) => t.count), 1);
+  const max = Math.max(...timeline.map((d) => d.count), 1);
+  const maxHour = Math.max(...hourly.map((h) => h.count), 1);
+  const minHour = hourly.length ? Math.min(...hourly.map((h) => h.count)) : 0;
+  // peak-to-trough: a human rhythm sits well above 3x, automation stays near 1
+  const ratio = minHour > 0 ? maxHour / minHour : 0;
+
+  // outages read straight off the timeline, so the panel can never disagree with its own chart
+  const outages: { from: string; to: string; days: number }[] = [];
+  let run: string[] = [];
+  for (const d of timeline) {
+    if (d.count === 0) run.push(d.date);
+    else if (run.length) {
+      if (run.length >= 2) {
+        outages.push({ from: run[0], to: run[run.length - 1], days: run.length });
+      }
+      run = [];
+    }
+  }
+  if (run.length >= 2) outages.push({ from: run[0], to: run[run.length - 1], days: run.length });
   const sensors = Object.keys(overview.by_sensor);
 
   return (
@@ -84,30 +106,30 @@ export default function Pulse({
       <Tooltip content={tip.content} at={tip.at} />
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {tiles.map((t, i) => (
-          <Reveal key={t.label} delay={i * 80}>
+        {tiles.map((tile, i) => (
+          <Reveal key={tile.label} delay={i * 80}>
             <div
               className="tile rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-4 h-full cursor-default"
               onMouseMove={(e) =>
                 tip.show(
                   e,
                   <div className="max-w-[240px]">
-                    <div className="text-[11px] text-white/85 leading-snug">{t.detail}</div>
+                    <div className="text-[11px] text-white/85 leading-snug">{tile.detail}</div>
                   </div>,
                 )
               }
               onMouseLeave={tip.hide}
             >
-              <span className="tile-glow" style={{ background: t.glow }} />
+              <span className="tile-glow" style={{ background: tile.glow }} />
               <div className="relative">
                 <div className="flex items-center gap-2 text-white/35">
-                  <t.icon className="w-3.5 h-3.5" />
-                  <span className="text-[9px] uppercase tracking-wider">{t.label}</span>
+                  <tile.icon className="w-3.5 h-3.5" />
+                  <span className="text-[9px] uppercase tracking-wider">{tile.label}</span>
                 </div>
                 <div className="font-data text-2xl text-white mt-2">
-                  <CountUp end={t.value} />
+                  <CountUp end={tile.value} />
                 </div>
-                <div className="text-[10px] text-white/40 mt-1">{t.sub}</div>
+                <div className="text-[10px] text-white/40 mt-1">{tile.sub}</div>
               </div>
             </div>
           </Reveal>
@@ -118,7 +140,7 @@ export default function Pulse({
         <div className="rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-4">
           <div className="flex items-baseline justify-between mb-1 flex-wrap gap-2">
             <span className="text-[9px] uppercase tracking-wider text-white/35">
-              Actividad diaria por sensor
+              {t.pulse.chartTitle}
             </span>
             <div className="flex items-center gap-3">
               {sensors.map((s) => (
@@ -137,29 +159,29 @@ export default function Pulse({
           </div>
 
           <div className="bar-group flex items-end gap-[2px] h-32 mt-3">
-            {timeline.map((t) => {
-              const empty = t.count === 0;
+            {timeline.map((d) => {
+              const empty = d.count === 0;
               return (
                 <div
-                  key={t.date}
+                  key={d.date}
                   className="bar-item flex-1 flex flex-col justify-end h-full transition-opacity duration-200 cursor-default"
                   onMouseMove={(e) =>
                     tip.show(
                       e,
                       <div className="min-w-[168px]">
-                        <div className="text-[11px] text-white/90 first-letter:uppercase">{longDate(t.date)}</div>
+                        <div className="text-[11px] text-white/90 first-letter:uppercase">{longDate(d.date, lang)}</div>
                         {empty ? (
                           <div className="text-[10px] text-white/45 mt-1.5 max-w-[190px] leading-snug">
-                            Sin captura. Interrupción documentada, no ausencia de ataques.
+                            {t.pulse.noCapture}
                           </div>
                         ) : (
                           <>
                             <div className="font-data text-[15px] text-white mt-0.5">
-                              {n(t.count)}
+                              {n(d.count)}
                             </div>
                             <div className="flex flex-col gap-0.5 mt-1.5">
                               {sensors.map((s) => {
-                                const v = (t as unknown as Record<string, number>)[s] ?? 0;
+                                const v = (d as unknown as Record<string, number>)[s] ?? 0;
                                 return (
                                   <span
                                     key={s}
@@ -176,7 +198,7 @@ export default function Pulse({
                               })}
                             </div>
                             <div className="text-[9px] text-white/30 mt-1.5">
-                              {pct(t.count, overview.events)}% del total capturado
+                              {t.pulse.ofTotal(pct(d.count, overview.events))}
                             </div>
                           </>
                         )}
@@ -189,7 +211,7 @@ export default function Pulse({
                     <div className="w-full border-b border-dashed border-white/12" />
                   ) : (
                     sensors.map((s) => {
-                      const v = (t as unknown as Record<string, number>)[s] ?? 0;
+                      const v = (d as unknown as Record<string, number>)[s] ?? 0;
                       if (!v) return null;
                       return (
                         <div
@@ -209,8 +231,91 @@ export default function Pulse({
           </div>
 
           <div className="text-[10px] text-white/35 mt-2.5 leading-relaxed">
-            Las líneas punteadas son interrupciones de captura documentadas, no ausencia de ataques.
-            Pasá el cursor por cualquier día para ver el detalle.
+            {t.pulse.chartNote}
+          </div>
+        </div>
+      </Reveal>
+
+      {/* Hour of day: the flat curve is the finding. Human traffic has office hours; this does
+          not, because there is nobody on the other side. */}
+      <Reveal delay={260}>
+        <div className="grid lg:grid-cols-[1fr_320px] gap-3">
+          <div className="rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-4">
+            <div className="flex items-baseline justify-between gap-3 flex-wrap">
+              <span className="text-[9px] uppercase tracking-wider text-white/35">
+                {t.pulse.busiest}
+              </span>
+              <span className="font-data text-[10px] text-white/30">
+                {t.pulse.ratio(dec(ratio))}
+              </span>
+            </div>
+
+            <div className="bar-group flex items-end gap-[3px] h-20 mt-3">
+              {hourly.map((h) => (
+                <div
+                  key={h.hour}
+                  className="bar-item flex-1 flex flex-col justify-end h-full transition-opacity duration-200 cursor-default"
+                  onMouseMove={(e) =>
+                    tip.show(
+                      e,
+                      <div className="min-w-[150px]">
+                        <div className="font-data text-[11px] text-white/90">
+                          {String(h.hour).padStart(2, '0')}:00 UTC
+                        </div>
+                        <div className="font-data text-[15px] text-white mt-0.5">{n(h.count)}</div>
+                        <div className="text-[10px] text-white/45">{t.pulse.events_short}</div>
+                        <div className="text-[10px] text-white/40 mt-1.5 pt-1.5 border-t border-white/8">
+                          {n(h.logins)} {t.pulse.loginsAtThisHour}
+                        </div>
+                      </div>,
+                    )
+                  }
+                  onMouseLeave={tip.hide}
+                >
+                  <div
+                    className="w-full rounded-sm transition-all duration-700"
+                    style={{
+                      height: `${(h.count / maxHour) * 100}%`,
+                      background: 'var(--honey-amber)',
+                      opacity: 0.55 + (h.count / maxHour) * 0.45,
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-between font-data text-[9px] text-white/25 mt-1.5">
+              <span>00</span>
+              <span>06</span>
+              <span>12</span>
+              <span>18</span>
+              <span>23</span>
+            </div>
+            <div className="text-[10px] text-white/40 mt-2.5 leading-relaxed">
+              {t.pulse.busiestNote}
+            </div>
+          </div>
+
+          {/* Outages, derived from the gaps in the timeline itself */}
+          <div className="rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-4">
+            <div className="text-[9px] uppercase tracking-wider text-white/35">
+              {t.pulse.outages}
+            </div>
+            <div className="flex flex-col gap-2 mt-3">
+              {outages.map((o) => (
+                <div
+                  key={o.from}
+                  className="flex items-center justify-between gap-2 rounded-lg bg-white/[0.02] ring-1 ring-white/5 px-2.5 py-2"
+                >
+                  <span className="font-data text-[10px] text-white/60">
+                    {o.from.slice(5)} → {o.to.slice(5)}
+                  </span>
+                  <span className="text-[10px] text-white/35">{t.pulse.days(o.days)}</span>
+                </div>
+              ))}
+            </div>
+            <div className="text-[10px] text-white/40 mt-3 leading-relaxed">
+              {t.pulse.outagesNote}
+            </div>
           </div>
         </div>
       </Reveal>

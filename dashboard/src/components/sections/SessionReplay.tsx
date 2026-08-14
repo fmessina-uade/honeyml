@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Play, Pause, RotateCcw, Terminal, Gauge } from 'lucide-react';
+import { Play, Pause, RotateCcw, Terminal, Gauge, Search } from 'lucide-react';
 import type { Replay } from '../../lib/api';
+import { useI18n } from '../../lib/i18n';
 
 // One tactic, one colour, reused across the whole dashboard.
 const TACTIC_COLOR: Record<string, string> = {
@@ -28,10 +29,12 @@ const SPEEDS = [
  * and re-read it, and autoplay alone makes that a race against the timer.
  */
 export default function SessionReplay({ replays }: { replays: Replay[] }) {
+  const { t, lang } = useI18n();
   const [selected, setSelected] = useState(0);
   const [step, setStep] = useState(0);
   const [playing, setPlaying] = useState(true);
   const [speed, setSpeed] = useState(1);
+  const [filter, setFilter] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const replay = replays[selected];
@@ -78,13 +81,26 @@ export default function SessionReplay({ replays }: { replays: Replay[] }) {
   if (!replay) {
     return (
       <div className="rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-8 text-center">
-        <div className="text-[13px] text-white/60">No hay sesiones con comandos para reproducir.</div>
+        <div className="text-[13px] text-white/60">{t.replay.empty}</div>
         <div className="text-[11px] text-white/35 mt-1">
-          Generalas con <span className="font-data">make replays</span> después de bajar logs frescos.
+          {t.replay.emptyHint}
         </div>
       </div>
     );
   }
+
+  // index is kept alongside so picking still selects the right session after filtering
+  const q = filter.trim().toLowerCase();
+  const visible = replays
+    .map((r, i) => ({ r, i }))
+    .filter(
+      ({ r }) =>
+        !q ||
+        r.attacker.toLowerCase().includes(q) ||
+        r.credentials.user.toLowerCase().includes(q) ||
+        r.credentials.password.toLowerCase().includes(q) ||
+        r.tactics.some((x) => x.toLowerCase().includes(q)),
+    );
 
   const current = replay.steps[Math.min(step, total - 1)];
   const done = step >= total - 1;
@@ -124,7 +140,7 @@ export default function SessionReplay({ replays }: { replays: Replay[] }) {
               className="flex items-center gap-1.5 rounded-md bg-white/5 hover:bg-white/10 px-2.5 py-1 text-[10px] text-white/70 transition"
             >
               {playing ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-              {playing ? 'Pausar' : 'Reproducir'}
+              {playing ? t.replay.pause : t.replay.play}
             </button>
             <button
               onClick={() => {
@@ -134,7 +150,7 @@ export default function SessionReplay({ replays }: { replays: Replay[] }) {
               className="flex items-center gap-1.5 rounded-md bg-white/5 hover:bg-white/10 px-2.5 py-1 text-[10px] text-white/70 transition"
             >
               <RotateCcw className="w-3 h-3" />
-              Reiniciar
+              {t.replay.restart}
             </button>
           </div>
         </div>
@@ -146,7 +162,7 @@ export default function SessionReplay({ replays }: { replays: Replay[] }) {
           <div className="text-[var(--neural-teal)] mb-3">
             <span className="text-white/40">$</span> ssh {replay.credentials.user}@honeypot
             <div className="text-white/40 mt-1">
-              Acceso concedido con {replay.credentials.user}:{replay.credentials.password}
+              {t.replay.accessGranted(replay.credentials.user, replay.credentials.password)}
             </div>
           </div>
 
@@ -155,7 +171,7 @@ export default function SessionReplay({ replays }: { replays: Replay[] }) {
               <button
                 onClick={() => seek(i)}
                 className="flex gap-2 text-left w-full group"
-                title="Ir a este paso"
+                title={t.replay.goToStep}
               >
                 <span style={{ color: tacticColor(s.tactic) }}>$</span>
                 <span
@@ -171,7 +187,7 @@ export default function SessionReplay({ replays }: { replays: Replay[] }) {
                   className="mt-1.5 ml-4 pl-3 border-l-2 text-[11px] text-white/55 leading-relaxed"
                   style={{ borderColor: tacticColor(s.tactic) }}
                 >
-                  {s.what}
+                  {lang === "en" && s.what_en ? s.what_en : s.what}
                 </div>
               )}
             </div>
@@ -181,7 +197,7 @@ export default function SessionReplay({ replays }: { replays: Replay[] }) {
           <div className="flex gap-2">
             <span className="text-white/40">$</span>
             {done && !playing ? (
-              <span className="text-white/30">sesión finalizada</span>
+              <span className="text-white/30">{t.replay.sessionEnded}</span>
             ) : (
               <span className="terminal-cursor" />
             )}
@@ -196,7 +212,7 @@ export default function SessionReplay({ replays }: { replays: Replay[] }) {
             max={Math.max(total - 1, 0)}
             value={Math.min(step, total - 1)}
             onChange={(e) => seek(Number(e.target.value))}
-            aria-label="Posición en la sesión"
+            aria-label={t.replay.step(step + 1, total)}
             className="w-full h-1 appearance-none bg-transparent cursor-pointer
                        [&::-webkit-slider-runnable-track]:h-1 [&::-webkit-slider-runnable-track]:rounded
                        [&::-webkit-slider-runnable-track]:bg-white/8
@@ -216,10 +232,8 @@ export default function SessionReplay({ replays }: { replays: Replay[] }) {
           />
           <div className="flex justify-between mt-1.5 text-[9px] text-white/35">
             <span>
-              Paso {Math.min(step + 1, total)} de {total}
-              <span className="text-white/20 ml-2 hidden sm:inline">
-                espacio pausa · ← → paso a paso
-              </span>
+              {t.replay.step(Math.min(step + 1, total), total)}
+              <span className="text-white/20 ml-2 hidden sm:inline">{t.replay.keys}</span>
             </span>
             <span>{replay.timestamp?.slice(0, 10)}</span>
           </div>
@@ -235,7 +249,7 @@ export default function SessionReplay({ replays }: { replays: Replay[] }) {
               style={{ background: tacticColor(current.tactic) }}
             />
             <span className="text-[11px] font-medium" style={{ color: tacticColor(current.tactic) }}>
-              {current.tactic}
+              {t.tactics[current.tactic as keyof typeof t.tactics]?.name ?? current.tactic}
             </span>
             {current.technique && (
               <a
@@ -243,30 +257,44 @@ export default function SessionReplay({ replays }: { replays: Replay[] }) {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-data text-[10px] text-white/35 hover:text-[var(--honey-amber)] transition underline decoration-dotted underline-offset-2"
-                title="Ver la técnica en MITRE ATT&CK"
+                title={t.replay.seeInMitre}
               >
                 [{current.technique}]
               </a>
             )}
           </div>
           <div key={step} className="section-in">
-            <div className="text-[13px] text-white/85 leading-relaxed mb-3">{current.what}</div>
+            <div className="text-[13px] text-white/85 leading-relaxed mb-3">{lang === "en" && current.what_en ? current.what_en : current.what}</div>
             <div className="text-[8px] uppercase tracking-wider text-white/30 mb-1">
-              Por qué lo hace
+              {t.replay.why}
             </div>
-            <div className="text-[12px] text-white/55 leading-relaxed">{current.why}</div>
+            <div className="text-[12px] text-white/55 leading-relaxed">{lang === "en" && current.why_en ? current.why_en : current.why}</div>
           </div>
         </div>
 
         <div className="rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-4">
           <div className="flex items-baseline justify-between mb-2">
             <span className="text-[8px] uppercase tracking-wider text-white/30">
-              Otras sesiones capturadas
+              {t.replay.others}
             </span>
-            <span className="font-data text-[9px] text-white/25">{replays.length} atacantes</span>
+            <span className="font-data text-[9px] text-white/25">{t.replay.attackers(replays.length)}</span>
           </div>
-          <div className="thin-scroll flex flex-col gap-1 max-h-[260px] overflow-y-auto pr-1">
-            {replays.map((r, i) => (
+          <div className="relative mb-2">
+            <Search className="w-3 h-3 text-white/25 absolute left-2 top-1/2 -translate-y-1/2" />
+            <input
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder={t.replay.search}
+              className="w-full rounded-md bg-white/[0.04] ring-1 ring-white/8 focus:ring-white/20
+                         pl-7 pr-2 py-1.5 text-[11px] text-white/80 placeholder:text-white/25
+                         outline-none transition font-data"
+            />
+          </div>
+          <div className="thin-scroll flex flex-col gap-1 max-h-[300px] overflow-y-auto pr-1">
+            {visible.length === 0 && (
+              <div className="text-[10px] text-white/30 py-3 text-center">{t.replay.noMatch}</div>
+            )}
+            {visible.map(({ r, i }) => (
               <button
                 key={r.attacker + i}
                 onClick={() => pick(i)}
@@ -298,7 +326,7 @@ export default function SessionReplay({ replays }: { replays: Replay[] }) {
                       style={{ background: tacticColor(t), opacity: i === selected ? 0.95 : 0.4 }}
                     />
                   ))}
-                  <span className="text-[9px] text-white/25 ml-1 shrink-0">{r.steps.length} cmd</span>
+                  <span className="text-[9px] text-white/25 ml-1 shrink-0">{r.steps.length} {t.replay.cmd}</span>
                 </div>
               </button>
             ))}

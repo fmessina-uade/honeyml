@@ -33,7 +33,9 @@ export default function CountUp({
     const start = performance.now();
     let raf = 0;
     const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / duration);
+      // clamp both ends: requestAnimationFrame can hand back a timestamp from before the
+      // performance.now() captured just above, and a negative t renders a negative figure
+      const t = Math.min(1, Math.max(0, (now - start) / duration));
       setValue(end * (1 - Math.pow(1 - t, 3)));
       if (t < 1) raf = requestAnimationFrame(tick);
     };
