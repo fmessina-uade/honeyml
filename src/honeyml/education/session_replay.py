@@ -29,7 +29,9 @@ LOCAL_IP = "127.0.0.1"
 # Commands that add nothing for a reader (empty lines the client sends on connect).
 MIN_COMMAND_LEN = 2
 # How many sessions to publish, and how long a session may be before we trim it.
-TOP_N = 12
+# One session per attacker (see build_replays), so this is really a cap on distinct attackers.
+# The captures yield ~260; the cap only guards against an unbounded file if that grows a lot.
+TOP_N = 400
 MAX_COMMANDS = 20
 
 
@@ -135,6 +137,8 @@ def build_replays(logs_dir: Path = LOGS_DIR, top_n: int = TOP_N) -> list[dict[st
                     "command": defang(cmd),
                     "what": a.what,
                     "why": a.why,
+                    "what_en": a.what_en,
+                    "why_en": a.why_en,
                     "tactic": a.tactic,
                     "technique": a.technique,
                 }

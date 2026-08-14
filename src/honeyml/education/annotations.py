@@ -4,7 +4,8 @@ Each entry explains what the command does, why an attacker runs it, and which MI
 tactic it maps to. This is the layer that makes the dashboard educational rather than analytical:
 the data alone shows *what* happened, these annotations explain *why it matters*.
 
-Text is in Spanish because it is user-facing content for the dashboard and the thesis.
+Every entry carries both Spanish and English: the panel has a language toggle, and leaving the
+replay explanations untranslated would break its most distinctive section.
 """
 
 from __future__ import annotations
@@ -21,6 +22,8 @@ class Annotation:
     why: str  # why an attacker runs it at this point of the intrusion
     tactic: str  # MITRE ATT&CK tactic
     technique: str  # MITRE ATT&CK technique id, empty when it doesn't map cleanly
+    what_en: str = ""  # same, in English
+    why_en: str = ""
 
 
 # Ordered: the first pattern that matches wins, so put the specific ones first.
@@ -31,6 +34,12 @@ RULES: list[tuple[re.Pattern[str], Annotation]] = [
             what="Consulta el nombre y la versión del núcleo del sistema.",
             why="Identifica el sistema operativo para elegir un exploit compatible. Es casi "
             "siempre el primer comando: antes de atacar hay que saber dónde se está parado.",
+            what_en="Queries the system's kernel name and version.",
+            why_en=(
+                "Identifies the operating system in order to pick a compatible exploit. It is "
+                "almost always the first command: before attacking you need to know where you are "
+                "standing."
+            ),
             tactic="Descubrimiento",
             technique="T1082",
         ),
@@ -41,6 +50,12 @@ RULES: list[tuple[re.Pattern[str], Annotation]] = [
             what="Lee las características del procesador y la memoria disponible.",
             why="Mide la capacidad de cómputo del equipo. Es el reconocimiento típico previo a "
             "instalar un minero de criptomonedas: cuanto más potente, más rentable.",
+            what_en="Reads the processor's characteristics and the available memory.",
+            why_en=(
+                "Measures the machine's compute capacity. This is the reconnaissance typically "
+                "done before installing a cryptocurrency miner: the more powerful, the more "
+                "profitable."
+            ),
             tactic="Descubrimiento",
             technique="T1082",
         ),
@@ -51,6 +66,11 @@ RULES: list[tuple[re.Pattern[str], Annotation]] = [
             what="Invoca BusyBox, el conjunto de utilidades mínimo de los sistemas embebidos.",
             why="Señal característica de las botnets de la familia Mirai: usan su presencia para "
             "confirmar que es un dispositivo de internet de las cosas y no una trampa.",
+            what_en="Invokes BusyBox, the minimal utility set of embedded systems.",
+            why_en=(
+                "A signature move of the Mirai family of botnets: they use its presence to "
+                "confirm this is an internet-of-things device and not a trap."
+            ),
             tactic="Descubrimiento",
             technique="T1082",
         ),
@@ -61,6 +81,11 @@ RULES: list[tuple[re.Pattern[str], Annotation]] = [
             what="Descarga un archivo desde un servidor remoto.",
             why="Trae la carga maliciosa al equipo comprometido. Es el momento en que la "
             "intrusión deja de ser exploratoria y pasa a instalar software.",
+            what_en="Downloads a file from a remote server.",
+            why_en=(
+                "Brings the malicious payload onto the compromised machine. This is the moment "
+                "the intrusion stops being exploratory and starts installing software."
+            ),
             tactic="Ejecución",
             technique="T1105",
         ),
@@ -71,6 +96,11 @@ RULES: list[tuple[re.Pattern[str], Annotation]] = [
             what="Cambia los permisos de un archivo, normalmente para hacerlo ejecutable.",
             why="Paso obligado después de descargar la carga: sin permiso de ejecución el "
             "archivo descargado es inofensivo.",
+            what_en="Changes a file's permissions, normally to make it executable.",
+            why_en=(
+                "A mandatory step after downloading the payload: without execute permission the "
+                "downloaded file is harmless."
+            ),
             tactic="Ejecución",
             technique="T1222",
         ),
@@ -81,6 +111,11 @@ RULES: list[tuple[re.Pattern[str], Annotation]] = [
             what="Escribe un archivo de prueba y verifica que haya quedado creado.",
             why="Comprueba en qué directorios puede escribir. Necesita un lugar donde dejar la "
             "carga maliciosa, y no todos los directorios se lo permiten.",
+            what_en="Writes a test file and checks that it was created.",
+            why_en=(
+                "Works out which directories it can write to. It needs somewhere to drop the "
+                "malicious payload, and not every directory will allow it."
+            ),
             tactic="Descubrimiento",
             technique="T1083",
         ),
@@ -91,6 +126,11 @@ RULES: list[tuple[re.Pattern[str], Annotation]] = [
             what="Recorre los procesos en ejecución del sistema.",
             why="Busca competencia: otros programas maliciosos ya instalados, o herramientas de "
             "seguridad que puedan delatarlo. Varias botnets eliminan a sus rivales.",
+            what_en="Walks through the system's running processes.",
+            why_en=(
+                "Looks for competition: other malicious programs already installed, or security "
+                "tools that could give it away. Several botnets kill their rivals."
+            ),
             tactic="Descubrimiento",
             technique="T1057",
         ),
@@ -101,6 +141,11 @@ RULES: list[tuple[re.Pattern[str], Annotation]] = [
             what="Muestra con qué usuario y permisos se está ejecutando la sesión.",
             why="Determina si ya tiene privilegios de administrador o si necesita escalarlos "
             "antes de continuar.",
+            what_en="Shows which user and permissions the session is running as.",
+            why_en=(
+                "Determines whether it already holds administrator privileges or needs to "
+                "escalate before continuing."
+            ),
             tactic="Descubrimiento",
             technique="T1033",
         ),
@@ -111,6 +156,11 @@ RULES: list[tuple[re.Pattern[str], Annotation]] = [
             what="Manipula las tareas programadas o los servicios de arranque.",
             why="Busca sobrevivir al reinicio del equipo. Sin esto, apagar la máquina elimina al "
             "intruso; con esto, vuelve solo.",
+            what_en="Manipulates scheduled tasks or start-up services.",
+            why_en=(
+                "Aims to survive a reboot. Without this, powering the machine off removes the "
+                "intruder; with it, the intruder comes back on its own."
+            ),
             tactic="Persistencia",
             technique="T1053",
         ),
@@ -121,6 +171,11 @@ RULES: list[tuple[re.Pattern[str], Annotation]] = [
             what="Manipula las claves de acceso por SSH del usuario.",
             why="Instala una llave propia para volver a entrar aunque se cambie la contraseña. "
             "Es una de las formas de persistencia más silenciosas.",
+            what_en="Manipulates the user's SSH access keys.",
+            why_en=(
+                "Installs its own key so it can get back in even if the password is changed. It "
+                "is one of the quietest forms of persistence."
+            ),
             tactic="Persistencia",
             technique="T1098",
         ),
@@ -130,6 +185,8 @@ RULES: list[tuple[re.Pattern[str], Annotation]] = [
         Annotation(
             what="Borra archivos o limpia el historial de comandos.",
             why="Elimina rastros de la intrusión para dificultar el análisis forense posterior.",
+            what_en="Deletes files or clears the command history.",
+            why_en=("Removes traces of the intrusion to make later forensic analysis harder."),
             tactic="Evasión de defensas",
             technique="T1070",
         ),
@@ -140,6 +197,11 @@ RULES: list[tuple[re.Pattern[str], Annotation]] = [
             what="Modifica contraseñas o cuentas de usuario del sistema.",
             why="Crea una cuenta propia o cambia la del administrador para bloquear al dueño "
             "legítimo y asegurarse el acceso.",
+            what_en="Modifies system passwords or user accounts.",
+            why_en=(
+                "Creates an account of its own, or changes the administrator's, to lock out the "
+                "legitimate owner and secure its access."
+            ),
             tactic="Persistencia",
             technique="T1136",
         ),
@@ -149,6 +211,11 @@ RULES: list[tuple[re.Pattern[str], Annotation]] = [
         Annotation(
             what="Navega por el sistema de archivos o inspecciona su contenido.",
             why="Reconocimiento básico del entorno: ubicarse, ver qué hay y dónde dejar la carga.",
+            what_en="Navigates the file system or inspects its contents.",
+            why_en=(
+                "Basic reconnaissance of the environment: getting oriented, seeing what is there "
+                "and where to drop the payload."
+            ),
             tactic="Descubrimiento",
             technique="T1083",
         ),
@@ -160,6 +227,14 @@ RULES: list[tuple[re.Pattern[str], Annotation]] = [
             why="Una botnet necesita miles de sockets simultáneos para escanear o para sumarse a "
             "un ataque de denegación de servicio. El límite por defecto del sistema se lo "
             "impediría, así que lo levanta antes de arrancar.",
+            what_en=(
+                "Raises to the maximum the number of files and connections the process can open."
+            ),
+            why_en=(
+                "A botnet needs thousands of simultaneous sockets to scan or to join a denial-of- "
+                "service attack. The system's default limit would prevent that, so it raises the "
+                "ceiling before starting."
+            ),
             tactic="Evasión de defensas",
             technique="T1562.001",
         ),
@@ -170,6 +245,12 @@ RULES: list[tuple[re.Pattern[str], Annotation]] = [
             what="Consulta el modelo exacto del procesador.",
             why="Determina la arquitectura para descargar el binario que corresponde: la misma "
             "botnet mantiene versiones para ARM, MIPS y x86. Es el paso previo a elegir la carga.",
+            what_en="Queries the exact processor model.",
+            why_en=(
+                "Determines the architecture in order to download the matching binary: the same "
+                "botnet keeps versions for ARM, MIPS and x86. It is the step before choosing the "
+                "payload."
+            ),
             tactic="Descubrimiento",
             technique="T1082",
         ),
@@ -180,6 +261,11 @@ RULES: list[tuple[re.Pattern[str], Annotation]] = [
             what="Mide el espacio disponible en disco.",
             why="Confirma que hay lugar para descargar la carga maliciosa, y de paso distingue un "
             "servidor real de un contenedor mínimo o de un señuelo con poco disco.",
+            what_en="Measures the available disk space.",
+            why_en=(
+                "Confirms there is room to download the malicious payload, and incidentally tells "
+                "a real server apart from a minimal container or a decoy with little disk."
+            ),
             tactic="Descubrimiento",
             technique="T1082",
         ),
@@ -190,6 +276,12 @@ RULES: list[tuple[re.Pattern[str], Annotation]] = [
             what="Lista los procesos en ejecución y su consumo de recursos.",
             why="Busca dos cosas: si el equipo ya está infectado por una botnet rival a la que "
             "conviene matar, y si hay vigilancia corriendo. El cómputo robado no se comparte.",
+            what_en="Lists the running processes and their resource usage.",
+            why_en=(
+                "It is after two things: whether the machine is already infected by a rival "
+                "botnet worth killing, and whether any monitoring is running. Stolen compute is "
+                "not shared."
+            ),
             tactic="Descubrimiento",
             technique="T1057",
         ),
@@ -200,6 +292,11 @@ RULES: list[tuple[re.Pattern[str], Annotation]] = [
             what="Verifica si una herramienta está instalada y dónde.",
             why="Antes de depender de wget, curl o python, comprueba que existan. Si el señuelo "
             "responde que sí a todo, el atacante puede sospechar que no es un sistema real.",
+            what_en="Checks whether a tool is installed, and where.",
+            why_en=(
+                "Before relying on wget, curl or python, it verifies they exist. If the decoy "
+                "answers yes to everything, the attacker may suspect it is not a real system."
+            ),
             tactic="Descubrimiento",
             technique="T1082",
         ),
@@ -210,6 +307,11 @@ RULES: list[tuple[re.Pattern[str], Annotation]] = [
             what="Ejecuta el binario que acaba de descargar.",
             why="Es el momento en que el equipo pasa a estar comprometido de verdad: hasta acá "
             "era reconocimiento, a partir de acá corre código del atacante.",
+            what_en="Runs the binary it has just downloaded.",
+            why_en=(
+                "This is the moment the machine becomes genuinely compromised: up to here it was "
+                "reconnaissance, from here on it is running the attacker's code."
+            ),
             tactic="Ejecución",
             technique="T1059.004",
         ),
@@ -221,6 +323,8 @@ FALLBACK = Annotation(
     why="Forma parte de la secuencia de reconocimiento posterior al acceso.",
     tactic="Descubrimiento",
     technique="",
+    what_en="Command executed by the attacker during the session.",
+    why_en="Part of the reconnaissance sequence that follows access.",
 )
 
 
