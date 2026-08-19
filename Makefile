@@ -218,6 +218,36 @@ validate-indexing-resumen:
 
 # educational dashboard: API + SPA. Run `make api` and `make dash` in two terminals.
 
+# One command for the whole data cycle: pull fresh logs from the sensors, wait for the pipeline
+# to ingest them, and regenerate every derived artifact. Replaces running five targets by hand.
+#
+# It does NOT start the stack: run `make elastic-dev-up` first. Keeping them separate means a
+# refresh cannot silently bring up containers you did not expect.
+refresh:
+	@echo "==> 1/3  Descargando registros de los sensores"
+	@$(MAKE) --no-print-directory pull-logs
+	@echo ""
+	@echo "==> 2/3  Esperando a que el pipeline ingiera lo nuevo"
+	@./.venv/bin/python scripts/wait_for_ingest.py
+	@echo ""
+	@echo "==> 3/3  Regenerando artefactos derivados"
+	@$(MAKE) --no-print-directory artifacts
+
+# Consolidated telemetry: the first link of the derived-artifact chain.
+consolidate:
+	@./.venv/bin/python -m honeyml.eda.es_loader
+
+# Feature engineering: reads the consolidated table, so it runs after `consolidate`.
+features:
+	@./.venv/bin/python -m honeyml.features.build_features
+	@./.venv/bin/python -m honeyml.features.command_encoding
+
+# Everything that reads from the index or from the consolidated table. Order matters:
+# `consolidate` produces the table the feature engineering depends on.
+artifacts: consolidate features snapshot replays fingerprints passwords
+	@echo ""
+	@echo "Artefactos al día."
+
 snapshot:
 	@./.venv/bin/python -m honeyml.api.offline
 

@@ -2,15 +2,26 @@
 
 Uses the scroll API over urllib (no elasticsearch client, so we don't pin to its version) and
 flattens the nested ECS fields into flat columns ready for the EDA.
+
+Running it as a module writes the consolidated table to disk. That file is the first link of the
+derived-artifact chain: the exploratory analysis, the per-address features and the command
+encoding all read it, so it has to be reproducible from a command rather than from an ad-hoc
+session.
+
+Usage:
+    python -m honeyml.eda.es_loader
 """
 
 from __future__ import annotations
 
 import json
 import urllib.request
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
+
+OUT_FILE = Path("data/processed/honeypot_events.parquet")
 
 # ECS fields pulled per event. Asked for explicitly so we don't drag heavy payloads along.
 DEFAULT_FIELDS = [
@@ -121,8 +132,23 @@ def load_events(
     return df
 
 
-if __name__ == "__main__":
+def main() -> None:
     df = load_events()
-    print(f"Events loaded: {len(df):,}")
-    print(df.dtypes)
-    print(df.head())
+    if df.empty:
+        raise SystemExit("No se recuperó ningún evento. ¿Está levantado Elasticsearch?")
+
+    OUT_FILE.parent.mkdir(parents=True, exist_ok=True)
+    df.to_parquet(OUT_FILE, index=False)
+
+    size_mb = OUT_FILE.stat().st_size / 1024 / 1024
+    print(f"Telemetría consolidada -> {OUT_FILE} ({size_mb:.0f} MB)")
+    print(f"  {len(df):,} eventos, {len(df.columns)} columnas".replace(",", "."))
+    if "@timestamp" in df.columns:
+        print(f"  ventana {df['@timestamp'].min():%Y-%m-%d} a {df['@timestamp'].max():%Y-%m-%d}")
+    if "honeypot" in df.columns:
+        for sensor, n in df["honeypot"].value_counts().items():
+            print(f"  {sensor}: {n:,}".replace(",", "."))
+
+
+if __name__ == "__main__":
+    main()
