@@ -218,6 +218,22 @@ validate-indexing-resumen:
 
 # educational dashboard: API + SPA. Run `make api` and `make dash` in two terminals.
 
+REDIS_FILE   = infra/redis/docker-compose.yml
+
+# Event bus (Redis Streams). Lives in the analysis zone and joins elastic_net, so the stack
+# must be up first: the network is created there.
+bus-up:
+	@if [ ! -f infra/redis/.env ]; then cp infra/redis/.env.example infra/redis/.env; echo "Creado infra/redis/.env desde el ejemplo."; fi
+	docker compose --env-file infra/redis/.env -f $(REDIS_FILE) up -d
+	@echo ""
+	@echo "Bus de eventos disponible en 127.0.0.1:6379"
+
+bus-down:
+	docker compose --env-file infra/redis/.env -f $(REDIS_FILE) down
+
+bus-status:
+	@./.venv/bin/python scripts/bus_status.py
+
 # One command for the whole data cycle: pull fresh logs from the sensors, wait for the pipeline
 # to ingest them, and regenerate every derived artifact. Replaces running five targets by hand.
 #
