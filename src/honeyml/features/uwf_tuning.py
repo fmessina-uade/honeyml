@@ -164,16 +164,22 @@ def main() -> None:
 
     # Auditoría de la búsqueda. Lo que importa es la última ronda: si no llegó al total del
     # entrenamiento, el ganador se eligió sobre datos parciales y su ventaja puede no sobrevivir al
-    # conjunto entero. Pasó en una corrida en modo rápido, y es la razón por la que esto se imprime.
+    # conjunto entero. Ya pasó una vez —con un piso fijo la progresión cortaba en el 42 % de las
+    # filas— y esta comprobación es lo que lo destapó.
     rondas = list(zip(busqueda.n_candidates_, busqueda.n_resources_, strict=True))
     print(
         "  rondas (candidatos × filas):",
         "  ".join(f"{c}×{r:,}" for c, r in rondas).replace(",", "."),
     )
-    if rondas[-1][1] < len(x_tr):
+    # Con tolerancia y no con `<` a secas: la progresión geométrica deja un resto de unas pocas
+    # filas —1.423.953 de 1.423.959 en una corrida— y avisar por eso sería ruido que enseña a
+    # ignorar el aviso. Lo que hay que detectar es una ronda final materialmente más chica.
+    completa = rondas[-1][1] >= len(x_tr) * 0.99
+    if not completa:
+        faltante = 100 - rondas[-1][1] / len(x_tr) * 100
         print(
-            f"  ATENCIÓN: la última ronda usó {rondas[-1][1]:,} de {len(x_tr):,} filas. "
-            "El ganador no se midió sobre el total.".replace(",", ".")
+            f"  ATENCIÓN: la última ronda usó {rondas[-1][1]:,} de {len(x_tr):,} filas "
+            f"({faltante:.0f} % menos). El ganador no se midió sobre el total.".replace(",", ".")
         )
     print()
 
@@ -233,7 +239,7 @@ def main() -> None:
                 "candidatos_evaluados": candidatos,
                 "recurso_minimo": int(busqueda.min_resources_),
                 "recurso_maximo": int(busqueda.max_resources_),
-                "ultima_ronda_uso_el_total": bool(rondas[-1][1] >= len(x_tr)),
+                "ultima_ronda_uso_el_total": completa,
                 "rondas": [{"candidatos": c, "filas": r} for c, r in rondas],
                 "espacio": {k.replace("clf__", ""): v for k, v in ESPACIO.items()},
                 "mejores_hiperparametros": mejores,
