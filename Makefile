@@ -1,5 +1,5 @@
 .PHONY: help up down logs status ps clean deploy-vps dev-up dev-down dev-logs validate lint test \
-        test-integration \
+        test-integration consumer \
         api dash replays \
         elastic-up elastic-down elastic-logs elastic-dev-up elastic-dev-down elastic-dev-logs \
         es-bootstrap validate-indexing pull-logs
@@ -252,6 +252,12 @@ bus-down:
 
 bus-status:
 	@./.venv/bin/python scripts/bus_status.py
+
+# Consumidor del bus. Sigue el stream hasta que se lo interrumpe; con LIMITE=N atiende N eventos
+# y sale, que es la forma de inspeccionar sin quedarse escuchando.
+#   make consumer            make consumer LIMITE=20
+consumer:
+	@./.venv/bin/python -m honeyml.agent.consumer $(if $(LIMITE),--limite $(LIMITE),)
 
 # One command for the whole data cycle: pull fresh logs from the sensors, wait for the pipeline
 # to ingest them, and regenerate every derived artifact. Replaces running five targets by hand.
