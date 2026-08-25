@@ -63,6 +63,10 @@ services:
     volumes:
       - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
       - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
+      # La cola persistida vive acá. Es lo que hace que `queue.type: persisted` signifique algo:
+      # sin este volumen la cola quedaría en la capa de escritura del contenedor y desaparecería
+      # con cada recreación, que es justo el escenario del que protege.
+      - ls_data:/usr/share/logstash/data
     ports:
       - "127.0.0.1:5044:5044"   # beats input
     networks:
@@ -146,6 +150,8 @@ networks:
 volumes:
   es_data:
     name: elastic_es_data
+  ls_data:
+    name: elastic_ls_data
   filebeat_data:
     name: elastic_filebeat_data
   # volumes created by infra/honeypots/docker-compose.yml, mounted read-only here

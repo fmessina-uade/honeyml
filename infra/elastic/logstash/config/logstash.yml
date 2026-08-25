@@ -4,3 +4,41 @@ xpack.monitoring.enabled: false
 # main pipeline lives in the files under /usr/share/logstash/pipeline
 pipeline.ordered: auto
 log.level: info
+
+# --- Cola persistente entre la entrada y el resto del pipeline ---
+#
+# POR QUÉ
+# Con la cola en memoria, los eventos que Logstash ya aceptó del transportador pero todavía no
+# escribió en el índice viven únicamente en la RAM del proceso. Un reinicio del contenedor, un
+# corte de energía en el servidor o un fin de proceso por memoria se los lleva. Sobre un honeypot
+# eso no es un dato reproducible: el ataque ocurrió una vez y no se repite.
+#
+# Con la cola persistida, la entrada confirma recepción recién cuando el evento está escrito en
+# disco, y al reiniciar el pipeline retoma desde el último punto de control. La telemetría deja de
+# depender de que el proceso siga vivo.
+#
+# La cola vive en path.data, que en el compose está montado sobre un volumen con nombre. Sin ese
+# volumen esto no serviría de nada: la cola quedaría en la capa efímera del contenedor y se
+# perdería en cada recreación, que es exactamente lo que se quiere evitar.
+queue.type: persisted
+
+# DIMENSIONADO, medido sobre el corpus real
+# El día de mayor actividad registró 258.348 eventos. Un evento en cola pesa más que en el índice
+# —no está comprimido y conserva el mensaje original—, del orden de 1,5 KB, así que un día pico
+# ocupa unos 400 MB. Dos gigabytes cubren cerca de cinco días pico seguidos con el índice caído.
+#
+# El espacio se reserva de a páginas, a medida que hace falta: en operación normal la cola está
+# casi vacía y no ocupa ese tamaño. El servidor tiene 182 GB libres, así que el techo es holgado a
+# propósito: el costo de que sobre es nulo y el de que falte es perder eventos.
+queue.max_bytes: 2gb
+
+# El punto de control se sincroniza a disco cada 128 escrituras en lugar de las 1024 por defecto.
+# Con el caudal de este sistema —21 eventos por minuto de media, 180 en el día pico— el valor por
+# defecto dejaba ventanas de hasta 48 minutos sin sincronizar. A 128 la ventana baja a menos de un
+# minuto en pico, y el costo es de una sincronización cada minuto y medio: irrelevante.
+#
+# Lo que hay dentro de esa ventana no se pierde: se vuelve a entregar al reiniciar. Como el
+# identificador del documento es determinista, reindexar lo mismo no genera duplicados. Sí llegan
+# repetidos al bus, que es de entrega al menos una vez por diseño y por eso su consumidor tiene que
+# ser idempotente.
+queue.checkpoint.writes: 128
