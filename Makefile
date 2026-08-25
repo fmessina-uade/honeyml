@@ -89,7 +89,7 @@ lint:
 	@if [ -x ./.venv/bin/mypy ]; then \
 		./.venv/bin/mypy src/; \
 	else \
-		echo "  mypy no instalado (opcional: pip install mypy)"; \
+		echo "  mypy no instalado (pip install -e \".[dev]\")"; \
 	fi
 
 test:

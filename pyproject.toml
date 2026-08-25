@@ -6,7 +6,11 @@ build-backend = "setuptools.build_meta"
 name = "honeyml"
 version = "0.1.0"
 description = "HoneyML - open-source threat intelligence platform: honeypots + Agentic AI"
-requires-python = ">=3.11"
+# 3.12 es lo que corre en todos lados: el servidor (Ubuntu 24.04 trae 3.12.3), el entorno de
+# desarrollo y el hook de pre-commit. Antes acá decía 3.11, que no corría en ningún lado —solo
+# estaba declarado en CI— y esa diferencia entre lo declarado y lo real hacía que la verificación
+# de tipos no pudiera correr localmente.
+requires-python = ">=3.12"
 
 [project.optional-dependencies]
 # EDA and feature engineering. Install with: pip install -e ".[analysis]"
@@ -37,6 +41,10 @@ agent = [
 dev = [
     "pytest>=8.0",
     "ruff>=0.6",
+    # Clavado a la misma versión que el hook de .pre-commit-config.yaml: dos versiones distintas
+    # dan dos veredictos distintos. Está para poder invocarlo a mano sobre un archivo puntual;
+    # `make lint` no lo corre, por el motivo que explica [tool.mypy] más abajo.
+    "mypy==1.13.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -54,12 +62,15 @@ addopts = "--tb=short -q"
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP"]
 
 [tool.mypy]
-python_version = "3.11"
+# Tiene que coincidir con requires-python y con CI. Cuando decía 3.11 y el entorno real era 3.12,
+# mypy no podía parsear los stubs de numpy —que usan sintaxis de 3.12— y abortaba antes de mirar
+# una línea del proyecto, con lo que la verificación de tipos solo corría en el hook.
+python_version = "3.12"
 strict = true
 ignore_missing_imports = true
