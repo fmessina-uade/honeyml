@@ -45,8 +45,9 @@
         },
         "destination": {
           "properties": {
-            "ip":   { "type": "ip" },
-            "port": { "type": "long" }
+            "ip":     { "type": "ip" },
+            "port":   { "type": "long" },
+            "domain": { "type": "keyword", "ignore_above": 1024 }
           }
         },
         "network": {
@@ -69,8 +70,9 @@
         },
         "related": {
           "properties": {
-            "ip":   { "type": "ip" },
-            "user": { "type": "keyword" }
+            "ip":    { "type": "ip" },
+            "user":  { "type": "keyword" },
+            "hosts": { "type": "keyword", "ignore_above": 1024 }
           }
         },
         "process": {
