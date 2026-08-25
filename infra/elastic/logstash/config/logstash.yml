@@ -5,6 +5,19 @@ xpack.monitoring.enabled: false
 pipeline.ordered: auto
 log.level: info
 
+# --- Bases de datos geográficas ---
+#
+# Se desactiva el gestor que viene activo por defecto. Con él, Logstash intenta descargar las bases
+# desde el servicio de Elastic y, si no lo alcanza, entra en un período de gracia de 30 días y
+# después DEJA DE ENRIQUECER, marcando los eventos en vez de fallar. Sobre un sistema que corre sin
+# supervisión continua eso es una bomba de tiempo silenciosa: el enriquecimiento desaparece un mes
+# después y nada lo anuncia.
+#
+# Desactivado, el filtro usa las bases con licencia Creative Commons que ya vienen empaquetadas con
+# el plugin (GeoLite2-City y GeoLite2-ASN), que no caducan. Son menos precisas que las comerciales,
+# lo cual para ubicar el origen de un ataque a nivel país y organización es más que suficiente.
+xpack.geoip.downloader.enabled: false
+
 # --- Cola persistente entre la entrada y el resto del pipeline ---
 #
 # POR QUÉ

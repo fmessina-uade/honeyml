@@ -39,8 +39,27 @@
 
         "source": {
           "properties": {
-            "ip":   { "type": "ip" },
-            "port": { "type": "long" }
+            "ip":     { "type": "ip" },
+            "port":   { "type": "long" },
+            "domain": { "type": "keyword", "ignore_above": 1024 },
+            "geo": {
+              "properties": {
+                "city_name":        { "type": "keyword" },
+                "region_name":      { "type": "keyword" },
+                "region_iso_code":  { "type": "keyword" },
+                "country_name":     { "type": "keyword" },
+                "country_iso_code": { "type": "keyword" },
+                "continent_code":   { "type": "keyword" },
+                "timezone":         { "type": "keyword" },
+                "location":         { "type": "geo_point" }
+              }
+            },
+            "as": {
+              "properties": {
+                "number":       { "type": "long" },
+                "organization": { "properties": { "name": { "type": "keyword" } } }
+              }
+            }
           }
         },
         "destination": {
