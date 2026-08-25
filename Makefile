@@ -1,4 +1,5 @@
 .PHONY: help up down logs status ps clean deploy-vps dev-up dev-down dev-logs validate lint test \
+        test-integration \
         api dash replays \
         elastic-up elastic-down elastic-logs elastic-dev-up elastic-dev-down elastic-dev-logs \
         es-bootstrap validate-indexing pull-logs
@@ -60,8 +61,12 @@ validate:
 
 lint:
 	@echo "--- shellcheck ---"
+	@# -S warning: los scripts de verificación usan `comando && ok ... || fallo ...` a propósito,
+	@# y shellcheck lo marca como nota de estilo (SC2015). Con el umbral por defecto la puerta
+	@# quedaba siempre en rojo por doce avisos cosméticos, que es la forma más segura de que nadie
+	@# vuelva a mirarla. Los errores y advertencias reales siguen deteniendo la corrida.
 	@if command -v shellcheck >/dev/null 2>&1; then \
-		shellcheck infra/vps/scripts/*.sh scripts/validate_local.sh && echo "  shellcheck OK"; \
+		shellcheck -S warning infra/vps/scripts/*.sh scripts/validate_local.sh && echo "  shellcheck OK"; \
 	else \
 		echo "  shellcheck no instalado (brew install shellcheck)"; \
 	fi
@@ -71,25 +76,39 @@ lint:
 	else \
 		echo "  yamllint no instalado (pip install yamllint)"; \
 	fi
+	@# Se usan los ejecutables del entorno del proyecto, no los del PATH: nadie activa el entorno
+	@# para correr make, y buscarlos en el PATH hacía que la comprobación se saltara en silencio
+	@# aunque estuvieran instalados.
 	@echo "--- ruff (Python) ---"
-	@if command -v ruff >/dev/null 2>&1; then \
-		ruff check src/ tests/ 2>/dev/null && echo "  ruff OK" || echo "  ruff: sin código Python todavía"; \
+	@if [ -x ./.venv/bin/ruff ]; then \
+		./.venv/bin/ruff check src/ scripts/ tests/ && ./.venv/bin/ruff format --check src/ scripts/ tests/; \
 	else \
-		echo "  ruff no instalado (pip install ruff)"; \
+		echo "  ruff no instalado (pip install -e \".[dev]\")"; \
 	fi
 	@echo "--- mypy (tipos Python) ---"
-	@if command -v mypy >/dev/null 2>&1; then \
-		mypy src/ 2>/dev/null && echo "  mypy OK" || echo "  mypy: sin código Python todavía"; \
+	@if [ -x ./.venv/bin/mypy ]; then \
+		./.venv/bin/mypy src/; \
 	else \
-		echo "  mypy no instalado (pip install mypy)"; \
+		echo "  mypy no instalado (opcional: pip install mypy)"; \
 	fi
 
 test:
-	@if command -v pytest >/dev/null 2>&1; then \
-		pytest tests/ -v --tb=short 2>/dev/null || echo "  Sin tests todavía (Fase 2+)"; \
+	@# Sin `|| echo`: una suite que falla tiene que detener la corrida. Antes cualquier fallo se
+	@# convertía en "Sin tests todavía" y make devolvía éxito, con lo que la verificación existía
+	@# en el Makefile pero no en la práctica.
+	@# Las de integración quedan fuera por defecto: piden los sensores escuchando en la máquina
+	@# local, y los sensores viven en el servidor. Están marcadas desde que se escribieron, pero el
+	@# Makefile nunca usó la marca, así que corrían siempre y fallaban siempre.
+	@if [ -x ./.venv/bin/pytest ]; then \
+		./.venv/bin/pytest tests/ -v --tb=short -m "not integration"; \
 	else \
-		echo "pytest no instalado. Instalar con: pip install pytest"; \
+		echo "pytest no instalado. Instalar con: pip install -e \".[dev]\""; \
+		exit 1; \
 	fi
+
+# Solo tiene sentido con los sensores corriendo acá: make dev-up primero.
+test-integration:
+	@./.venv/bin/pytest tests/ -v --tb=short -m integration
 
 dev-up:
 	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_DEV) up -d

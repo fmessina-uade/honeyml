@@ -31,6 +31,13 @@ agent = [
     "redis>=5.0",
     "pydantic>=2.9",
 ]
+# Herramientas de verificación. Instalar con: pip install -e ".[dev]"
+# Estaban declaradas en la configuración de pytest y ruff pero no como dependencia, así que
+# `make test` respondía "pytest no instalado" y la suite no se corría nunca.
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
