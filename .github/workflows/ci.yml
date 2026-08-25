@@ -71,10 +71,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
           cache: pip
 
       - name: install pytest
@@ -83,6 +83,33 @@ jobs:
       - name: pytest
         run: pytest tests/unit/ -v --tb=short
 
+  # Formato y tipos. Existían solo en el hook de pre-commit, que se puede saltear con --no-verify:
+  # sin esto, un commit sin verificar entraba a main sin que nada lo revisara.
+  quality:
+    name: Lint Python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      # Las mismas bibliotecas que declara el hook de mypy en .pre-commit-config.yaml, para que
+      # los dos den el mismo veredicto. Si se agrega una allá, va acá también.
+      - name: install
+        run: pip install -e ".[dev]" fastapi "redis>=5.0" types-requests
+
+      - name: ruff
+        run: |
+          ruff check src/ scripts/ tests/
+          ruff format --check src/ scripts/ tests/
+
+      - name: mypy
+        run: mypy --ignore-missing-imports src/
+
   # honeypot config gotchas that break things silently if wrong
   config-validation:
     name: Config Validation
@@ -90,7 +117,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
 
       # cowrie only loads userdb.txt if it's plain ascii

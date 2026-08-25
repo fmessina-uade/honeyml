@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any
 from urllib.error import URLError
 
 from fastapi import FastAPI, HTTPException
@@ -24,10 +24,8 @@ from . import offline, queries
 
 REPLAY_FILE = Path("data/processed/replay_sessions.json")
 
-T = TypeVar("T")
 
-
-def _live_or_frozen(fetch: Callable[[], T], key: str) -> T:
+def _live_or_frozen[T](fetch: Callable[[], T], key: str) -> T:
     """Run a live query, falling back to the frozen snapshot when Elasticsearch is unreachable.
 
     Only connection errors fall back. A malformed query is a bug and must surface as one rather
