@@ -24,7 +24,7 @@ import argparse
 import json
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 from sklearn.base import BaseEstimator
@@ -145,6 +145,27 @@ def evaluate(
     }
 
 
+def cargar_y_partir() -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
+    """Load the reference dataset and split it, always the same way.
+
+    Extracted so that hyperparameter tuning trains and measures on exactly the same partition as
+    this comparison. If each module built its own split, an apparent improvement could just be an
+    easier test set, and there would be no way to tell the difference from the numbers.
+    """
+    df = load_uwf()
+    x, y = features_target(df)
+    x = x[NUMERIC + CATEGORICAL].copy()
+    for c in ("local_orig", "local_resp"):
+        if c in x.columns:
+            x[c] = x[c].astype(int)
+
+    # train_test_split no está tipada: devuelve una lista sin anotar. El cast declara la forma que
+    # el llamador puede confiar —cuatro objetos, en el orden entrenamiento/prueba de x y después de
+    # y— en lugar de dejar que se propague un Any por todo el módulo de ajuste.
+    partes = train_test_split(x, y, test_size=0.25, stratify=y, random_state=RANDOM_STATE)
+    return cast("tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]", tuple(partes))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument(
@@ -154,16 +175,9 @@ def main() -> None:
     )
     args = ap.parse_args()
 
-    df = load_uwf()
-    x, y = features_target(df)
-    x = x[NUMERIC + CATEGORICAL].copy()
-    for c in ("local_orig", "local_resp"):
-        if c in x.columns:
-            x[c] = x[c].astype(int)
-
-    x_tr, x_te, y_tr, y_te = train_test_split(
-        x, y, test_size=0.25, stratify=y, random_state=RANDOM_STATE
-    )
+    x_tr, x_te, y_tr, y_te = cargar_y_partir()
+    x = pd.concat([x_tr, x_te])
+    y = pd.concat([y_tr, y_te])
 
     if args.rapido:
         # stratified subsample so every class survives, including the rare ones
