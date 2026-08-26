@@ -1,0 +1,5 @@
+# Generado por scripts/build_world_map.py: son 1.981 pares de coordenadas en una sola línea, a
+# propósito. Formatearlo lo expande a más de dos mil líneas sin que nadie lo vaya a leer nunca.
+src/lib/world.ts
+
+dist
