@@ -162,6 +162,12 @@ def get_snapshot() -> dict[str, Any]:
         return frozen
 
 
+@app.get("/api/weekly-rhythm")
+def get_weekly_rhythm() -> dict[str, Any]:
+    """Events by day of week and hour of day: whether there is any human rhythm at all."""
+    return _live_or_frozen(queries.weekly_rhythm, "weekly_rhythm")
+
+
 @app.get("/api/geography")
 def get_geography() -> dict[str, Any]:
     """Origin of the attacks by country and by autonomous system."""

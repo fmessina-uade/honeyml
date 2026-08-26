@@ -6,6 +6,7 @@ serve the live API and the static snapshot used for offline screenshots.
 
 from __future__ import annotations
 
+import datetime
 import json
 import urllib.request
 from typing import Any
@@ -299,6 +300,57 @@ def hourly(es_url: str = ES_URL) -> list[dict[str, Any]]:
     return [{"hour": h, "count": per_hour[h], "logins": logins_per_hour[h]} for h in range(24)]
 
 
+def weekly_rhythm(es_url: str = ES_URL) -> dict[str, Any]:
+    """Events laid out as day of week by hour of day: 168 cells, in UTC.
+
+    The flat hourly curve already says the traffic is automated, but as twenty-four bars it reads
+    as a chart that happens to be even. Spread over a full week it stops being a claim and becomes
+    something the reader checks themselves: a system with people behind it lights up on weekdays
+    between nine and six and goes dark at night and on weekends. Whatever pattern this grid does
+    or does not have is visible at a glance, with no statistic in between.
+
+    Bucketing happens here and not in Elasticsearch because the hourly histogram is already being
+    read: adding a scripted aggregation would ask the cluster to redo work for two thousand
+    buckets that fit in memory.
+    """
+    body = {
+        "size": 0,
+        "query": NOT_LOCAL,
+        "aggs": {
+            "h": {
+                "date_histogram": {"field": "@timestamp", "calendar_interval": "hour"},
+            }
+        },
+    }
+
+    # [día][hora], con lunes en 0 para que el fin de semana quede junto al final de la fila.
+    matriz = [[0] * 24 for _ in range(7)]
+    horas_observadas = [[0] * 24 for _ in range(7)]
+
+    for b in _search(body, es_url)["aggregations"]["h"]["buckets"]:
+        marca = b["key_as_string"]
+        fecha = datetime.datetime.strptime(marca[:13], "%Y-%m-%dT%H").replace(tzinfo=datetime.UTC)
+        matriz[fecha.weekday()][fecha.hour] += b["doc_count"]
+        horas_observadas[fecha.weekday()][fecha.hour] += 1
+
+    # El promedio por hora observada y no el total: la captura no cubre la misma cantidad de lunes
+    # que de martes, así que los totales crudos harían parecer más activo al día que más veces
+    # apareció en la ventana de captura.
+    promedio = [
+        [
+            round(matriz[d][h] / horas_observadas[d][h], 1) if horas_observadas[d][h] else 0.0
+            for h in range(24)
+        ]
+        for d in range(7)
+    ]
+
+    return {
+        "total": [[matriz[d][h] for h in range(24)] for d in range(7)],
+        "average": promedio,
+        "observed": horas_observadas,
+    }
+
+
 def snapshot(es_url: str = ES_URL) -> dict[str, Any]:
     """Everything the dashboard needs, in one object (also used for the offline snapshot)."""
     return {
@@ -311,4 +363,5 @@ def snapshot(es_url: str = ES_URL) -> dict[str, Any]:
         "protocol_detail": protocol_detail(es_url),
         "hourly": hourly(es_url),
         "geography": geography(es_url),
+        "weekly_rhythm": weekly_rhythm(es_url),
     }
