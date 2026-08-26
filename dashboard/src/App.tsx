@@ -9,8 +9,17 @@ import {
   Camera,
   AlertTriangle,
   Archive,
+  Users,
+  Globe,
 } from 'lucide-react';
-import { api, type FingerprintData, type Health, type Replay, type Snapshot } from './lib/api';
+import {
+  api,
+  type ArchetypeData,
+  type FingerprintData,
+  type Health,
+  type Replay,
+  type Snapshot,
+} from './lib/api';
 import { useI18n } from './lib/i18n';
 import LangToggle from './components/LangToggle';
 import Pulse from './components/sections/Pulse';
@@ -19,6 +28,8 @@ import Dictionary from './components/sections/Dictionary';
 import MitreMatrix from './components/sections/MitreMatrix';
 import Protocols from './components/sections/Protocols';
 import Fingerprints from './components/sections/Fingerprints';
+import Archetypes from './components/sections/Archetypes';
+import Geography from './components/sections/Geography';
 import AttackCanvas from './components/AttackCanvas';
 
 // Order is narrative: scale, then one concrete intrusion, then the whole surface, then the
@@ -29,6 +40,8 @@ const SECTIONS = [
   { id: 'protocolos', icon: Network },
   { id: 'diccionario', icon: BookOpen },
   { id: 'huellas', icon: Fingerprint },
+  { id: 'arquetipos', icon: Users },
+  { id: 'origen', icon: Globe },
   { id: 'mitre', icon: Grid3x3 },
 ] as const;
 
@@ -42,6 +55,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [active, setActive] = useState<SectionId>('pulso');
   const [families, setFamilies] = useState<FingerprintData | null>(null);
+  const [archetypes, setArchetypes] = useState<ArchetypeData | null>(null);
   // capture mode freezes every animation so report screenshots are reproducible
   const [capture, setCapture] = useState(false);
 
@@ -57,7 +71,16 @@ export default function App() {
       .health()
       .then(setHealth)
       .catch(() => setHealth(null));
-    api.fingerprints().then(setFamilies).catch(() => setFamilies(null));
+    api
+      .fingerprints()
+      .then(setFamilies)
+      .catch(() => setFamilies(null));
+    // Cada uno por separado y con su propio catch: son artefactos generados aparte, y que falte
+    // uno no tiene por qué dejar sin panel a los demás.
+    api
+      .archetypes()
+      .then(setArchetypes)
+      .catch(() => setArchetypes(null));
   }, []);
 
   useEffect(() => {
@@ -65,9 +88,9 @@ export default function App() {
   }, [capture]);
 
   return (
-    <div className="min-h-screen flex">
+    <div className="h-screen flex overflow-hidden">
       {/* Sidebar */}
-      <aside className="w-56 shrink-0 border-r border-white/5 bg-[#0f141b] p-4 flex flex-col">
+      <aside className="w-56 shrink-0 border-r border-white/5 bg-[#0f141b] p-4 flex flex-col overflow-y-auto thin-scroll">
         <div className="flex items-center gap-2.5 mb-6">
           <img
             src="/favicon.png"
@@ -118,6 +141,10 @@ export default function App() {
               onClick={() => setCapture((c) => !c)}
               title={t.capture.hint}
               aria-pressed={capture}
+              /* El modo captura apaga los eventos de puntero de toda la página para que el cursor
+                 no deje un estado de hover en la captura. Este botón queda exceptuado, porque si
+                 no, no habría forma de volver a apagarlo. */
+              data-capture-toggle
               className={`flex items-center justify-center rounded-full p-1.5 transition ${
                 capture
                   ? 'bg-[var(--honey-amber)]/20 text-[var(--honey-amber)] ring-1 ring-[var(--honey-amber)]/40'
@@ -149,14 +176,15 @@ export default function App() {
           )}
           {snapshot && (
             <div className="font-data text-[9px] text-white/25 -mt-2">
-              {snapshot.overview.first_event?.slice(0, 10)} → {snapshot.overview.last_event?.slice(0, 10)}
+              {snapshot.overview.first_event?.slice(0, 10)} →{' '}
+              {snapshot.overview.last_event?.slice(0, 10)}
             </div>
           )}
         </div>
       </aside>
 
       {/* Main */}
-      <main className="flex-1 p-6 max-w-[1400px]">
+      <main className="flex-1 p-6 max-w-[1400px] overflow-y-auto thin-scroll">
         <header key={`h-${active}`} className="relative mb-5 section-in -mx-6 -mt-6 px-6 pt-6 pb-4">
           {snapshot && <AttackCanvas intensity={snapshot.timeline.map((d) => d.count)} />}
           <div className="relative">
@@ -213,6 +241,22 @@ export default function App() {
             {active === 'huellas' &&
               (families ? (
                 <Fingerprints data={families} />
+              ) : (
+                <div className="rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-8 text-center text-[13px] text-white/50">
+                  {t.error.title}
+                </div>
+              ))}
+            {active === 'arquetipos' &&
+              (archetypes ? (
+                <Archetypes data={archetypes} />
+              ) : (
+                <div className="rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-8 text-center text-[13px] text-white/50">
+                  {t.error.title}
+                </div>
+              ))}
+            {active === 'origen' &&
+              (snapshot.geography ? (
+                <Geography data={snapshot.geography} />
               ) : (
                 <div className="rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-8 text-center text-[13px] text-white/50">
                   {t.error.title}

@@ -210,3 +210,19 @@ body { background: var(--abyss-black); color: #fff; }
 :root[data-capture='on'] .terminal-cursor {
   opacity: 1;
 }
+
+/* El cursor dejaba su rastro en la captura: congelar las animaciones no apaga los estados de
+   hover, así que el elemento que estuviera debajo del puntero salía resaltado y distinto del
+   resto. Apagar los eventos de puntero es la forma robusta de evitarlo — no hay que enumerar cada
+   estilo de hover, que además son decenas de utilidades distintas.
+
+   El desplazamiento con la rueda sigue funcionando: el evento no encuentra destino acá y sube
+   hasta el documento, que es quien desplaza. Lo que se pierde es poder hacer clic mientras el modo
+   está activo, que para un modo pensado para sacar capturas es el comportamiento correcto. */
+:root[data-capture='on'] body * {
+  pointer-events: none !important;
+}
+:root[data-capture='on'] [data-capture-toggle],
+:root[data-capture='on'] [data-capture-toggle] * {
+  pointer-events: auto !important;
+}

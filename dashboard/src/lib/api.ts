@@ -88,6 +88,62 @@ export interface Health {
   generated_at?: string;
 }
 
+export interface CountryOrigin {
+  country: string;
+  iso: string;
+  count: number;
+  sources: number;
+  /** Centroide de las direcciones observadas en ese país. Puede faltar si ninguna resolvió. */
+  lat?: number | null;
+  lon?: number | null;
+}
+
+export interface AsOrigin {
+  organization: string;
+  count: number;
+  sources: number;
+}
+
+export interface Geography {
+  events: number;
+  /** Events whose source resolved to a country / to an autonomous system. The free MaxMind
+   *  databases do not know every address, so these bound every percentage in the section. */
+  with_geo: number;
+  with_asn: number;
+  countries: CountryOrigin[];
+  autonomous_systems: AsOrigin[];
+}
+
+export interface ArchetypeTrait {
+  caracteristica: string;
+  columna: string;
+  /** Distance from the population mean, in standard deviations. */
+  desvios: number;
+  direccion: 'alto' | 'bajo';
+}
+
+export interface Archetype {
+  grupo: number;
+  /** Derived from the profile, never from the cluster number, which KMeans does not keep stable. */
+  nombre: string;
+  descripcion: string;
+  direcciones: number;
+  porcentaje: number;
+  rasgos: ArchetypeTrait[];
+  mediana_eventos: number;
+  mediana_intentos_acceso: number;
+  pct_ejecuto_comandos: number;
+  pct_descargo_archivo: number;
+  pct_logro_acceso: number;
+}
+
+export interface ArchetypeData {
+  direcciones_analizadas: number;
+  caracteristicas: number;
+  grupos: number;
+  perfiles: Archetype[];
+}
+
 export interface Snapshot {
   overview: Overview;
   timeline: TimelinePoint[];
@@ -97,6 +153,8 @@ export interface Snapshot {
   stages: Bucket[];
   protocol_detail: ProtocolDetail[];
   hourly: HourPoint[];
+  /** Optional: a snapshot frozen before geographic enrichment existed will not carry it. */
+  geography?: Geography;
   generated_at?: string;
 }
 
@@ -112,6 +170,13 @@ export const api = {
   replays: () => get<Replay[]>('/replays'),
   health: () => get<Health>('/health'),
   fingerprints: () => get<FingerprintData>('/fingerprints'),
+  geography: () => get<Geography>('/geography'),
+  timeline: (interval: string, sensor?: string) => {
+    const q = new URLSearchParams({ interval });
+    if (sensor && sensor !== 'todos') q.set('sensor', sensor);
+    return get<TimelinePoint[]>(`/timeline?${q}`);
+  },
+  archetypes: () => get<ArchetypeData>('/archetypes'),
   passwordCheck: (prefix: string) =>
     get<PasswordCheckResult>(`/password-check?prefix=${encodeURIComponent(prefix)}`),
 };

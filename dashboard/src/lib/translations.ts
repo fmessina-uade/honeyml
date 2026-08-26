@@ -25,10 +25,13 @@ const es = {
     protocolos: 'Más allá de SSH',
     diccionario: 'Diccionario del atacante',
     huellas: 'Huella de las botnets',
+    arquetipos: 'Tipos de atacante',
+    origen: 'De dónde vienen',
     mitre: 'Tácticas MITRE',
   },
   lead: {
-    pulso: 'Un equipo que nadie publicó en ningún lado, expuesto a internet. Esto es lo que recibe.',
+    pulso:
+      'Un equipo que nadie publicó en ningún lado, expuesto a internet. Esto es lo que recibe.',
     anatomia: 'Una intrusión real capturada, reproducida paso a paso. Cada comando, explicado.',
     protocolos:
       'SSH es la puerta que todos se acuerdan de cerrar. Estas son las otras, y lo que llegó a cada una.',
@@ -36,6 +39,9 @@ const es = {
       'Qué credenciales prueban y por qué. La evidencia detrás de cada consejo de seguridad.',
     huellas:
       'Miles de sesiones, un puñado de guiones. Lo que queda cuando se agrupan por lo que ejecutan.',
+    arquetipos:
+      'Casi ninguno de los que golpean la puerta llega a entrar. Estos son los que sí, y en qué se distinguen.',
+    origen: 'El país dice poco por sí solo. La red que opera la dirección dice bastante más.',
     mitre: 'El marco con el que se clasifica cada acción, iluminado con las capturas propias.',
   },
   pulse: {
@@ -89,7 +95,8 @@ const es = {
     noMatch: 'Ninguna sesión coincide.',
   },
   protocols: {
-    intro1: 'El señuelo no expone solo SSH. Estos son los otros servicios que dejó abiertos, y lo que llegó a cada uno.',
+    intro1:
+      'El señuelo no expone solo SSH. Estos son los otros servicios que dejó abiertos, y lo que llegó a cada uno.',
     introStrong: 'Nadie publicó esta dirección:',
     intro2: 'todo lo que ves lo encontró un escáner recorriendo internet.',
     volume: 'volumen',
@@ -131,7 +138,8 @@ const es = {
     stageEvents: 'eventos en esta etapa',
     ofEverything: 'de todo lo capturado',
     techTitle: 'Técnicas observadas',
-    techNote: 'Cada técnica es un identificador del catálogo de MITRE ATT&CK. Hacé clic para ver la ficha oficial.',
+    techNote:
+      'Cada técnica es un identificador del catálogo de MITRE ATT&CK. Hacé clic para ver la ficha oficial.',
     steps: 'pasos',
     whyNotSeen: 'Por qué no aparece',
   },
@@ -205,6 +213,76 @@ const es = {
     lesson:
       'Casi todas las sesiones capturadas no son ataques distintos: son el mismo guion ejecutado por muchas máquinas. Agrupar por secuencia exacta de comandos lo hace evidente, y de paso muestra por qué contar alertas no sirve para medir amenazas. Una familia con miles de sesiones desde un puñado de direcciones no son miles de atacantes: es un programa, repetido.',
   },
+  archetypes: {
+    addresses: 'direcciones',
+    // Los rasgos se traducen acá y no en la API: el backend manda el nombre de columna, que es
+    // neutral al idioma, y así no hay que enviar dos versiones de cada texto.
+    usedCmd: (c: string) => `usó «${c}»`,
+    traits: {
+      log1p_n_eventos: 'volumen de eventos',
+      log1p_n_sesiones: 'cantidad de sesiones',
+      log1p_eventos_por_sesion: 'eventos por sesión',
+      log1p_login_intentos: 'intentos de acceso',
+      log1p_login_exitosos: 'accesos logrados',
+      log1p_usuarios_distintos: 'usuarios distintos probados',
+      log1p_pass_distintas: 'contraseñas distintas probadas',
+      log1p_n_comandos: 'comandos ejecutados',
+      ejecuto_comandos: 'llegó a ejecutar comandos',
+      descargo_archivo: 'descargó un archivo',
+      ratio_ssh: 'proporción de SSH',
+      log1p_span_horas: 'horas entre el primer y último evento',
+      horas_activas: 'horas distintas con actividad',
+      ratio_nocturno: 'proporción de actividad nocturna',
+      log1p_dur_sesion_media_s: 'duración media de sesión',
+      tuvo_logins: 'intentó autenticarse',
+      ratio_fallo_login: 'proporción de accesos fallidos',
+      log1p_interarribo_medio_s: 'tiempo medio entre eventos',
+      log1p_eventos_por_hora: 'ritmo por hora',
+    } as Record<string, string>,
+    ranCommands: 'Ejecutó comandos',
+    downloaded: 'Descargó archivo',
+    gotIn: 'Logró acceso',
+    lesson:
+      'Las huellas agrupan ataques por la secuencia exacta de comandos, y por eso no ven a quien nunca llegó a una consola. Esto va al revés: toma el comportamiento de cada dirección observada —cuánto insistió, a qué hora, si probó credenciales, si descargó algo— y deja que los datos decidan dónde caen los límites. El resultado es contundente: la enorme mayoría solo golpea la puerta, y un grupo muy chico es el que efectivamente entra y actúa.',
+    method: (dirs: string, feats: number, groups: number) =>
+      `Agrupamiento no supervisado sobre ${dirs} direcciones y ${feats} características de comportamiento. La cantidad de grupos (${groups}) se eligió por el criterio de silueta, no a mano. Los grupos son descriptivos: no existe una clave externa que diga cuántos tipos de atacante hay, y los nombres son una interpretación de cada perfil.`,
+    groups: {
+      'Intrusión efectiva': {
+        name: 'Intrusión efectiva',
+        blurb:
+          'Entraron, ejecutaron comandos y trajeron algo desde afuera. Es el único grupo donde hubo un compromiso real y no un intento.',
+      },
+      'Fuerza bruta': {
+        name: 'Fuerza bruta',
+        blurb:
+          'Prueban credenciales de forma sostenida. Algunos entran, pero casi ninguno hace algo después: el objetivo parece ser la credencial en sí, para venderla o sumarla a una lista.',
+      },
+      Sondeo: {
+        name: 'Sondeo',
+        blurb:
+          'Se conectan, miran y se van. Sin insistencia ni comandos: es reconocimiento indiscriminado, el ruido de fondo permanente de internet.',
+      },
+    },
+  },
+  geography: {
+    byCountry: 'Por país',
+    byAs: 'Por red que opera la dirección',
+    addresses: 'direcciones',
+    perAddress: (r: string) => `${r} eventos por dirección`,
+    pickHint:
+      'Cada punto es un país de origen, ubicado en el centroide de las direcciones que se observaron ahí. El tamaño sigue el volumen de eventos. Tocá un punto o una fila para que el globo gire hasta ese país.',
+    selected: (p: string) =>
+      `${p} seleccionado. El marcador queda al frente y resaltado en la tabla. Tocalo de nuevo para soltar la selección y que el globo retome el giro.`,
+    lesson:
+      'Un ataque lanzado desde un servidor alquilado y otro desde una conexión hogareña pueden compartir bandera y ser cosas distintas. Por eso al país lo acompaña el sistema autónomo, que nombra a la red que realmente opera la dirección: cuando aparece un proveedor de nube o de alojamiento, no hay una persona en ese país, hay una máquina rentada. Y conviene mirar los eventos por dirección: un país puede liderar en volumen y ser apenas un puñado de máquinas insistiendo.',
+    coverage: (geo: string, asn: string) =>
+      `Se resolvió el país del ${geo}% de los eventos y la red operadora del ${asn}%. Las bases usadas son las gratuitas de MaxMind, que no conocen todas las direcciones. Además, quien usa una VPN o una cadena de equipos comprometidos aparece donde está el último salto: el dato sirve para agrupar y comparar, no para atribuir.`,
+  },
+  controls: {
+    interval: { hour: 'Por hora', day: 'Por día', week: 'Por semana' },
+    allSensors: 'Ambos',
+    loading: 'actualizando…',
+  },
   capture: {
     on: 'Modo captura',
     off: 'Modo captura',
@@ -237,6 +315,8 @@ const en: typeof es = {
     protocolos: 'Beyond SSH',
     diccionario: "The attacker's dictionary",
     huellas: 'Botnet fingerprints',
+    arquetipos: 'Kinds of attacker',
+    origen: 'Where they come from',
     mitre: 'MITRE tactics',
   },
   lead: {
@@ -248,6 +328,9 @@ const en: typeof es = {
       'Which credentials they try, and why. The evidence behind every security recommendation.',
     huellas:
       'Thousands of sessions, a handful of scripts. What is left when you group them by what they run.',
+    arquetipos:
+      'Almost none of those knocking ever get in. These are the ones who do, and what sets them apart.',
+    origen: 'The country says little on its own. The network operating the address says far more.',
     mitre: 'The framework used to classify each action, lit up with our own captures.',
   },
   pulse: {
@@ -301,7 +384,8 @@ const en: typeof es = {
     noMatch: 'No session matches.',
   },
   protocols: {
-    intro1: 'The decoy does not only expose SSH. These are the other services it left open, and what reached each one.',
+    intro1:
+      'The decoy does not only expose SSH. These are the other services it left open, and what reached each one.',
     introStrong: 'Nobody published this address:',
     intro2: 'everything you see was found by a scanner sweeping the internet.',
     volume: 'volume',
@@ -343,7 +427,8 @@ const en: typeof es = {
     stageEvents: 'events at this stage',
     ofEverything: 'of everything captured',
     techTitle: 'Observed techniques',
-    techNote: 'Each technique is an identifier from the MITRE ATT&CK catalogue. Click to open the official entry.',
+    techNote:
+      'Each technique is an identifier from the MITRE ATT&CK catalogue. Click to open the official entry.',
     steps: 'steps',
     whyNotSeen: 'Why it does not appear',
   },
@@ -416,6 +501,74 @@ const en: typeof es = {
     truncated: (n: number) => `… and ${n - 12} more commands`,
     lesson:
       'Almost every captured session is not a distinct attack: it is the same script run by many machines. Grouping by exact command sequence makes that obvious, and shows why counting alerts does not measure threat. A family with thousands of sessions from a handful of addresses is not thousands of attackers: it is one program, repeated.',
+  },
+  archetypes: {
+    addresses: 'addresses',
+    usedCmd: (c: string) => `ran «${c}»`,
+    traits: {
+      log1p_n_eventos: 'event volume',
+      log1p_n_sesiones: 'number of sessions',
+      log1p_eventos_por_sesion: 'events per session',
+      log1p_login_intentos: 'login attempts',
+      log1p_login_exitosos: 'successful logins',
+      log1p_usuarios_distintos: 'distinct usernames tried',
+      log1p_pass_distintas: 'distinct passwords tried',
+      log1p_n_comandos: 'commands run',
+      ejecuto_comandos: 'reached a shell',
+      descargo_archivo: 'downloaded a file',
+      ratio_ssh: 'share of SSH',
+      log1p_span_horas: 'hours between first and last event',
+      horas_activas: 'distinct active hours',
+      ratio_nocturno: 'share of night-time activity',
+      log1p_dur_sesion_media_s: 'mean session duration',
+      tuvo_logins: 'attempted authentication',
+      ratio_fallo_login: 'share of failed logins',
+      log1p_interarribo_medio_s: 'mean time between events',
+      log1p_eventos_por_hora: 'pace per hour',
+    } as Record<string, string>,
+    ranCommands: 'Ran commands',
+    downloaded: 'Downloaded a file',
+    gotIn: 'Got access',
+    lesson:
+      'Fingerprints group attacks by their exact command sequence, and so they cannot see anyone who never reached a shell. This works the other way round: it takes how each observed address behaved — how hard it pushed, at what hour, whether it tried credentials, whether it downloaded anything — and lets the data draw the boundaries. The result is stark: the overwhelming majority only knock, and a very small group is the one that actually gets in and acts.',
+    method: (dirs: string, feats: number, groups: number) =>
+      `Unsupervised grouping over ${dirs} addresses and ${feats} behavioural features. The number of groups (${groups}) was chosen by the silhouette criterion, not by hand. The groups are descriptive: there is no external key saying how many kinds of attacker exist, and the names are an interpretation of each profile.`,
+    groups: {
+      'Intrusión efectiva': {
+        name: 'Effective intrusion',
+        blurb:
+          'They got in, ran commands and pulled something from outside. It is the only group where a real compromise happened rather than an attempt.',
+      },
+      'Fuerza bruta': {
+        name: 'Brute force',
+        blurb:
+          'They try credentials relentlessly. Some get in, but almost none do anything afterwards: the credential itself seems to be the goal, to sell or to add to a list.',
+      },
+      Sondeo: {
+        name: 'Probing',
+        blurb:
+          'They connect, look and leave. No persistence, no commands: indiscriminate reconnaissance, the permanent background noise of the internet.',
+      },
+    },
+  },
+  geography: {
+    byCountry: 'By country',
+    byAs: 'By network operating the address',
+    addresses: 'addresses',
+    perAddress: (r: string) => `${r} events per address`,
+    pickHint:
+      'Each dot is a country of origin, placed at the centroid of the addresses observed there. Size follows event volume. Tap a dot or a row and the globe turns to that country.',
+    selected: (p: string) =>
+      `${p} selected. The marker faces front and the row is highlighted. Tap again to release it and let the globe resume turning.`,
+    lesson:
+      'An attack launched from a rented server and one from a home connection can share a flag and be entirely different things. That is why the country comes paired with the autonomous system, which names the network actually operating the address: when a cloud or hosting provider shows up, there is no person in that country, there is a rented machine. It is also worth reading events per address: a country can lead on volume and be just a handful of machines pushing hard.',
+    coverage: (geo: string, asn: string) =>
+      `The country resolved for ${geo}% of events and the operating network for ${asn}%. The databases used are the free MaxMind ones, which do not know every address. On top of that, anyone behind a VPN or a chain of compromised machines shows up wherever the last hop is: the data is for grouping and comparing, not for attribution.`,
+  },
+  controls: {
+    interval: { hour: 'Hourly', day: 'Daily', week: 'Weekly' },
+    allSensors: 'Both',
+    loading: 'updating…',
   },
   capture: {
     on: 'Capture mode',

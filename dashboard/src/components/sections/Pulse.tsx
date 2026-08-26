@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Activity, Fingerprint, KeyRound, TerminalSquare } from 'lucide-react';
 import type { HourPoint, Overview, TimelinePoint } from '../../lib/api';
 import CountUp from '../CountUp';
@@ -5,13 +6,13 @@ import Reveal from '../Reveal';
 import Tooltip, { useTooltip } from '../Tooltip';
 import { n, pct, dec } from '../../lib/format';
 import { useI18n } from '../../lib/i18n';
+import TimelineControls, { type Interval, type Sensor } from '../TimelineControls';
+import { api } from '../../lib/api';
 
 const SENSOR_COLOR: Record<string, string> = {
   cowrie: 'var(--honey-amber)',
   dionaea: 'var(--neural-teal)',
 };
-
-
 
 /** Long date for the tooltip: "lunes, 3 de junio". Reads better than an ISO string. */
 function longDate(iso: string, lang: 'es' | 'en'): string {
@@ -32,7 +33,7 @@ function longDate(iso: string, lang: 'es' | 'en'): string {
  */
 export default function Pulse({
   overview,
-  timeline,
+  timeline: timelineBase,
   hourly,
 }: {
   overview: Overview;
@@ -41,6 +42,37 @@ export default function Pulse({
 }) {
   const { t, lang } = useI18n();
   const tip = useTooltip();
+
+  // La serie del snapshot es la vista por defecto. En cuanto se toca un filtro se pide una serie
+  // nueva a la API y se muestra esa; volver a "por día" y "ambos" recupera la original sin pedir
+  // nada, que es la combinación que el snapshot ya trae.
+  const [interval, setInterval] = useState<Interval>('day');
+  const [sensor, setSensor] = useState<Sensor>('todos');
+  const [serie, setSerie] = useState<TimelinePoint[] | null>(null);
+  const [cargando, setCargando] = useState(false);
+
+  useEffect(() => {
+    if (interval === 'day' && sensor === 'todos') {
+      setSerie(null);
+      return;
+    }
+    let vigente = true;
+    setCargando(true);
+    api
+      .timeline(interval, sensor)
+      .then((d) => {
+        // Una respuesta que llega tarde, después de que el usuario cambió de filtro otra vez, no
+        // debe pisar a la que corresponde al filtro actual.
+        if (vigente) setSerie(d);
+      })
+      .catch(() => vigente && setSerie(null))
+      .finally(() => vigente && setCargando(false));
+    return () => {
+      vigente = false;
+    };
+  }, [interval, sensor]);
+
+  const timeline = serie ?? timelineBase;
   const days = timeline.filter((d) => d.count > 0).length;
   const perDay = days ? Math.round(overview.events / days) : 0;
   const peak = timeline.reduce((a, b) => (b.count > a.count ? b : a), timeline[0]);
@@ -158,6 +190,16 @@ export default function Pulse({
             </div>
           </div>
 
+          <div className="mt-2">
+            <TimelineControls
+              interval={interval}
+              sensor={sensor}
+              onInterval={setInterval}
+              onSensor={setSensor}
+              loading={cargando}
+            />
+          </div>
+
           <div className="bar-group flex items-end gap-[2px] h-32 mt-3">
             {timeline.map((d) => {
               const empty = d.count === 0;
@@ -169,7 +211,9 @@ export default function Pulse({
                     tip.show(
                       e,
                       <div className="min-w-[168px]">
-                        <div className="text-[11px] text-white/90 first-letter:uppercase">{longDate(d.date, lang)}</div>
+                        <div className="text-[11px] text-white/90 first-letter:uppercase">
+                          {longDate(d.date, lang)}
+                        </div>
                         {empty ? (
                           <div className="text-[10px] text-white/45 mt-1.5 max-w-[190px] leading-snug">
                             {t.pulse.noCapture}
@@ -189,7 +233,9 @@ export default function Pulse({
                                   >
                                     <span
                                       className="w-1.5 h-1.5 rounded-sm"
-                                      style={{ background: SENSOR_COLOR[s] ?? 'var(--ghost-slate)' }}
+                                      style={{
+                                        background: SENSOR_COLOR[s] ?? 'var(--ghost-slate)',
+                                      }}
                                     />
                                     {s}
                                     <span className="font-data ml-auto text-white/75">{n(v)}</span>
