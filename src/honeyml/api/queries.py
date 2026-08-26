@@ -78,11 +78,49 @@ def overview(es_url: str = ES_URL) -> dict[str, Any]:
     }
 
 
-def timeline(es_url: str = ES_URL, interval: str = "1d") -> list[dict[str, Any]]:
+def _filtrado(
+    sensor: str | None = None, desde: str | None = None, hasta: str | None = None
+) -> dict[str, Any]:
+    """The base query plus whatever filters the caller passed.
+
+    Built here rather than in each query so every filtered view excludes the container's own
+    healthchecks the same way. Passing nothing gives exactly the unfiltered query, so adding
+    filter support to a view cannot change what it returns by default.
+    """
+    must: list[dict[str, Any]] = []
+    if sensor:
+        must.append({"term": {"honeypot": sensor}})
+    if desde or hasta:
+        rango: dict[str, str] = {}
+        if desde:
+            rango["gte"] = desde
+        if hasta:
+            rango["lte"] = hasta
+        must.append({"range": {"@timestamp": rango}})
+
+    if not must:
+        return NOT_LOCAL
+    return {"bool": {"must": must, "must_not": [{"term": {"source.ip": LOCAL_IP}}]}}
+
+
+# Intervalos aceptados. Se validan contra esta lista y no se pasan tal cual a Elasticsearch: el
+# parámetro llega desde el navegador y termina dentro del cuerpo de la consulta.
+INTERVALOS = {"hour", "day", "week", "month"}
+
+
+def timeline(
+    es_url: str = ES_URL,
+    interval: str = "day",
+    sensor: str | None = None,
+    desde: str | None = None,
+    hasta: str | None = None,
+) -> list[dict[str, Any]]:
     """Events over time: shows the relentlessness of the traffic, and the capture gaps."""
+    if interval not in INTERVALOS:
+        interval = "day"
     body = {
         "size": 0,
-        "query": NOT_LOCAL,
+        "query": _filtrado(sensor, desde, hasta),
         "aggs": {
             "t": {
                 "date_histogram": {"field": "@timestamp", "calendar_interval": interval},
@@ -90,10 +128,14 @@ def timeline(es_url: str = ES_URL, interval: str = "1d") -> list[dict[str, Any]]
             }
         },
     }
+    # Con intervalo horario la fecha sola no alcanza: dos puntos del mismo día quedarían con la
+    # misma etiqueta y el eje mostraría repetidos.
+    corte = 13 if interval == "hour" else 10
     out = []
     for b in _search(body, es_url)["aggregations"]["t"]["buckets"]:
         by_sensor = {s["key"]: s["doc_count"] for s in b["sensors"]["buckets"]}
-        out.append({"date": b["key_as_string"][:10], "count": b["doc_count"], **by_sensor})
+        etiqueta = b["key_as_string"][:corte].replace("T", " ")
+        out.append({"date": etiqueta, "count": b["doc_count"], **by_sensor})
     return out
 
 
@@ -157,6 +199,81 @@ def protocol_detail(es_url: str = ES_URL) -> list[dict[str, Any]]:
     return out
 
 
+def geography(es_url: str = ES_URL) -> dict[str, Any]:
+    """Where the attacks come from, by country and by autonomous system.
+
+    Both are reported, and the pair is the point. The country says little on its own: an attack
+    launched from a cloud rental and one from a home connection can share a flag and be entirely
+    different things. The autonomous system is what tells them apart, because it names the network
+    that actually operates the address.
+
+    Distinct sources travel next to event counts for the same reason as in protocol_detail: one
+    persistent host inflates a country's event total without meaning that many attackers are there.
+
+    Coverage is reported rather than assumed. The bundled databases are the free MaxMind ones, and
+    they do not know every address — hiding that would make the percentages look complete when they
+    are computed over a subset.
+    """
+    body = {
+        "size": 0,
+        "track_total_hits": True,
+        "query": NOT_LOCAL,
+        "aggs": {
+            "con_geo": {
+                "filter": {"exists": {"field": "source.geo.country_name"}},
+                "aggs": {"ips": {"cardinality": {"field": "source.ip"}}},
+            },
+            "con_asn": {"filter": {"exists": {"field": "source.as.organization.name"}}},
+            "paises": {
+                "terms": {"field": "source.geo.country_name", "size": 12},
+                "aggs": {
+                    "ips": {"cardinality": {"field": "source.ip"}},
+                    "iso": {"terms": {"field": "source.geo.country_iso_code", "size": 1}},
+                    # Centroide de las direcciones observadas, no del país. Se usa para ubicar el
+                    # marcador en el globo, y sale de los datos en vez de una tabla fija de
+                    # coordenadas que habría que mantener aparte y que envejecería sola.
+                    "centro": {"geo_centroid": {"field": "source.geo.location"}},
+                },
+            },
+            "sistemas": {
+                "terms": {"field": "source.as.organization.name", "size": 10},
+                "aggs": {"ips": {"cardinality": {"field": "source.ip"}}},
+            },
+        },
+    }
+    res = _search(body, es_url)
+    agg = res["aggregations"]
+
+    paises = []
+    for b in agg["paises"]["buckets"]:
+        iso = b["iso"]["buckets"]
+        centro = b["centro"].get("location") or {}
+        paises.append(
+            {
+                "country": b["key"],
+                "iso": iso[0]["key"] if iso else "",
+                "count": b["doc_count"],
+                "sources": b["ips"]["value"],
+                "lat": centro.get("lat"),
+                "lon": centro.get("lon"),
+            }
+        )
+
+    sistemas = [
+        {"organization": b["key"], "count": b["doc_count"], "sources": b["ips"]["value"]}
+        for b in agg["sistemas"]["buckets"]
+    ]
+
+    total = res["hits"]["total"]["value"]
+    return {
+        "events": total,
+        "with_geo": agg["con_geo"]["doc_count"],
+        "with_asn": agg["con_asn"]["doc_count"],
+        "countries": paises,
+        "autonomous_systems": sistemas,
+    }
+
+
 def hourly(es_url: str = ES_URL) -> list[dict[str, Any]]:
     """Attacks by hour of day, in UTC.
 
@@ -193,4 +310,5 @@ def snapshot(es_url: str = ES_URL) -> dict[str, Any]:
         "stages": attack_stages(es_url),
         "protocol_detail": protocol_detail(es_url),
         "hourly": hourly(es_url),
+        "geography": geography(es_url),
     }

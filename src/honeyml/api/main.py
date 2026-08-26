@@ -20,6 +20,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from ..education import fingerprints, password_index
+from ..features import arquetipos
 from . import offline, queries
 
 REPLAY_FILE = Path("data/processed/replay_sessions.json")
@@ -87,9 +88,23 @@ def get_overview() -> dict[str, Any]:
 
 
 @app.get("/api/timeline")
-def get_timeline(interval: str = "1d") -> list[dict[str, Any]]:
-    """Events over time."""
-    return _live_or_frozen(lambda: queries.timeline(interval=interval), "timeline")
+def get_timeline(
+    interval: str = "day",
+    sensor: str | None = None,
+    desde: str | None = None,
+    hasta: str | None = None,
+) -> list[dict[str, Any]]:
+    """Events over time, optionally narrowed by sensor and date range.
+
+    The frozen fallback only covers the unfiltered view: the snapshot holds one precomputed
+    timeline, not every combination of filters. Asking for a filtered view with Elasticsearch down
+    fails loudly rather than silently returning the unfiltered one, which would be a wrong answer
+    dressed as a right one.
+    """
+    filtrado = bool(sensor or desde or hasta) or interval != "day"
+    if filtrado:
+        return queries.timeline(interval=interval, sensor=sensor, desde=desde, hasta=hasta)
+    return _live_or_frozen(queries.timeline, "timeline")
 
 
 @app.get("/api/credentials")
@@ -145,6 +160,28 @@ def get_snapshot() -> dict[str, Any]:
                 ),
             ) from exc
         return frozen
+
+
+@app.get("/api/geography")
+def get_geography() -> dict[str, Any]:
+    """Origin of the attacks by country and by autonomous system."""
+    return _live_or_frozen(queries.geography, "geography")
+
+
+@app.get("/api/archetypes")
+def get_archetypes() -> dict[str, Any]:
+    """Behavioural groups of the observed sources.
+
+    Served from the precomputed file and not from a live query: the grouping runs over the whole
+    feature table and takes seconds, which is fine as a batch step and not on a page load.
+    """
+    data = arquetipos.load()
+    if data is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Faltan los arquetipos. Generalos con: make arquetipos",
+        )
+    return data
 
 
 @app.get("/api/fingerprints")
