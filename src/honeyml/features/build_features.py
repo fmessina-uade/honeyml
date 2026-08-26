@@ -118,7 +118,14 @@ def build_features(df: pd.DataFrame, prune: bool = True) -> pd.DataFrame:
             # volume / frequency
             "n_eventos": g.size(),
             "n_sesiones": g["cowrie.session"].nunique(),
-            "eventos_por_sesion": g.size() / g["cowrie.session"].nunique(),
+            # El denominador lleva piso 1. Una dirección puede tener eventos y ninguna sesión
+            # identificada —los de Dionaea no traen identificador de sesión, y algunos de Cowrie
+            # tampoco—, y ahí la división daba infinito: 3.077 de 14.173 direcciones, el 21,7 %.
+            # Un infinito no se nota en un promedio (lo vuelve infinito, que se lee como error de
+            # otra cosa) pero rompe cualquier escalado o modelo que consuma la tabla.
+            # Con piso 1, una ráfaga sin sesión cuenta como una sola sesión, que es la lectura
+            # razonable: hubo actividad, no se pudo segmentar.
+            "eventos_por_sesion": g.size() / g["cowrie.session"].nunique().clip(lower=1),
             # auth
             "login_intentos": g["is_login"].sum(),
             "login_fallidos": g["is_fail"].sum(),
