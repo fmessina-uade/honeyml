@@ -1,5 +1,5 @@
 .PHONY: help up down logs status ps clean deploy-vps dev-up dev-down dev-logs validate lint test \
-        test-integration consumer \
+        test-integration consumer arquetipos \
         api dash replays \
         elastic-up elastic-down elastic-logs elastic-dev-up elastic-dev-down elastic-dev-logs \
         es-bootstrap validate-indexing pull-logs
@@ -294,6 +294,11 @@ snapshot:
 
 fingerprints:
 	@./.venv/bin/python -m honeyml.education.fingerprints
+
+# Arquetipos de atacante: agrupamiento no supervisado sobre las características por dirección.
+# Depende de `features`, que es quien genera la tabla que consume.
+arquetipos:
+	@./.venv/bin/python -m honeyml.features.arquetipos
 
 passwords:
 	@./.venv/bin/python -m honeyml.education.password_index
