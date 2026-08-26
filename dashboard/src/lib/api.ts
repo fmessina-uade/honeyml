@@ -88,6 +88,15 @@ export interface Health {
   generated_at?: string;
 }
 
+export interface WeeklyRhythm {
+  /** [día][hora], lunes en 0. Totales crudos. */
+  total: number[][];
+  /** Promedio por hora observada: la ventana de captura no cubre la misma cantidad de cada día. */
+  average: number[][];
+  /** Cuántas veces se observó cada celda, para poder leer el promedio con criterio. */
+  observed: number[][];
+}
+
 export interface CountryOrigin {
   country: string;
   iso: string;
@@ -155,6 +164,7 @@ export interface Snapshot {
   hourly: HourPoint[];
   /** Optional: a snapshot frozen before geographic enrichment existed will not carry it. */
   geography?: Geography;
+  weekly_rhythm?: WeeklyRhythm;
   generated_at?: string;
 }
 
@@ -171,9 +181,13 @@ export const api = {
   health: () => get<Health>('/health'),
   fingerprints: () => get<FingerprintData>('/fingerprints'),
   geography: () => get<Geography>('/geography'),
-  timeline: (interval: string, sensor?: string) => {
+  timeline: (interval: string, sensor?: string, desde?: string, hasta?: string) => {
     const q = new URLSearchParams({ interval });
     if (sensor && sensor !== 'todos') q.set('sensor', sensor);
+    if (desde) q.set('desde', desde);
+    // El fin de día, no su comienzo: con la fecha pelada, Elasticsearch corta a las 00:00 y el
+    // último día elegido quedaría fuera del rango que el usuario cree haber pedido.
+    if (hasta) q.set('hasta', `${hasta}T23:59:59`);
     return get<TimelinePoint[]>(`/timeline?${q}`);
   },
   archetypes: () => get<ArchetypeData>('/archetypes'),

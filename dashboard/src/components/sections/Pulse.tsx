@@ -1,12 +1,18 @@
 import { useEffect, useState } from 'react';
-import { Activity, Fingerprint, KeyRound, TerminalSquare } from 'lucide-react';
-import type { HourPoint, Overview, TimelinePoint } from '../../lib/api';
+import { Activity, CheckCircle2, Fingerprint, KeyRound, TerminalSquare } from 'lucide-react';
+import type { HourPoint, Overview, TimelinePoint, WeeklyRhythm } from '../../lib/api';
 import CountUp from '../CountUp';
 import Reveal from '../Reveal';
 import Tooltip, { useTooltip } from '../Tooltip';
 import { n, pct, dec } from '../../lib/format';
 import { useI18n } from '../../lib/i18n';
-import TimelineControls, { type Interval, type Sensor } from '../TimelineControls';
+import TimelineControls, {
+  ATAJOS,
+  type Atajo,
+  type Interval,
+  type Sensor,
+} from '../TimelineControls';
+import WeekHeatmap from '../WeekHeatmap';
 import { api } from '../../lib/api';
 
 const SENSOR_COLOR: Record<string, string> = {
@@ -14,15 +20,23 @@ const SENSOR_COLOR: Record<string, string> = {
   dionaea: 'var(--neural-teal)',
 };
 
-/** Long date for the tooltip: "lunes, 3 de junio". Reads better than an ISO string. */
-function longDate(iso: string, lang: 'es' | 'en'): string {
-  const [y, m, d] = iso.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(lang === 'en' ? 'en-GB' : 'es-AR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    timeZone: 'UTC',
-  });
+/**
+ * Long date for the tooltip: "lunes, 3 de junio". Reads better than an ISO string.
+ *
+ * The hourly view labels its points "2026-08-19 14", so the hour has to be split off before the
+ * date is parsed. Splitting the whole label on dashes turned the day into "19 14", which parses
+ * as NaN and rendered every hourly tooltip as "Invalid Date".
+ */
+function longDate(etiqueta: string, lang: 'es' | 'en'): string {
+  const [fecha, hora] = etiqueta.split(' ');
+  const [y, m, d] = fecha.split('-').map(Number);
+  if (!y || !m || !d) return etiqueta;
+
+  const texto = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(
+    lang === 'en' ? 'en-GB' : 'es-AR',
+    { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' },
+  );
+  return hora ? `${texto}, ${hora.padStart(2, '0')}:00 UTC` : texto;
 }
 
 /**
@@ -35,10 +49,12 @@ export default function Pulse({
   overview,
   timeline: timelineBase,
   hourly,
+  weekly,
 }: {
   overview: Overview;
   timeline: TimelinePoint[];
   hourly: HourPoint[];
+  weekly?: WeeklyRhythm;
 }) {
   const { t, lang } = useI18n();
   const tip = useTooltip();
@@ -46,20 +62,80 @@ export default function Pulse({
   // La serie del snapshot es la vista por defecto. En cuanto se toca un filtro se pide una serie
   // nueva a la API y se muestra esa; volver a "por día" y "ambos" recupera la original sin pedir
   // nada, que es la combinación que el snapshot ya trae.
+  const minimo = (overview.first_event ?? '').slice(0, 10);
+  const maximo = (overview.last_event ?? '').slice(0, 10);
+
   const [interval, setInterval] = useState<Interval>('day');
   const [sensor, setSensor] = useState<Sensor>('todos');
+  const [desde, setDesde] = useState(minimo);
+  const [hasta, setHasta] = useState(maximo);
   const [serie, setSerie] = useState<TimelinePoint[] | null>(null);
   const [cargando, setCargando] = useState(false);
 
+  const completo = desde === minimo && hasta === maximo;
+
+  /**
+   * Cambiar el intervalo ajusta el rango cuando hace falta.
+   *
+   * Por hora sobre los tres meses completos son más de dos mil barras en novecientos píxeles: los
+   * huecos entre ellas solos ocupan más que el ancho disponible y el gráfico sale vacío. Es
+   * exactamente lo que pasaba. Al pasar a "por hora" se acota a los últimos siete días, que es un
+   * rango donde una barra por hora se puede ver; volver a día o semana recupera todo.
+   */
+  const cambiarIntervalo = (i: Interval) => {
+    setInterval(i);
+    if (i === 'hour' && completo) {
+      const fin = new Date(`${maximo}T00:00:00`);
+      const ini = new Date(fin);
+      ini.setDate(ini.getDate() - 6);
+      const iso = (d: Date) => d.toISOString().slice(0, 10);
+      setDesde(iso(ini) < minimo ? minimo : iso(ini));
+    } else if (i !== 'hour' && !completo && desde !== minimo) {
+      setDesde(minimo);
+    }
+  };
+
+  /** Corre `dias` hacia atrás desde el último día capturado, sin pasarse del primero. */
+  const desplazar = (dias: number): string => {
+    const d = new Date(`${maximo}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() - dias);
+    const iso = d.toISOString().slice(0, 10);
+    return iso < minimo ? minimo : iso;
+  };
+
+  const aplicarAtajo = (a: Atajo) => {
+    const { dias, interval: i } = ATAJOS[a];
+    setInterval(i);
+    if (dias === null) {
+      setDesde(minimo);
+      setHasta(maximo);
+      return;
+    }
+    // "Ayer" es un día solo, no desde ayer hasta hoy: los dos extremos se mueven juntos.
+    const fin = a === 'ayer' ? desplazar(1) : maximo;
+    setDesde(a === 'ayer' ? fin : desplazar(dias));
+    setHasta(fin);
+  };
+
+  /** Qué atajo describe el rango actual, para poder marcarlo sin guardar estado duplicado. */
+  const atajoActivo: Atajo | null =
+    (Object.keys(ATAJOS) as Atajo[]).find((a) => {
+      const { dias, interval: i } = ATAJOS[a];
+      if (i !== interval) return false;
+      if (dias === null) return desde === minimo && hasta === maximo;
+      const fin = a === 'ayer' ? desplazar(1) : maximo;
+      return hasta === fin && desde === (a === 'ayer' ? fin : desplazar(dias));
+    }) ?? null;
+
   useEffect(() => {
-    if (interval === 'day' && sensor === 'todos') {
+    if (interval === 'day' && sensor === 'todos' && completo) {
       setSerie(null);
       return;
     }
     let vigente = true;
     setCargando(true);
     api
-      .timeline(interval, sensor)
+      .timeline(interval, sensor, desde, hasta)
       .then((d) => {
         // Una respuesta que llega tarde, después de que el usuario cambió de filtro otra vez, no
         // debe pisar a la que corresponde al filtro actual.
@@ -70,7 +146,7 @@ export default function Pulse({
     return () => {
       vigente = false;
     };
-  }, [interval, sensor]);
+  }, [interval, sensor, desde, hasta, completo]);
 
   const timeline = serie ?? timelineBase;
   const days = timeline.filter((d) => d.count > 0).length;
@@ -194,8 +270,18 @@ export default function Pulse({
             <TimelineControls
               interval={interval}
               sensor={sensor}
-              onInterval={setInterval}
+              desde={desde}
+              hasta={hasta}
+              minimo={minimo}
+              maximo={maximo}
+              onInterval={cambiarIntervalo}
               onSensor={setSensor}
+              onRango={(d, h) => {
+                setDesde(d);
+                setHasta(h);
+              }}
+              onAtajo={aplicarAtajo}
+              atajoActivo={atajoActivo}
               loading={cargando}
             />
           </div>
@@ -346,25 +432,50 @@ export default function Pulse({
             <div className="text-[9px] uppercase tracking-wider text-white/35">
               {t.pulse.outages}
             </div>
-            <div className="flex flex-col gap-2 mt-3">
-              {outages.map((o) => (
-                <div
-                  key={o.from}
-                  className="flex items-center justify-between gap-2 rounded-lg bg-white/[0.02] ring-1 ring-white/5 px-2.5 py-2"
-                >
-                  <span className="font-data text-[10px] text-white/60">
-                    {o.from.slice(5)} → {o.to.slice(5)}
-                  </span>
-                  <span className="text-[10px] text-white/35">{t.pulse.days(o.days)}</span>
+            {outages.length > 0 ? (
+              <>
+                <div className="flex flex-col gap-2 mt-3">
+                  {outages.map((o) => (
+                    <div
+                      key={o.from}
+                      className="flex items-center justify-between gap-2 rounded-lg bg-white/[0.02] ring-1 ring-white/5 px-2.5 py-2"
+                    >
+                      <span className="font-data text-[10px] text-white/60">
+                        {o.from.slice(5)} → {o.to.slice(5)}
+                      </span>
+                      <span className="text-[10px] text-white/35">{t.pulse.days(o.days)}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <div className="text-[10px] text-white/40 mt-3 leading-relaxed">
-              {t.pulse.outagesNote}
-            </div>
+                <div className="text-[10px] text-white/40 mt-3 leading-relaxed">
+                  {t.pulse.outagesNote}
+                </div>
+              </>
+            ) : (
+              /* Un bloque vacío se lee como algo que falló al cargar. Decir que no hubo cortes es
+                 información: significa que el sensor cubrió el período entero. */
+              <div className="mt-3 flex items-start gap-2.5 rounded-lg bg-[var(--neural-teal)]/[0.06] ring-1 ring-[var(--neural-teal)]/20 px-3 py-2.5">
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-[1px] text-[var(--neural-teal)]" />
+                <div>
+                  <div className="text-[11px] text-white/85">{t.pulse.noOutages}</div>
+                  <div className="text-[10px] text-white/40 mt-1 leading-relaxed">
+                    {t.pulse.noOutagesNote}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </Reveal>
+
+      {/* Va al final porque es la conclusión: las secciones anteriores describen el volumen, esta
+          responde quién lo produce. Solo aparece si el respaldo trae la matriz — un snapshot
+          congelado antes de que existiera no la tiene. */}
+      {weekly && (
+        <Reveal delay={320}>
+          <WeekHeatmap data={weekly} />
+        </Reveal>
+      )}
     </section>
   );
 }

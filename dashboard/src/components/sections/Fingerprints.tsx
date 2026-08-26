@@ -20,6 +20,19 @@ export default function Fingerprints({ data }: { data: FingerprintData }) {
   const share = pct(data.grouped_sessions, data.total_sessions, 0);
   const max = Math.max(...data.families.map((f) => f.sessions), 1);
 
+  /**
+   * Cuánto del total se explica con unas pocas familias.
+   *
+   * La lista ordenada ya insinúa que arriba está todo el peso, pero obliga a sumar de a ojo. Esto
+   * lo dice: la primera familia sola, y las tres primeras juntas, contra el total.
+   */
+  const orden = [...data.families].sort((a, b) => b.sessions - a.sessions);
+  const primera = orden[0];
+  const tresPrimeras = orden.slice(0, 3).reduce((s, f) => s + f.sessions, 0);
+  // Direcciones distintas de la familia más grande: es lo que separa "muchos atacantes" de
+  // "un programa corriendo en muchas máquinas".
+  const maquinas = primera?.sources ?? 0;
+
   const tacticName = (key: string) => t.tactics[key as keyof typeof t.tactics]?.name ?? key;
   const fmtDate = (iso?: string) =>
     iso
@@ -77,11 +90,72 @@ export default function Fingerprints({ data }: { data: FingerprintData }) {
         </div>
       </Reveal>
 
+      {/* La concentración: el dato que la lista ordenada insinúa pero no dice. */}
+      {primera && (
+        <Reveal delay={60}>
+          <div className="tile rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-4">
+            <span className="tile-glow" style={{ background: 'var(--agent-coral)' }} />
+            <div className="relative">
+              <div className="text-[9px] uppercase tracking-wider text-white/35 mb-3">
+                {t.fingerprints.concentrationTitle}
+              </div>
+
+              {/* Una sola barra apilada: cada tramo es una familia, y el ancho de la primera contra
+                  el resto es toda la lectura. */}
+              <div className="flex h-7 rounded-md overflow-hidden ring-1 ring-white/5">
+                {orden.slice(0, 3).map((f, i) => (
+                  <div
+                    key={f.label}
+                    className="h-7 transition-all duration-1000"
+                    style={{
+                      width: `${(f.sessions / data.total_sessions) * 100}%`,
+                      background: `rgba(255,107,53,${0.55 - i * 0.16})`,
+                    }}
+                    title={`${f.label}: ${n(f.sessions)}`}
+                  />
+                ))}
+                <div className="flex-1 h-7 bg-white/[0.04]" />
+              </div>
+
+              <div className="grid sm:grid-cols-3 gap-2 mt-3">
+                <div className="rounded-lg bg-white/[0.03] p-2.5">
+                  <div className="font-data text-[15px] text-white/90">
+                    {pct(primera.sessions, data.total_sessions, 0)}%
+                  </div>
+                  <div className="text-[9px] uppercase tracking-wider text-white/35 mt-0.5">
+                    {t.fingerprints.topOne}
+                  </div>
+                </div>
+                <div className="rounded-lg bg-white/[0.03] p-2.5">
+                  <div className="font-data text-[15px] text-white/90">
+                    {pct(tresPrimeras, data.total_sessions, 0)}%
+                  </div>
+                  <div className="text-[9px] uppercase tracking-wider text-white/35 mt-0.5">
+                    {t.fingerprints.topThree}
+                  </div>
+                </div>
+                <div className="rounded-lg bg-white/[0.03] p-2.5">
+                  <div className="font-data text-[15px] text-white/90">{n(maquinas)}</div>
+                  <div className="text-[9px] uppercase tracking-wider text-white/35 mt-0.5">
+                    {t.fingerprints.machinesBehind}
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-[11px] text-white/55 leading-relaxed mt-3">
+                {t.fingerprints.concentrationNote(
+                  pct(primera.sessions, data.total_sessions, 0),
+                  n(maquinas),
+                )}
+              </div>
+            </div>
+          </div>
+        </Reveal>
+      )}
+
       <Reveal delay={100}>
         <div className="rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-4">
-          <div className="text-[11px] text-white/60 leading-relaxed">
-            {t.fingerprints.lesson}
-          </div>
+          <div className="text-[11px] text-white/60 leading-relaxed">{t.fingerprints.lesson}</div>
         </div>
       </Reveal>
 

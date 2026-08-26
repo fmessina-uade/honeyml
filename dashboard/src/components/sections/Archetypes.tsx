@@ -1,6 +1,7 @@
 import { Crosshair, KeyRound, Radar } from 'lucide-react';
 import type { ArchetypeData } from '../../lib/api';
 import Reveal from '../Reveal';
+import AttackFunnel from '../AttackFunnel';
 import { n } from '../../lib/format';
 import { useI18n } from '../../lib/i18n';
 
@@ -51,6 +52,12 @@ export default function Archetypes({ data }: { data: ArchetypeData }) {
         <div className="rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-4">
           <div className="text-[11px] text-white/60 leading-relaxed">{t.archetypes.lesson}</div>
         </div>
+      </Reveal>
+
+      {/* El embudo va antes que las tarjetas: da la forma del conjunto, y recién después conviene
+          mirar quiénes componen cada escalón. */}
+      <Reveal delay={40}>
+        <AttackFunnel data={data} />
       </Reveal>
 
       <div className="flex flex-col gap-3">

@@ -228,6 +228,7 @@ export default function App() {
                 overview={snapshot.overview}
                 timeline={snapshot.timeline}
                 hourly={snapshot.hourly}
+                weekly={snapshot.weekly_rhythm}
               />
             )}
             {active === 'anatomia' && <SessionReplay replays={replays} />}

@@ -8,10 +8,7 @@ import { useI18n } from '../../lib/i18n';
  * What each exposed service is, and why someone knocks on it. The point of the section is that
  * SSH is the door everyone remembers to lock and the others are the ones left open.
  */
-const PROTOCOL_INFO: Record<
-  string,
-  { name: string; what: string; why: string; color: string }
-> = {
+const PROTOCOL_INFO: Record<string, { name: string; what: string; why: string; color: string }> = {
   smbd: {
     name: 'SMB',
     what: 'Compartir archivos e impresoras en redes Windows.',
@@ -56,50 +53,51 @@ const PROTOCOL_INFO: Record<
   },
 };
 
-const PROTOCOL_INFO_EN: Record<string, { name: string; what: string; why: string; color: string }> = {
-  smbd: {
-    name: 'SMB',
-    what: 'File and printer sharing on Windows networks.',
-    why: 'It is the protocol of WannaCry and NotPetya. It should never be exposed to the internet, and yet it remains the most hammered: the worms of 2017 are still circulating, looking for unpatched machines.',
-    color: 'var(--agent-coral)',
-  },
-  httpd: {
-    name: 'HTTP',
-    what: 'The protocol of the web.',
-    why: 'Scanners sweep it looking for admin panels, forgotten configuration files and known vulnerabilities in content management systems.',
-    color: 'var(--honey-amber)',
-  },
-  mysqld: {
-    name: 'MySQL',
-    what: 'A database open on port 3306.',
-    why: 'A database reachable from the internet is direct access to the data, with no need to breach the operating system. Default credentials get tried.',
-    color: 'var(--neural-teal)',
-  },
-  mssqld: {
-    name: 'MSSQL',
-    what: "Microsoft's database on port 1433.",
-    why: 'The "sa" user is the administrator and exists on every install. It is the equivalent of root: there is no name to guess.',
-    color: '#a78bfa',
-  },
-  ftpd: {
-    name: 'FTP',
-    what: 'File transfer, unencrypted.',
-    why: 'Credentials travel in plain text. Anonymous access gets tried, still enabled by default on many old servers.',
-    color: 'var(--ghost-slate)',
-  },
-  epmapper: {
-    name: 'MSRPC',
-    what: "Windows' remote service locator, port 135.",
-    why: 'It is used to enumerate which services run on the machine. This is reconnaissance before choosing an exploit.',
-    color: '#60a5fa',
-  },
-  ftpdatalisten: {
-    name: 'FTP (data channel)',
-    what: 'The secondary connection FTP opens to transfer the file.',
-    why: 'Not a vector of its own: it appears as a consequence of FTP activity. Shown so the totals add up.',
-    color: 'rgba(148,163,184,0.5)',
-  },
-};
+const PROTOCOL_INFO_EN: Record<string, { name: string; what: string; why: string; color: string }> =
+  {
+    smbd: {
+      name: 'SMB',
+      what: 'File and printer sharing on Windows networks.',
+      why: 'It is the protocol of WannaCry and NotPetya. It should never be exposed to the internet, and yet it remains the most hammered: the worms of 2017 are still circulating, looking for unpatched machines.',
+      color: 'var(--agent-coral)',
+    },
+    httpd: {
+      name: 'HTTP',
+      what: 'The protocol of the web.',
+      why: 'Scanners sweep it looking for admin panels, forgotten configuration files and known vulnerabilities in content management systems.',
+      color: 'var(--honey-amber)',
+    },
+    mysqld: {
+      name: 'MySQL',
+      what: 'A database open on port 3306.',
+      why: 'A database reachable from the internet is direct access to the data, with no need to breach the operating system. Default credentials get tried.',
+      color: 'var(--neural-teal)',
+    },
+    mssqld: {
+      name: 'MSSQL',
+      what: "Microsoft's database on port 1433.",
+      why: 'The "sa" user is the administrator and exists on every install. It is the equivalent of root: there is no name to guess.',
+      color: '#a78bfa',
+    },
+    ftpd: {
+      name: 'FTP',
+      what: 'File transfer, unencrypted.',
+      why: 'Credentials travel in plain text. Anonymous access gets tried, still enabled by default on many old servers.',
+      color: 'var(--ghost-slate)',
+    },
+    epmapper: {
+      name: 'MSRPC',
+      what: "Windows' remote service locator, port 135.",
+      why: 'It is used to enumerate which services run on the machine. This is reconnaissance before choosing an exploit.',
+      color: '#60a5fa',
+    },
+    ftpdatalisten: {
+      name: 'FTP (data channel)',
+      what: 'The secondary connection FTP opens to transfer the file.',
+      why: 'Not a vector of its own: it appears as a consequence of FTP activity. Shown so the totals add up.',
+      color: 'rgba(148,163,184,0.5)',
+    },
+  };
 
 export default function Protocols({ detail }: { detail: ProtocolDetail[] }) {
   const { t, lang } = useI18n();
@@ -110,6 +108,24 @@ export default function Protocols({ detail }: { detail: ProtocolDetail[] }) {
   const maxEvents = Math.max(...vectors.map((d) => d.count), 1);
   const maxSources = Math.max(...vectors.map((d) => d.sources), 1);
 
+  /**
+   * El contraste que hace al punto de la sección: dos servicios pueden recibir volúmenes parecidos
+   * y significar cosas opuestas según cuántas máquinas distintas los golpeen.
+   *
+   * Se eligen por extremos de eventos por origen en lugar de fijar SMB y HTTP a mano: si mañana el
+   * tráfico cambia de forma, la comparación sigue mostrando el contraste real y no uno histórico.
+   */
+  const porOrigen = (d: ProtocolDetail) => d.count / (d.sources || 1);
+  const ordenados = [...vectors]
+    .filter((d) => d.sources > 5)
+    .sort((a, b) => porOrigen(b) - porOrigen(a));
+  const insistente = ordenados[0];
+  const disperso = ordenados[ordenados.length - 1];
+  const brecha =
+    insistente && disperso && porOrigen(disperso) > 0
+      ? porOrigen(insistente) / porOrigen(disperso)
+      : 0;
+
   return (
     <section className="flex flex-col gap-4">
       <Tooltip content={tip.content} at={tip.at} />
@@ -117,12 +133,55 @@ export default function Protocols({ detail }: { detail: ProtocolDetail[] }) {
       <Reveal>
         <div className="rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-4">
           <div className="text-[11px] text-white/60 leading-relaxed">
-            {t.protocols.intro1}{' '}
-            <span className="text-white/85">{t.protocols.introStrong}</span>{' '}
+            {t.protocols.intro1} <span className="text-white/85">{t.protocols.introStrong}</span>{' '}
             {t.protocols.intro2}
           </div>
         </div>
       </Reveal>
+
+      {/* El contraste, arriba de la lista: es la lectura que la lista sola no entrega. */}
+      {brecha > 2 && (
+        <Reveal delay={60}>
+          <div className="tile rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-4">
+            <span className="tile-glow" style={{ background: 'var(--agent-coral)' }} />
+            <div className="relative">
+              <div className="text-[9px] uppercase tracking-wider text-white/35 mb-3">
+                {t.protocols.contrastTitle}
+              </div>
+              <div className="grid sm:grid-cols-[1fr_auto_1fr] gap-3 items-center">
+                {[insistente, disperso].map((d, i) => (
+                  <div key={d.protocol} className={i === 1 ? 'sm:order-3' : ''}>
+                    <div className="text-[11px] text-white/80">
+                      {(lang === 'en' ? PROTOCOL_INFO_EN : PROTOCOL_INFO)[d.protocol]?.name ??
+                        d.protocol}
+                    </div>
+                    <div className="font-data text-2xl text-white mt-1">
+                      {n(Math.round(porOrigen(d)))}
+                    </div>
+                    <div className="text-[10px] text-white/40 mt-0.5">
+                      {t.protocols.perSourceLabel}
+                    </div>
+                    <div className="font-data text-[10px] text-white/30 mt-1">
+                      {n(d.count)} · {n(d.sources)} {t.protocols.sourcesShort}
+                    </div>
+                  </div>
+                ))}
+                <div className="sm:order-2 text-center">
+                  <div className="font-data text-lg" style={{ color: 'var(--agent-coral)' }}>
+                    {n(Math.round(brecha))}×
+                  </div>
+                  <div className="text-[9px] uppercase tracking-wider text-white/25">
+                    {t.protocols.gap}
+                  </div>
+                </div>
+              </div>
+              <div className="text-[11px] text-white/55 leading-relaxed mt-3">
+                {t.protocols.contrastNote}
+              </div>
+            </div>
+          </div>
+        </Reveal>
+      )}
 
       <div className="bar-group grid gap-3">
         {vectors.map((d, i) => {
@@ -174,7 +233,9 @@ export default function Protocols({ detail }: { detail: ProtocolDetail[] }) {
                     <span className="w-2 h-2 rounded-sm" style={{ background: info.color }} />
                     <span className="text-[13px] text-white/90 font-mono-display">{info.name}</span>
                     {d.port && (
-                      <span className="font-data text-[10px] text-white/30">{t.protocols.port} {d.port}</span>
+                      <span className="font-data text-[10px] text-white/30">
+                        {t.protocols.port} {d.port}
+                      </span>
                     )}
                   </div>
                   <div className="flex items-center gap-5 font-data text-[10px]">
@@ -232,9 +293,7 @@ export default function Protocols({ detail }: { detail: ProtocolDetail[] }) {
           <div className="text-[9px] uppercase tracking-wider text-white/35 mb-2">
             {t.protocols.lessonTitle}
           </div>
-          <div className="text-[11px] text-white/55 leading-relaxed">
-            {t.protocols.lesson}
-          </div>
+          <div className="text-[11px] text-white/55 leading-relaxed">{t.protocols.lesson}</div>
         </div>
       </Reveal>
     </section>

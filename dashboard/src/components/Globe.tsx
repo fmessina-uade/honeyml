@@ -227,6 +227,7 @@ export default function Globe({ countries, selected, onSelect }: Props) {
   }, []);
 
   const lineas = graticula(rotLon);
+  const contornosPath = contornos(mundo, rotLon);
 
   return (
     <svg viewBox="0 0 200 200" className="w-full h-full" role="img" aria-label="Globo terráqueo">
@@ -243,6 +244,9 @@ export default function Globe({ countries, selected, onSelect }: Props) {
           <stop offset="0%" stopColor="#1b2836" />
           <stop offset="100%" stopColor="#0c1219" />
         </radialGradient>
+        <filter id="f-costa">
+          <feGaussianBlur stdDeviation="1.4" />
+        </filter>
         <filter id="f-brillo">
           <feGaussianBlur stdDeviation="2.2" result="b" />
           <feMerge>
@@ -263,12 +267,26 @@ export default function Globe({ countries, selected, onSelect }: Props) {
         ))}
       </g>
 
+      {/* Los contornos van en el verde de la paleta, no en blanco: el blanco es el color del texto
+          en todo el panel y usarlo acá hacía competir al mapa con lo que hay que leer. Se dibujan
+          dos veces, una difusa por debajo, para que las costas tengan el mismo halo que el resto
+          de los elementos de la interfaz. */}
       <path
-        d={contornos(mundo, rotLon)}
+        d={contornosPath}
         fill="none"
-        stroke="rgba(148,163,184,0.42)"
-        strokeWidth="0.45"
+        stroke="var(--neural-teal)"
+        strokeWidth="1.6"
         strokeLinejoin="round"
+        opacity="0.14"
+        filter="url(#f-costa)"
+      />
+      <path
+        d={contornosPath}
+        fill="none"
+        stroke="var(--neural-teal)"
+        strokeWidth="0.4"
+        strokeLinejoin="round"
+        opacity="0.55"
       />
 
       <circle cx={CX} cy={CY} r={R} fill="none" stroke="rgba(0,184,148,0.28)" strokeWidth="0.6" />

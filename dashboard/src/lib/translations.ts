@@ -70,6 +70,9 @@ const es = {
     loginsAtThisHour: 'intentos de acceso en esa hora',
     events_short: 'eventos',
     outages: 'Interrupciones de captura',
+    noOutages: 'Sin interrupciones de captura en el período seleccionado',
+    noOutagesNote:
+      'Los sensores registraron actividad todos los días del rango elegido. Las interrupciones, cuando ocurren, se detectan como días sin ningún evento y casi siempre corresponden a un cuelgue del sensor y no a una pausa de los atacantes.',
     outagesNote:
       'Declaradas y documentadas. Los huecos del gráfico corresponden a estos períodos, no a ausencia de ataques.',
     days: (n: number) => (n === 1 ? '1 día' : `${n} días`),
@@ -95,6 +98,12 @@ const es = {
     noMatch: 'Ninguna sesión coincide.',
   },
   protocols: {
+    contrastTitle: 'Mismo sensor, lecturas opuestas',
+    perSourceLabel: 'eventos por dirección',
+    sourcesShort: 'direcciones',
+    gap: 'de diferencia',
+    contrastNote:
+      'Contar eventos alcanza para saber cuánto ruido hay, no de qué tipo. Un servicio golpeado muchísimas veces desde pocas direcciones es un gusano insistiendo contra el mismo puerto; uno golpeado menos pero desde muchas más direcciones es rastreo masivo buscando qué hay expuesto. Son dos amenazas distintas y la única forma de distinguirlas es mirar las dos cifras juntas.',
     intro1:
       'El señuelo no expone solo SSH. Estos son los otros servicios que dejó abiertos, y lo que llegó a cada uno.',
     introStrong: 'Nadie publicó esta dirección:',
@@ -199,6 +208,12 @@ const es = {
       'Cómo funciona: el navegador calcula el hash SHA-256 de lo que escribís y envía solo los primeros cinco caracteres. El servicio responde con todos los hashes capturados que empiezan igual, y la comparación termina acá. La contraseña nunca sale de tu equipo, y el servicio no puede saber cuál preguntaste.',
   },
   fingerprints: {
+    concentrationTitle: 'Cuánto de todo esto es un solo programa',
+    topOne: 'la familia más grande',
+    topThree: 'las tres primeras',
+    machinesBehind: 'máquinas que lo corren',
+    concentrationNote: (p: string, m: string) =>
+      `Una sola familia explica el ${p}% de todas las sesiones que llegaron a una consola, ejecutada desde ${m} direcciones distintas. Esa proporción es el punto entero: no son ${m} atacantes decidiendo qué escribir, es un guion desplegado en ${m} máquinas comprometidas. Contar alertas reportaría miles de incidentes donde hay uno.`,
     sessionsLabel: 'Sesiones con comandos',
     withCommands: 'donde el atacante llegó a ejecutar algo',
     familiesLabel: 'Familias distintas',
@@ -264,6 +279,22 @@ const es = {
       },
     },
   },
+  funnel: {
+    title: 'De golpear la puerta a llevarse algo',
+    knocked: 'Golpearon la puerta',
+    knockedHint: 'Direcciones distintas que tocaron el sensor al menos una vez',
+    tried: 'Insistieron con credenciales',
+    triedHint: 'Dejaron de ser un sondeo y probaron entrar',
+    gotIn: 'Lograron entrar',
+    gotInHint: 'Alguna combinación de usuario y contraseña funcionó',
+    ran: 'Ejecutaron comandos',
+    ranHint: 'Llegaron a una consola e hicieron algo con ella',
+    took: 'Trajeron algo de afuera',
+    tookHint: 'Descargaron un archivo: es la señal de un compromiso real',
+    survives: (p: string) => `sobrevive el ${p}% del escalón anterior`,
+    lesson: (total: string, fin: string, porc: string) =>
+      `De ${total} direcciones que golpearon la puerta, ${fin} llegaron a descargar algo: el ${porc}%. Esa caída es el argumento central del triaje automático — tratar cada evento como una alerta significa revisar catorce mil cosas para encontrar doscientas. Lo que el motor tiene que hacer no es detectar más, es descartar mejor.`,
+  },
   geography: {
     byCountry: 'Por país',
     byAs: 'Por red que opera la dirección',
@@ -278,10 +309,36 @@ const es = {
     coverage: (geo: string, asn: string) =>
       `Se resolvió el país del ${geo}% de los eventos y la red operadora del ${asn}%. Las bases usadas son las gratuitas de MaxMind, que no conocen todas las direcciones. Además, quien usa una VPN o una cadena de equipos comprometidos aparece donde está el último salto: el dato sirve para agrupar y comparar, no para atribuir.`,
   },
+  week: {
+    title: 'La semana completa, hora por hora',
+    utc: 'horario UTC',
+    days: ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'],
+    daysLong: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'],
+    perHour: 'eventos por hora, en promedio',
+    observed: (n: number) => `medido sobre ${n} ${n === 1 ? 'semana' : 'semanas'}`,
+    office: 'Oficina L-V 9-18',
+    night: 'Madrugada 0-6',
+    weekend: 'Fin de semana',
+    vsOffice: (r: string) => `${r}× la actividad de oficina`,
+    verdictAutomated:
+      'Ahí está la prueba de que no hay nadie del otro lado. Un sistema operado por personas se enciende de lunes a viernes en horario de oficina y se apaga de noche y los fines de semana. Acá pasa lo contrario: la madrugada y el fin de semana superan al horario laboral. No es que los atacantes trabajen de noche, es que no duermen, porque son programas corriendo sin supervisión.',
+    verdictMixed:
+      'La distribución no reproduce un horario humano, pero tampoco es del todo pareja. Conviene mirar las celdas más intensas: suelen corresponder a una campaña puntual y no a un patrón sostenido.',
+  },
   controls: {
     interval: { hour: 'Por hora', day: 'Por día', week: 'Por semana' },
     allSensors: 'Ambos',
     loading: 'actualizando…',
+    from: 'Desde',
+    to: 'Hasta',
+    reset: 'Ver todo',
+    shortcut: {
+      hoy: 'Último día',
+      ayer: 'Día anterior',
+      semana: 'Última semana',
+      mes: 'Último mes',
+      todo: 'Todo',
+    },
   },
   capture: {
     on: 'Modo captura',
@@ -359,6 +416,9 @@ const en: typeof es = {
     loginsAtThisHour: 'access attempts in that hour',
     events_short: 'events',
     outages: 'Capture outages',
+    noOutages: 'No capture outages in the selected period',
+    noOutagesNote:
+      'The sensors recorded activity on every day of the chosen range. Outages, when they happen, show up as days with no events at all and almost always mean the sensor hung rather than the attackers pausing.',
     outagesNote:
       'Declared and documented. The gaps in the chart correspond to these periods, not to an absence of attacks.',
     days: (n: number) => (n === 1 ? '1 day' : `${n} days`),
@@ -384,6 +444,12 @@ const en: typeof es = {
     noMatch: 'No session matches.',
   },
   protocols: {
+    contrastTitle: 'Same sensor, opposite readings',
+    perSourceLabel: 'events per address',
+    sourcesShort: 'addresses',
+    gap: 'apart',
+    contrastNote:
+      'Counting events tells you how much noise there is, not what kind. A service hit an enormous number of times from few addresses is a worm hammering the same port; one hit less often but from many more addresses is mass scanning looking for what is exposed. Those are two different threats, and the only way to tell them apart is to read both figures together.',
     intro1:
       'The decoy does not only expose SSH. These are the other services it left open, and what reached each one.',
     introStrong: 'Nobody published this address:',
@@ -488,6 +554,12 @@ const en: typeof es = {
       'How it works: the browser computes the SHA-256 hash of what you type and sends only the first five characters. The service replies with every captured hash starting the same way, and the comparison finishes here. The password never leaves your machine, and the service cannot tell which one you asked about.',
   },
   fingerprints: {
+    concentrationTitle: 'How much of it is one program',
+    topOne: 'the largest family',
+    topThree: 'the top three',
+    machinesBehind: 'machines running it',
+    concentrationNote: (p: string, m: string) =>
+      `A single family accounts for ${p}% of every session that reached a shell, run from ${m} distinct addresses. That ratio is the whole point: those are not ${m} attackers deciding what to type, it is one script deployed across ${m} compromised machines. Counting alerts would report thousands of incidents where there is one.`,
     sessionsLabel: 'Sessions with commands',
     withCommands: 'where the attacker got to run something',
     familiesLabel: 'Distinct families',
@@ -551,6 +623,22 @@ const en: typeof es = {
       },
     },
   },
+  funnel: {
+    title: 'From knocking to taking something',
+    knocked: 'Knocked on the door',
+    knockedHint: 'Distinct addresses that touched the sensor at least once',
+    tried: 'Pushed on credentials',
+    triedHint: 'Stopped being a probe and tried to get in',
+    gotIn: 'Got in',
+    gotInHint: 'Some username and password combination worked',
+    ran: 'Ran commands',
+    ranHint: 'Reached a shell and did something with it',
+    took: 'Pulled something in',
+    tookHint: 'Downloaded a file: the mark of a real compromise',
+    survives: (p: string) => `${p}% of the previous step survives`,
+    lesson: (total: string, fin: string, porc: string) =>
+      `Out of ${total} addresses that knocked, ${fin} got as far as downloading something: ${porc}%. That drop-off is the whole case for automated triage — treating every event as an alert means reviewing fourteen thousand things to find two hundred. What the engine has to do is not detect more, it is discard better.`,
+  },
   geography: {
     byCountry: 'By country',
     byAs: 'By network operating the address',
@@ -565,10 +653,36 @@ const en: typeof es = {
     coverage: (geo: string, asn: string) =>
       `The country resolved for ${geo}% of events and the operating network for ${asn}%. The databases used are the free MaxMind ones, which do not know every address. On top of that, anyone behind a VPN or a chain of compromised machines shows up wherever the last hop is: the data is for grouping and comparing, not for attribution.`,
   },
+  week: {
+    title: 'The full week, hour by hour',
+    utc: 'UTC time',
+    days: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'],
+    daysLong: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+    perHour: 'events per hour, on average',
+    observed: (n: number) => `measured over ${n} ${n === 1 ? 'week' : 'weeks'}`,
+    office: 'Office Mon-Fri 9-18',
+    night: 'Small hours 0-6',
+    weekend: 'Weekend',
+    vsOffice: (r: string) => `${r}× office-hours activity`,
+    verdictAutomated:
+      'There is the proof that nobody is on the other side. A system run by people lights up on weekdays during office hours and goes quiet at night and on weekends. Here the opposite happens: the small hours and the weekend beat the working day. It is not that attackers work nights — they do not sleep, because they are programs running unattended.',
+    verdictMixed:
+      'The distribution does not reproduce a human schedule, but it is not perfectly even either. The most intense cells are worth a look: they usually mark a one-off campaign rather than a sustained pattern.',
+  },
   controls: {
     interval: { hour: 'Hourly', day: 'Daily', week: 'Weekly' },
     allSensors: 'Both',
     loading: 'updating…',
+    from: 'From',
+    to: 'To',
+    reset: 'Show all',
+    shortcut: {
+      hoy: 'Last day',
+      ayer: 'Previous day',
+      semana: 'Last week',
+      mes: 'Last month',
+      todo: 'All',
+    },
   },
   capture: {
     on: 'Capture mode',
