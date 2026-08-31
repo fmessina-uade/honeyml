@@ -259,6 +259,15 @@ bus-status:
 consumer:
 	@./.venv/bin/python -m honeyml.agent.consumer $(if $(LIMITE),--limite $(LIMITE),)
 
+# Topología del motor de triaje y qué nodo tiene implementación hoy.
+grafo:
+	@./.venv/bin/python -m honeyml.agent.graph
+
+# Entrena el clasificador final, lo persiste y calcula el ranking por permutación.
+# Tarda unos dos minutos: la parte lenta son las probabilidades fuera de muestra del umbral.
+modelo:
+	@./.venv/bin/python -m honeyml.features.uwf_export
+
 # One command for the whole data cycle: pull fresh logs from the sensors, wait for the pipeline
 # to ingest them, and regenerate every derived artifact. Replaces running five targets by hand.
 #
