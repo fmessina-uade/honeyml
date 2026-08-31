@@ -162,6 +162,23 @@ body {
   animation: sectionIn 0.55s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* ---- country label over the globe: enters while the globe is still turning toward it ---- */
+@keyframes paisRotulo {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+.pais-rotulo {
+  /* Arranca demorado a propósito: el globo tarda cerca de un segundo en centrar el país, y el
+     rótulo que aparece antes de que llegue se lee como si nombrara al que todavía está de frente. */
+  animation: paisRotulo 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.35s backwards;
+}
+
 /* ---- sheen sweep, used once on the active nav item ---- */
 @keyframes navSheen {
   from {

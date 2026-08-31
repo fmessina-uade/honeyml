@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Activity, CheckCircle2, Fingerprint, KeyRound, TerminalSquare } from 'lucide-react';
+import {
+  Activity,
+  AlertTriangle,
+  CheckCircle2,
+  Fingerprint,
+  KeyRound,
+  TerminalSquare,
+} from 'lucide-react';
 import type { HourPoint, Overview, TimelinePoint, WeeklyRhythm } from '../../lib/api';
 import CountUp from '../CountUp';
 import Reveal from '../Reveal';
@@ -71,8 +78,16 @@ export default function Pulse({
   const [hasta, setHasta] = useState(maximo);
   const [serie, setSerie] = useState<TimelinePoint[] | null>(null);
   const [cargando, setCargando] = useState(false);
+  /** Por qué no se pudo aplicar el filtro pedido. Ver el efecto que lo asigna. */
+  const [problema, setProblema] = useState<string | null>(null);
 
   const completo = desde === minimo && hasta === maximo;
+
+  // Un filtro que no se pudo aplicar no cuenta como filtro. Se distingue de `completo` —que es un
+  // hecho sobre las fechas y gobierna qué se pide— porque este gobierna qué se dice: sin la
+  // distinción, el encabezado anunciaba el rango elegido sobre un gráfico que seguía mostrando el
+  // período entero.
+  const filtroAplicado = !completo && problema === null;
 
   /**
    * Cambiar el intervalo ajusta el rango cuando hace falta.
@@ -139,9 +154,17 @@ export default function Pulse({
       .then((d) => {
         // Una respuesta que llega tarde, después de que el usuario cambió de filtro otra vez, no
         // debe pisar a la que corresponde al filtro actual.
-        if (vigente) setSerie(d);
+        if (!vigente) return;
+        setSerie(d);
+        setProblema(null);
       })
-      .catch(() => vigente && setSerie(null))
+      .catch((e: Error) => {
+        if (!vigente) return;
+        // Antes acá solo se descartaba la serie, y el gráfico volvía en silencio al período
+        // completo con los controles marcando el rango elegido. El motivo lo explica la API.
+        setSerie(null);
+        setProblema(e.message);
+      })
       .finally(() => vigente && setCargando(false));
     return () => {
       vigente = false;
@@ -149,9 +172,19 @@ export default function Pulse({
   }, [interval, sensor, desde, hasta, completo]);
 
   const timeline = serie ?? timelineBase;
-  const days = timeline.filter((d) => d.count > 0).length;
+
+  /**
+   * Las tarjetas describen la captura completa; el gráfico, lo seleccionado.
+   *
+   * Los números grandes —eventos, direcciones, accesos, comandos— vienen del resumen y no se
+   * filtran: la API de la línea de tiempo devuelve conteos por período, no el resumen recortado.
+   * Mientras lo derivado salía de la serie filtrada, elegir una semana dejaba "2,7 millones de
+   * eventos" arriba y "390.000 por día" debajo, que es la división de un total entre los días de
+   * otro rango. Derivándolo de la serie completa las cuatro tarjetas vuelven a hablar de lo mismo.
+   */
+  const days = timelineBase.filter((d) => d.count > 0).length;
   const perDay = days ? Math.round(overview.events / days) : 0;
-  const peak = timeline.reduce((a, b) => (b.count > a.count ? b : a), timeline[0]);
+  const peak = timelineBase.reduce((a, b) => (b.count > a.count ? b : a), timelineBase[0]);
 
   const tiles = [
     {
@@ -194,11 +227,35 @@ export default function Pulse({
   // peak-to-trough: a human rhythm sits well above 3x, automation stays near 1
   const ratio = minHour > 0 ? maxHour / minHour : 0;
 
-  // outages read straight off the timeline, so the panel can never disagree with its own chart
+  const sensors = Object.keys(overview.by_sensor);
+
+  // Cuando el filtro no se pudo aplicar, toda la sección vuelve a hablar del período completo. Que
+  // un bloque honre la selección y el de al lado no es peor que no filtrar: son dos paneles
+  // contándose cosas distintas sin decir cuál manda.
+  const desdeVisto = filtroAplicado ? desde : minimo;
+  const hastaVisto = filtroAplicado ? hasta : maximo;
+  const sensorVisto = filtroAplicado ? sensor : 'todos';
+  const cuenta = (d: TimelinePoint) =>
+    sensorVisto === 'todos'
+      ? d.count
+      : ((d as unknown as Record<string, number>)[sensorVisto] ?? 0);
+
+  /**
+   * Interrupciones de captura, siempre contadas en días.
+   *
+   * Siguen la selección —rango y sensor— pero se leen de la serie diaria y no de la del gráfico.
+   * Con el intervalo por hora, dos horas seguidas en cero no distinguen un sensor caído de una
+   * madrugada tranquila, y el bloque pasaba a declarar interrupciones que nunca ocurrieron. Un día
+   * entero sin un solo evento sí es un corte: llegan unos treinta mil por día.
+   *
+   * Filtrar por sensor además revela lo que el total esconde: la caída de Dionaea queda tapada
+   * mientras Cowrie sigue registrando.
+   */
   const outages: { from: string; to: string; days: number }[] = [];
   let run: string[] = [];
-  for (const d of timeline) {
-    if (d.count === 0) run.push(d.date);
+  for (const d of timelineBase) {
+    if (d.date < desdeVisto || d.date > hastaVisto) continue;
+    if (cuenta(d) === 0) run.push(d.date);
     else if (run.length) {
       if (run.length >= 2) {
         outages.push({ from: run[0], to: run[run.length - 1], days: run.length });
@@ -207,7 +264,6 @@ export default function Pulse({
     }
   }
   if (run.length >= 2) outages.push({ from: run[0], to: run[run.length - 1], days: run.length });
-  const sensors = Object.keys(overview.by_sensor);
 
   return (
     <section className="flex flex-col gap-4">
@@ -260,8 +316,14 @@ export default function Pulse({
                   {s}
                 </span>
               ))}
+              {/* El rango que se está viendo, no el de la captura entera.
+                  Estaba atado al resumen, así que elegir "ayer" o mover una fecha dejaba acá el
+                  período completo: el gráfico cambiaba y su encabezado seguía diciendo lo mismo. */}
               <span className="font-data text-[10px] text-white/30">
-                {overview.first_event?.slice(0, 10)} → {overview.last_event?.slice(0, 10)}
+                {filtroAplicado ? `${desde} → ${hasta}` : `${minimo} → ${maximo}`}
+                {filtroAplicado && (
+                  <span className="text-[var(--honey-amber)]/70"> · {t.pulse.filtered}</span>
+                )}
               </span>
             </div>
           </div>
@@ -285,6 +347,18 @@ export default function Pulse({
               loading={cargando}
             />
           </div>
+
+          {/* El aviso va entre los controles y el gráfico, que es donde mira quien acaba de tocar
+              un filtro y no vio cambiar nada. */}
+          {problema && (
+            <div className="mt-2 flex items-start gap-2 rounded-lg ring-1 ring-[var(--honey-amber)]/25 bg-[var(--honey-amber)]/[0.06] px-3 py-2">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-[1px] text-[var(--honey-amber)]" />
+              <div>
+                <div className="text-[11px] text-white/80">{t.pulse.filterFailed}</div>
+                <div className="text-[10px] text-white/45 mt-0.5 leading-relaxed">{problema}</div>
+              </div>
+            </div>
+          )}
 
           <div className="bar-group flex items-end gap-[2px] h-32 mt-3">
             {timeline.map((d) => {

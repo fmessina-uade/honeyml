@@ -26,6 +26,8 @@ export default function Geography({ data }: { data: GeoData }) {
   // tocarlo deselecciona y el giro continuo se retoma.
   const [pais, setPais] = useState<string | null>(null);
 
+  const elegido = pais ? (data.countries.find((c) => c.country === pais) ?? null) : null;
+
   const maxPais = Math.max(...data.countries.map((c) => c.count), 1);
   const maxAs = Math.max(...data.autonomous_systems.map((a) => a.count), 1);
 
@@ -48,11 +50,64 @@ export default function Geography({ data }: { data: GeoData }) {
       <Reveal delay={60}>
         <div className="rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-4">
           <div className="grid md:grid-cols-[minmax(0,320px)_1fr] gap-4 items-center">
-            <div className="aspect-square w-full max-w-[320px] mx-auto">
+            <div className="relative aspect-square w-full max-w-[320px] mx-auto">
               <Globo countries={data.countries} selected={pais} onSelect={setPais} />
+
+              {/* El nombre va sobre el globo y no al costado: al elegir un país la mirada ya está
+                  acá, siguiendo el giro, y leerlo en otro lado obliga a buscarlo. Sin capturar el
+                  puntero, para no romper el arrastre que pasa por debajo. */}
+              {elegido && (
+                <div
+                  key={elegido.country}
+                  className="pais-rotulo pointer-events-none absolute inset-x-0 bottom-0 px-3 pb-3 pt-10
+                             bg-gradient-to-t from-[#0f141b] via-[#0f141b]/85 to-transparent
+                             rounded-b-xl text-center"
+                >
+                  <div className="text-[10px] text-white/40 mb-0.5">{flag(elegido.iso)}</div>
+                  <div className="text-2xl leading-none text-white font-mono-display text-balance">
+                    {elegido.country}
+                  </div>
+                  <div className="font-data text-[11px] text-[var(--agent-coral)] mt-1.5">
+                    {n(elegido.count)}{' '}
+                    <span className="text-white/40">{t.geography.eventsShort}</span>
+                    <span className="text-white/25">
+                      {' '}
+                      · {pct(elegido.count, data.with_geo, 1)}%
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
+
             <div className="text-[11px] text-white/55 leading-relaxed">
-              {pais ? t.geography.selected(pais) : t.geography.pickHint}
+              {elegido ? (
+                <>
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    {[
+                      { label: t.geography.addresses, value: n(elegido.sources) },
+                      {
+                        label: t.geography.perAddressShort,
+                        value: porDireccion(elegido.count, elegido.sources),
+                      },
+                      {
+                        label: t.geography.ofLocated,
+                        value: `${pct(elegido.count, data.with_geo, 1)}%`,
+                      },
+                    ].map((m) => (
+                      <div key={m.label} className="rounded-lg bg-white/[0.03] p-2.5">
+                        <div className="font-data text-[15px] text-white/90">{m.value}</div>
+                        <div className="text-[9px] uppercase tracking-wider text-white/35 mt-0.5">
+                          {m.label}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {t.geography.selected(elegido.country)}
+                </>
+              ) : (
+                t.geography.pickHint
+              )}
+              <div className="text-[10px] text-white/30 mt-2">{t.geography.dragHint}</div>
             </div>
           </div>
         </div>

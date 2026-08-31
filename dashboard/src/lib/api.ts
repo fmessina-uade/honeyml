@@ -170,7 +170,16 @@ export interface Snapshot {
 
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`/api${path}`);
-  if (!res.ok) throw new Error(`${path}: ${res.status}`);
+  if (!res.ok) {
+    // La API explica en `detail` por qué no puede responder —típicamente qué falta levantar—, y
+    // ese texto es lo único accionable que tiene el lector. Quedarse con el número de estado
+    // convierte una instrucción en un código.
+    const detalle = await res
+      .json()
+      .then((b: { detail?: string }) => b?.detail)
+      .catch(() => undefined);
+    throw new Error(detalle ?? `${path}: ${res.status}`);
+  }
   return res.json() as Promise<T>;
 }
 

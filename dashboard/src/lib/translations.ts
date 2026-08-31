@@ -76,6 +76,8 @@ const es = {
     outagesNote:
       'Declaradas y documentadas. Los huecos del gráfico corresponden a estos períodos, no a ausencia de ataques.',
     days: (n: number) => (n === 1 ? '1 día' : `${n} días`),
+    filtered: 'filtrado',
+    filterFailed: 'No se pudo aplicar el filtro. El gráfico muestra el período completo.',
   },
   replay: {
     speed: 'Velocidad',
@@ -300,6 +302,12 @@ const es = {
     byAs: 'Por red que opera la dirección',
     addresses: 'direcciones',
     perAddress: (r: string) => `${r} eventos por dirección`,
+    eventsShort: 'eventos',
+    perAddressShort: 'por dirección',
+    // "De localizados" y no "del total": el porcentaje se calcula sobre los eventos cuyo país se
+    // pudo resolver, que no son todos. Decir "del total" sería un número distinto del que se muestra.
+    ofLocated: 'de localizados',
+    dragHint: 'Arrastrá el globo con el mouse para girarlo a mano.',
     pickHint:
       'Cada punto es un país de origen, ubicado en el centroide de las direcciones que se observaron ahí. El tamaño sigue el volumen de eventos. Tocá un punto o una fila para que el globo gire hasta ese país.',
     selected: (p: string) =>
@@ -422,6 +430,8 @@ const en: typeof es = {
     outagesNote:
       'Declared and documented. The gaps in the chart correspond to these periods, not to an absence of attacks.',
     days: (n: number) => (n === 1 ? '1 day' : `${n} days`),
+    filtered: 'filtered',
+    filterFailed: 'The filter could not be applied. The chart shows the full period.',
   },
   replay: {
     speed: 'Speed',
@@ -644,6 +654,10 @@ const en: typeof es = {
     byAs: 'By network operating the address',
     addresses: 'addresses',
     perAddress: (r: string) => `${r} events per address`,
+    eventsShort: 'events',
+    perAddressShort: 'per address',
+    ofLocated: 'of located',
+    dragHint: 'Drag the globe with the mouse to turn it by hand.',
     pickHint:
       'Each dot is a country of origin, placed at the centroid of the addresses observed there. Size follows event volume. Tap a dot or a row and the globe turns to that country.',
     selected: (p: string) =>

@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+// Con alias porque `PointerEvent` sin él tapa al del DOM, y en un archivo que maneja punteros esa
+// ambigüedad se paga cara.
+import type { PointerEvent as EventoPuntero } from 'react';
 import type { CountryOrigin } from '../lib/api';
 import { WORLD } from '../lib/world';
 
@@ -20,9 +23,21 @@ const CX = 100;
 const CY = 100;
 const RAD = Math.PI / 180;
 
-// Inclinación fija del eje. Con el globo derecho, el hemisferio norte —de donde viene casi todo el
-// tráfico— queda comprimido contra el borde superior.
+// Inclinación inicial del eje. Con el globo derecho, el hemisferio norte —de donde viene casi todo
+// el tráfico— queda comprimido contra el borde superior. Arrastrando en vertical se cambia.
 const TILT = 18;
+
+// Tope de la inclinación manual. Más allá del polo la proyección sigue siendo válida pero el mundo
+// aparece invertido, que se lee como un error de dibujo y no como una vista elegida.
+const TILT_MAX = 80;
+
+// Un arrastre del ancho del globo da media vuelta. Se mide contra el ancho real del elemento y no
+// en píxeles fijos, para que el gesto se sienta igual en el panel y en un teléfono.
+const GRADOS_POR_ANCHO = 180;
+
+// Movimiento por debajo del cual el gesto sigue siendo un clic. Sin esto, el temblor de la mano al
+// soltar sobre un marcador alcanzaba para que el clic no llegara a seleccionar el país.
+const UMBRAL_CLIC = 4;
 
 interface Punto {
   x: number;
@@ -32,11 +47,11 @@ interface Punto {
   z: number;
 }
 
-/** Orthographic projection of a lat/lon onto the sphere, for a given rotation. */
-function proyectar(lat: number, lon: number, rotLon: number): Punto {
+/** Orthographic projection of a lat/lon onto the sphere, for a given rotation and tilt. */
+function proyectar(lat: number, lon: number, rotLon: number, tilt: number): Punto {
   const l = (lon + rotLon) * RAD;
   const f = lat * RAD;
-  const f0 = TILT * RAD;
+  const f0 = tilt * RAD;
 
   const cosc = Math.sin(f0) * Math.sin(f) + Math.cos(f0) * Math.cos(f) * Math.cos(l);
   return {
@@ -53,7 +68,7 @@ function proyectar(lat: number, lon: number, rotLon: number): Punto {
  * Without the break, a line leaving the visible side would be drawn straight across the disc to
  * wherever it reappears, which reads as a crack rather than as a curve.
  */
-function graticula(rotLon: number): string[] {
+function graticula(rotLon: number, tilt: number): string[] {
   const paths: string[] = [];
 
   const traza = (puntos: Punto[]) => {
@@ -72,12 +87,12 @@ function graticula(rotLon: number): string[] {
 
   for (let lon = -180; lon < 180; lon += 30) {
     const puntos: Punto[] = [];
-    for (let lat = -90; lat <= 90; lat += 5) puntos.push(proyectar(lat, lon, rotLon));
+    for (let lat = -90; lat <= 90; lat += 5) puntos.push(proyectar(lat, lon, rotLon, tilt));
     traza(puntos);
   }
   for (let lat = -60; lat <= 60; lat += 30) {
     const puntos: Punto[] = [];
-    for (let lon = -180; lon <= 180; lon += 5) puntos.push(proyectar(lat, lon, rotLon));
+    for (let lon = -180; lon <= 180; lon += 5) puntos.push(proyectar(lat, lon, rotLon, tilt));
     traza(puntos);
   }
   return paths;
@@ -114,11 +129,11 @@ function precomputar(anillos: [number, number][][]): PuntoFijo[][] {
  * Same cut as the graticule and for the same reason: a ring that leaves the visible side would
  * otherwise be drawn straight across the disc to wherever it comes back.
  */
-function contornos(anillos: PuntoFijo[][], rotLon: number): string {
+function contornos(anillos: PuntoFijo[][], rotLon: number, tilt: number): string {
   const sinR = Math.sin(rotLon * RAD);
   const cosR = Math.cos(rotLon * RAD);
-  const sinF0 = Math.sin(TILT * RAD);
-  const cosF0 = Math.cos(TILT * RAD);
+  const sinF0 = Math.sin(tilt * RAD);
+  const cosF0 = Math.cos(tilt * RAD);
 
   let d = '';
   for (const anillo of anillos) {
@@ -156,6 +171,24 @@ function deltaAngular(desde: number, hasta: number): number {
   return ((((hasta - desde) % 360) + 540) % 360) - 180;
 }
 
+/**
+ * Qué gobierna la rotación en este momento.
+ *
+ * Sin esto había una sola pregunta —¿hay país elegido?— y no alcanzaba: en cuanto el arrastre puede
+ * mover el globo, hace falta distinguir "nadie lo tocó" de "el usuario lo dejó así". Si no, soltar
+ * el mouse con un país elegido devolvía el globo a su posición y el gesto parecía no haber pasado.
+ */
+type Modo = 'auto' | 'destino' | 'libre';
+
+interface Arrastre {
+  x: number;
+  y: number;
+  rot: number;
+  tilt: number;
+  /** Ancho del elemento al empezar: el gesto se mide en fracciones de él, no en píxeles. */
+  ancho: number;
+}
+
 interface Props {
   countries: CountryOrigin[];
   selected: string | null;
@@ -164,9 +197,17 @@ interface Props {
 
 export default function Globe({ countries, selected, onSelect }: Props) {
   const [rotLon, setRotLon] = useState(0);
+  const [tilt, setTilt] = useState(TILT);
   const rotRef = useRef(0);
+  const tiltRef = useRef(TILT);
   const destinoRef = useRef<number | null>(null);
   const rafRef = useRef<number | undefined>(undefined);
+  const modoRef = useRef<Modo>('auto');
+  const arrastreRef = useRef<Arrastre | null>(null);
+  // Sobrevive al pointerup a propósito: el clic del navegador llega después, y es ahí donde hay que
+  // saber si el gesto fue un clic o el final de un arrastre.
+  const movidoRef = useRef(false);
+  const [arrastrando, setArrastrando] = useState(false);
 
   // Se calcula una sola vez: el contorno del mundo no cambia entre fotogramas ni entre datos.
   const mundo = useMemo(() => precomputar(WORLD), []);
@@ -177,6 +218,7 @@ export default function Globe({ countries, selected, onSelect }: Props) {
   useEffect(() => {
     if (!selected) {
       destinoRef.current = null;
+      modoRef.current = 'auto';
       return;
     }
     const pais = conCoords.find((c) => c.country === selected);
@@ -184,6 +226,9 @@ export default function Globe({ countries, selected, onSelect }: Props) {
 
     const destino = -pais.lon;
     destinoRef.current = destino;
+    // Elegir un país recupera el control aunque el usuario hubiera movido el globo a mano: es una
+    // orden explícita —"mostrame este"— y tiene que ganarle al encuadre anterior.
+    modoRef.current = 'destino';
 
     // Si la animación no puede correr, se salta directo al destino en lugar de no moverse.
     //
@@ -206,9 +251,11 @@ export default function Globe({ countries, selected, onSelect }: Props) {
       // por fotograma: hay que detenerla acá o el globo seguiría girando durante la captura.
       const congelado = document.documentElement.dataset.capture === 'on';
 
-      if (!congelado) {
+      // En modo libre el globo queda donde lo dejó el usuario. El bucle sigue vivo igual, para que
+      // volver a 'auto' o a 'destino' no tenga que arrancarlo de nuevo.
+      if (!congelado && modoRef.current !== 'libre') {
         const destino = destinoRef.current;
-        if (destino != null) {
+        if (modoRef.current === 'destino' && destino != null) {
           const d = deltaAngular(rotRef.current, destino);
           // Frenado exponencial: rápido al principio y suave al llegar, sin rebote.
           rotRef.current += Math.abs(d) < 0.15 ? d : d * 0.06;
@@ -220,17 +267,95 @@ export default function Globe({ countries, selected, onSelect }: Props) {
       rafRef.current = requestAnimationFrame(paso);
     };
 
-    if (!sinAnimacion()) rafRef.current = requestAnimationFrame(paso);
+    const arrancar = () => {
+      if (rafRef.current !== undefined || sinAnimacion()) return;
+      rafRef.current = requestAnimationFrame(paso);
+    };
+    const parar = () => {
+      if (rafRef.current === undefined) return;
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = undefined;
+    };
+
+    /**
+     * Volver de segundo plano tiene que revivir el giro.
+     *
+     * La condición solo se miraba al montar, y en una pestaña oculta el navegador no ejecuta
+     * requestAnimationFrame: abrir el panel en una pestaña de fondo —con ctrl+clic, o restaurando
+     * una sesión— dejaba el bucle sin arrancar, y traerla al frente después no lo revivía. El globo
+     * quedaba muerto para toda la visita, sin nada que lo explicara.
+     */
+    const alCambiarVisibilidad = () => (document.hidden ? parar() : arrancar());
+    document.addEventListener('visibilitychange', alCambiarVisibilidad);
+    arrancar();
+
     return () => {
-      if (rafRef.current !== undefined) cancelAnimationFrame(rafRef.current);
+      document.removeEventListener('visibilitychange', alCambiarVisibilidad);
+      parar();
     };
   }, []);
 
-  const lineas = graticula(rotLon);
-  const contornosPath = contornos(mundo, rotLon);
+  const alBajar = (e: EventoPuntero<SVGSVGElement>) => {
+    const ancho = e.currentTarget.getBoundingClientRect().width || 1;
+    arrastreRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      rot: rotRef.current,
+      tilt: tiltRef.current,
+      ancho,
+    };
+    movidoRef.current = false;
+    modoRef.current = 'libre';
+    setArrastrando(true);
+    // Con captura, el gesto sobrevive a que el puntero se salga del círculo: sin ella, arrastrar
+    // rápido soltaba el globo a mitad de camino.
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const alMover = (e: EventoPuntero<SVGSVGElement>) => {
+    const a = arrastreRef.current;
+    if (!a) return;
+    const dx = e.clientX - a.x;
+    const dy = e.clientY - a.y;
+    if (!movidoRef.current && Math.hypot(dx, dy) > UMBRAL_CLIC) movidoRef.current = true;
+
+    rotRef.current = a.rot + (dx / a.ancho) * GRADOS_POR_ANCHO;
+    // Hacia abajo se mira más al norte: el hemisferio que se arrastra es el que se acerca.
+    const t = a.tilt + (dy / a.ancho) * GRADOS_POR_ANCHO;
+    tiltRef.current = Math.max(-TILT_MAX, Math.min(TILT_MAX, t));
+
+    setRotLon(rotRef.current);
+    setTilt(tiltRef.current);
+  };
+
+  const alSoltar = (e: EventoPuntero<SVGSVGElement>) => {
+    arrastreRef.current = null;
+    setArrastrando(false);
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    // Sin país elegido el giro continuo se retoma desde donde quedó, porque es la animación de
+    // fondo de la sección. Con uno elegido se respeta el encuadre: para eso el usuario lo movió.
+    if (!selected) modoRef.current = 'auto';
+  };
+
+  const lineas = graticula(rotLon, tilt);
+  const contornosPath = contornos(mundo, rotLon, tilt);
 
   return (
-    <svg viewBox="0 0 200 200" className="w-full h-full" role="img" aria-label="Globo terráqueo">
+    <svg
+      viewBox="0 0 200 200"
+      className="w-full h-full select-none"
+      role="img"
+      aria-label="Globo terráqueo"
+      onPointerDown={alBajar}
+      onPointerMove={alMover}
+      onPointerUp={alSoltar}
+      onPointerCancel={alSoltar}
+      /* touchAction none: sin esto, en pantalla táctil el gesto lo toma el desplazamiento de la
+         página y el globo no se entera. */
+      style={{ touchAction: 'none', cursor: arrastrando ? 'grabbing' : 'grab' }}
+    >
       <defs>
         {/* Atmósfera: un halo apenas por fuera del borde, para que la esfera no quede recortada
             contra el fondo como un círculo plano. */}
@@ -292,7 +417,7 @@ export default function Globe({ countries, selected, onSelect }: Props) {
       <circle cx={CX} cy={CY} r={R} fill="none" stroke="rgba(0,184,148,0.28)" strokeWidth="0.6" />
 
       {conCoords.map((c) => {
-        const p = proyectar(c.lat as number, c.lon as number, rotLon);
+        const p = proyectar(c.lat as number, c.lon as number, rotLon, tilt);
         if (!p.visible) return null;
 
         const esSel = selected === c.country;
@@ -304,7 +429,13 @@ export default function Globe({ countries, selected, onSelect }: Props) {
         return (
           <g
             key={c.country}
-            onClick={() => onSelect(esSel ? null : c.country)}
+            /* Soltar el arrastre encima de un marcador no lo selecciona: el clic del navegador
+               llega igual, y sin esta guardia girar el globo terminaba eligiendo un país al
+               azar —el que quedara bajo el cursor. */
+            onClick={() => {
+              if (movidoRef.current) return;
+              onSelect(esSel ? null : c.country);
+            }}
             style={{ cursor: 'pointer' }}
             opacity={0.35 + p.z * 0.65}
           >
