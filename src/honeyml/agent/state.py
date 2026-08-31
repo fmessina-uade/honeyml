@@ -19,9 +19,10 @@ and the Fase 4 campaign all read — and only this one is about what travels bet
 
 from __future__ import annotations
 
-from typing import Any, Literal, TypedDict
+import operator
+from typing import Annotated, Any, Literal, TypedDict
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .consumer import EventoDelBus
 from .severidad import Severidad
@@ -40,6 +41,11 @@ class Decision(BaseModel):
     an opinion, and the whole point of the project is that this one can be checked against the
     telemetry it came from.
     """
+
+    # `extra="forbid"` cierra el objeto, y eso es un requisito del modo estricto del proveedor:
+    # `additionalProperties: false` en todo objeto del esquema. Además vale por sí mismo — un campo
+    # que el modelo inventa y que nadie lee es una alucinación que pasa silenciosamente.
+    model_config = ConfigDict(extra="forbid")
 
     doc_id: str = Field(description="identidad del evento en el índice")
     # Enum y no `str`: la validación de la fila 84 rechaza un nivel inventado sin escribir una sola
@@ -100,10 +106,15 @@ class EstadoTriaje(TypedDict, total=False):
     borrador: dict[str, Any]
     decision: Decision
     intentos: int
-    # Los errores de validación, redactados para devolvérselos al proveedor. Se acumulan en vez de
-    # reemplazarse: un modelo que arregla el campo que le señalaron y rompe otro tiene que ver los
-    # dos, o el ciclo se queda alternando entre dos errores hasta agotar los intentos.
-    reproches: list[str]
+    # Los errores de validación, redactados para devolvérselos al proveedor.
+    #
+    # El `operator.add` no es decoración: LangGraph **reemplaza** el valor de una clave con lo que
+    # devuelve el nodo, salvo que se declare un reductor. Sin él, la acumulación que este comentario
+    # describía no ocurría —cada vuelta pisaba los reproches de la anterior— y el modelo que arregla
+    # el campo que le señalaron y rompe otro se queda alternando entre dos errores hasta agotar los
+    # intentos, sin ver nunca los dos juntos. Con el reductor, cada nodo devuelve solo los reproches
+    # nuevos y el estado conserva la historia.
+    reproches: Annotated[list[str], operator.add]
     motivo_de_corte: MotivoDeCorte
 
 

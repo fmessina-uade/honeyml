@@ -43,11 +43,17 @@ def _evento(**kw: Any) -> EventoDelBus:
 
 
 def _decision() -> Decision:
+    """Una decisión válida **para `_evento()`**, que es de categoría `process`.
+
+    El nivel no es decorativo: con `MEDIO` esta decisión quedaba por debajo del piso del evento y
+    el grafo la rechazaba, con razón. Lo destapó cablear la guardia de la fila 78 —antes cualquier
+    nivel pasaba— y es exactamente el defecto que la guardia existe para atrapar.
+    """
     return Decision(
         doc_id="abc123",
-        severidad=Severidad.MEDIO,
+        severidad=Severidad.ALTO,
         confianza=0.8,
-        justificacion="entró con credenciales del señuelo",
+        justificacion="ejecutó comandos dentro del señuelo",
     )
 
 
@@ -118,6 +124,158 @@ def test_el_grafo_recorre_los_cinco_nodos_con_implementaciones_de_prueba() -> No
     )
     compilado.invoke(estado_inicial(_evento()))
     assert visitados == graph.ORDEN
+
+
+# ---- las tres guardias que encontró la auditoría de escenarios ------------------------------
+#
+# Las tres nacieron de recorrer el grafo escenario por escenario en lugar de leerlo, y las tres
+# son contratos con nodos que todavía no existen —83 y 84—. Sin estas pruebas, la fila que los
+# implemente puede incumplirlos sin que nada se ponga en rojo.
+
+
+def _recorrer(cfg: dict[str, Any], evento: Any = None) -> tuple[list[str], Any]:
+    """Corre el grafo con nodos de prueba y devuelve el recorrido y el estado final."""
+    visitados: list[str] = []
+
+    def envolver(nombre: str, devuelve: Any) -> graph.Nodo:
+        def nodo(estado: Any) -> Any:
+            visitados.append(nombre)
+            return devuelve(estado) if callable(devuelve) else devuelve
+
+        return nodo
+
+    compilado = graph.construir_grafo({n: envolver(n, d) for n, d in cfg.items()})
+    final = graph.ejecutar(compilado, estado_inicial(evento or _evento()))
+    return visitados, final
+
+
+_CTX: dict[str, Any] = {"contexto": Contexto(doc_id="abc123", resumen="x")}
+
+
+def test_el_ciclo_termina_aunque_nadie_cuente_los_intentos() -> None:
+    """El hallazgo más caro de la auditoría: daba 10.007 vueltas, o sea 10.007 llamadas pagas.
+
+    El contador lo lleva un nodo que todavía no existe. Contar también los reproches acumulados
+    hace que olvidarse de incrementarlo sea inocuo en vez de catastrófico.
+    """
+    visitados, final = _recorrer(
+        {
+            graph.CONTEXTO: _CTX,
+            graph.HISTORIAL: {},
+            graph.INFERENCIA: {"borrador": {}},  # nunca toca `intentos`
+            graph.VALIDACION: {"reproches": ["falta severidad"]},
+            graph.PERSISTENCIA: {},
+        }
+    )
+    assert visitados.count(graph.INFERENCIA) == MAX_INTENTOS
+    assert graph.intentos_gastados(final) == MAX_INTENTOS
+    assert visitados[-1] == graph.PERSISTENCIA
+
+
+def test_los_reproches_se_acumulan_en_vez_de_pisarse() -> None:
+    """Sin el reductor de `state.py`, cada vuelta borraba el reproche de la anterior.
+
+    Y entonces un modelo que arregla el campo señalado y rompe otro nunca ve los dos juntos.
+    """
+    _, final = _recorrer(
+        {
+            graph.CONTEXTO: _CTX,
+            graph.HISTORIAL: {},
+            graph.INFERENCIA: {"borrador": {}},
+            graph.VALIDACION: lambda s: {"reproches": [f"error {graph.intentos_gastados(s)}"]},
+            graph.PERSISTENCIA: {},
+        }
+    )
+    assert final["reproches"] == ["error 0", "error 1", "error 2"]
+
+
+def test_una_severidad_por_debajo_del_piso_no_llega_a_persistirse() -> None:
+    """La guardia de la fila 78 existía y estaba probada, pero no estaba cableada al grafo.
+
+    `informativo` sobre un evento que documenta ejecución de comandos no es una diferencia de
+    criterio: contradice el registro.
+    """
+    imposible = Decision(
+        doc_id="abc123",
+        severidad=Severidad.INFORMATIVO,
+        confianza=0.9,
+        justificacion="parece inofensivo",
+    )
+    visitados, final = _recorrer(
+        {
+            graph.CONTEXTO: _CTX,
+            graph.HISTORIAL: {},
+            graph.INFERENCIA: {"borrador": {}},
+            graph.VALIDACION: {"decision": imposible, "reproches": ["por debajo del piso"]},
+            graph.PERSISTENCIA: {},
+        }
+    )
+    assert graph.decision_utilizable(final) is False
+    assert visitados.count(graph.INFERENCIA) == MAX_INTENTOS  # se reintentó, no se aceptó
+    assert graph.resultado_del_ciclo(final) == "esquema_invalido"
+
+
+def test_persistencia_siempre_recibe_un_motivo_cuando_no_hay_decision() -> None:
+    """Antes llegaba sin decisión *y sin motivo*, y el nodo no podía distinguir qué había pasado."""
+    _, agotado = _recorrer(
+        {
+            graph.CONTEXTO: _CTX,
+            graph.HISTORIAL: {},
+            graph.INFERENCIA: {"borrador": {}},
+            graph.VALIDACION: {"reproches": ["falta severidad"]},
+            graph.PERSISTENCIA: {},
+        }
+    )
+    assert graph.resultado_del_ciclo(agotado) == "esquema_invalido"
+
+    _, sin_ctx = _recorrer(
+        {
+            graph.CONTEXTO: {"motivo_de_corte": "sin_contexto"},
+            graph.HISTORIAL: {},
+            graph.INFERENCIA: {},
+            graph.VALIDACION: {},
+            graph.PERSISTENCIA: {},
+        },
+        evento=_evento(source_ip=""),
+    )
+    assert graph.resultado_del_ciclo(sin_ctx) == "sin_contexto"
+
+
+def test_una_decision_valida_no_declara_motivo_de_corte() -> None:
+    _, final = _recorrer(
+        {
+            graph.CONTEXTO: _CTX,
+            graph.HISTORIAL: {},
+            graph.INFERENCIA: {"borrador": {}},
+            graph.VALIDACION: {"decision": _decision()},
+            graph.PERSISTENCIA: {},
+        }
+    )
+    assert graph.resultado_del_ciclo(final) is None
+
+
+def test_una_correccion_a_tiempo_corta_el_bucle() -> None:
+    """El reintento correctivo tiene que servir para algo: si acierta, el ciclo sigue de largo."""
+    visitados, final = _recorrer(
+        {
+            graph.CONTEXTO: _CTX,
+            graph.HISTORIAL: {},
+            graph.INFERENCIA: {"borrador": {}},
+            graph.VALIDACION: lambda s: (
+                {"decision": _decision()}
+                if graph.intentos_gastados(s) >= 1
+                else {"reproches": ["falta severidad"]}
+            ),
+            graph.PERSISTENCIA: {},
+        }
+    )
+    assert visitados.count(graph.INFERENCIA) == 2
+    assert graph.decision_utilizable(final) is True
+
+
+def test_el_techo_de_pasos_sale_de_la_topologia() -> None:
+    """Que sea derivado y no un número a ojo es lo que lo mantiene correcto si cambia el margen."""
+    assert graph.LIMITE_DE_PASOS == 2 + 2 * (MAX_INTENTOS + 2) + 1
 
 
 # ---- nodo de contexto ---------------------------------------------------------------------

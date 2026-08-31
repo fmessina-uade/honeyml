@@ -38,7 +38,8 @@ from langgraph.graph import END, StateGraph
 
 from .nodes import contexto as nodo_contexto
 from .nodes import historial as nodo_historial
-from .state import MAX_INTENTOS, EstadoTriaje
+from .severidad import dentro_de_limites
+from .state import MAX_INTENTOS, EstadoTriaje, MotivoDeCorte
 
 # Un nodo devuelve el estado *parcial* que tocó, no un diccionario cualquiera. `EstadoTriaje` es
 # `total=False`, así que ese tipo ya dice exactamente eso: cualquier subconjunto de las claves del
@@ -63,6 +64,14 @@ DUENO: dict[str, str] = {
 }
 
 ORDEN = [CONTEXTO, HISTORIAL, INFERENCIA, VALIDACION, PERSISTENCIA]
+
+# Techo de pasos de una corrida, derivado de la topología y no elegido a ojo.
+#
+# El camino más largo legítimo es contexto → historial → (inferencia → validación) por cada intento
+# → persistencia. Con el margen de una vuelta, cualquier corrida que lo supere está en un bucle que
+# el diseño no contempla, y conviene que muera rápido y con un número que se pueda relacionar con
+# esta línea —en vez del 10.007 por defecto de LangGraph, que no le dice nada a nadie.
+LIMITE_DE_PASOS = 2 + 2 * (MAX_INTENTOS + 2) + 1
 
 
 def _pendiente(nombre: str) -> Nodo:
@@ -102,6 +111,45 @@ def ruta_tras_contexto(estado: EstadoTriaje) -> str:
     return PERSISTENCIA if estado.get("motivo_de_corte") else HISTORIAL
 
 
+def intentos_gastados(estado: EstadoTriaje) -> int:
+    """How many attempts this cycle has already spent.
+
+    El máximo entre el contador y los reproches acumulados, y no solo el contador, porque el
+    contador lo lleva un nodo que todavía no existe. Una auditoría del grafo lo mostró sin lugar a
+    dudas: con la validación rechazando y nadie incrementando `intentos`, el ciclo dio **10.007
+    vueltas** antes de que LangGraph lo cortara por límite de recursión —diez mil llamadas pagas
+    sobre un solo evento, y un error genérico al final que no nombra la causa.
+
+    Como la validación no puede rechazar sin dejar un reproche —es lo que se le devuelve al
+    proveedor para que corrija—, contar reproches es un segundo camino hacia el mismo número. Que
+    las filas 83 y 84 se olviden del contador deja de ser catastrófico y pasa a ser inocuo.
+    """
+    return max(int(estado.get("intentos", 0)), len(estado.get("reproches", [])))
+
+
+def decision_utilizable(estado: EstadoTriaje) -> bool:
+    """Whether the decision may be persisted as the engine's answer.
+
+    Dos condiciones, no una. Que exista, y que sea defendible **para este evento**: la fila 78
+    definió la escala anclada a la evidencia justamente para que una severidad por debajo del piso
+    —un `informativo` sobre un evento que documenta una transferencia de archivo— sea una
+    contradicción con el registro y no una diferencia de criterio.
+
+    Esa guardia existía y estaba probada desde la fila 78, pero **no estaba cableada**: el grafo
+    solo preguntaba si había decisión, así que una severidad imposible llegaba a persistencia sin
+    que nada la mirara. La auditoría lo encontró en el escenario 5.
+    """
+    decision = estado.get("decision")
+    if decision is None:
+        return False
+    evento = estado.get("evento")
+    if evento is None:
+        # Sin evento no hay piso contra el cual medir. No debería pasar —el estado inicial siempre
+        # lo trae— y si pasa, el problema no es la severidad.
+        return True
+    return dentro_de_limites(decision.severidad, evento)
+
+
 def ruta_tras_validar(estado: EstadoTriaje) -> str:
     """Where to go once validation has had its say.
 
@@ -110,11 +158,38 @@ def ruta_tras_validar(estado: EstadoTriaje) -> str:
     between "arrived" and "classified" with nothing to show for it. The panel can then present it
     the way CU-03 describes instead of simply not listing it.
     """
-    if estado.get("decision") is not None:
+    if decision_utilizable(estado):
         return PERSISTENCIA
-    if estado.get("intentos", 0) < MAX_INTENTOS:
+
+    # Reintentar sin un reproche es repetir la misma llamada. El proveedor no recibiría nada que
+    # corregir y devolvería lo mismo, así que el ciclo se corta acá en vez de gastar tres llamadas
+    # idénticas. Cierra además el único camino por el que el bucle podía no terminar: una validación
+    # que devuelve una decisión inutilizable y no deja reproche no mueve ningún contador.
+    if not estado.get("reproches"):
+        return PERSISTENCIA
+
+    if intentos_gastados(estado) < MAX_INTENTOS:
         return INFERENCIA
     return PERSISTENCIA
+
+
+def resultado_del_ciclo(estado: EstadoTriaje) -> MotivoDeCorte | None:
+    """Why this cycle is ending. `None` means it ended with a decision worth persisting.
+
+    Lo usa el nodo de persistencia (fila 85) para saber qué está guardando. Vive acá y no allá
+    porque es la contracara de `ruta_tras_validar`: las dos leen el mismo estado para responder la
+    misma pregunta, y separarlas dejaría que una diga "andá a persistir" y la otra no sepa por qué.
+
+    La auditoría mostró el hueco en el escenario 3: con los intentos agotados el ciclo llegaba a
+    persistencia sin decisión **y sin motivo**, así que el nodo no podía distinguir un esquema
+    irrecuperable de cualquier otra cosa que hubiera salido mal.
+    """
+    declarado = estado.get("motivo_de_corte")
+    if declarado:
+        return declarado
+    if decision_utilizable(estado):
+        return None
+    return "esquema_invalido"
 
 
 def construir_grafo(nodos: Mapping[str, Nodo] | None = None) -> Any:
@@ -146,6 +221,17 @@ def construir_grafo(nodos: Mapping[str, Nodo] | None = None) -> Any:
     )
     g.add_edge(PERSISTENCIA, END)
     return g.compile()
+
+
+def ejecutar(compilado: Any, estado: EstadoTriaje) -> EstadoTriaje:
+    """Run one event through the graph, with the step ceiling applied.
+
+    Es el único punto de entrada que debería usar el motor. Invocar el grafo directamente también
+    funciona, pero se queda con el límite por defecto de LangGraph —diez mil pasos— y ese número no
+    tiene relación con esta topología: convierte un contrato incumplido en una factura.
+    """
+    resultado: EstadoTriaje = compilado.invoke(estado, config={"recursion_limit": LIMITE_DE_PASOS})
+    return resultado
 
 
 def describir() -> str:
