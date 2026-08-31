@@ -96,15 +96,29 @@ def get_timeline(
 ) -> list[dict[str, Any]]:
     """Events over time, optionally narrowed by sensor and date range.
 
-    The frozen fallback only covers the unfiltered view: the snapshot holds one precomputed
-    timeline, not every combination of filters. Asking for a filtered view with Elasticsearch down
-    fails loudly rather than silently returning the unfiltered one, which would be a wrong answer
-    dressed as a right one.
+    With Elasticsearch down the snapshot answers what it can compute from its daily buckets —a date
+    range, a sensor, a weekly rollup— and refuses the hourly view, whose buckets it never stored.
+    The refusal is a 503 with the reason in it, not a stack trace: the panel shows the reason, and a
+    filter that cannot be honoured says so instead of leaving the unfiltered chart on screen.
     """
     filtrado = bool(sensor or desde or hasta) or interval != "day"
-    if filtrado:
+    if not filtrado:
+        return _live_or_frozen(queries.timeline, "timeline")
+
+    try:
         return queries.timeline(interval=interval, sensor=sensor, desde=desde, hasta=hasta)
-    return _live_or_frozen(queries.timeline, "timeline")
+    except (URLError, ConnectionError, TimeoutError) as exc:
+        congelado = offline.timeline(interval=interval, sensor=sensor, desde=desde, hasta=hasta)
+        if congelado is not None:
+            return congelado
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "La vista por hora necesita Elasticsearch: el respaldo congelado guarda un punto "
+                "por día y esas horas nunca se almacenaron. Las vistas por día y por semana sí "
+                "funcionan sobre el respaldo."
+            ),
+        ) from exc
 
 
 @app.get("/api/credentials")
