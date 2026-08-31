@@ -263,6 +263,10 @@ consumer:
 grafo:
 	@./.venv/bin/python -m honeyml.agent.graph
 
+# La escala de severidad tal como se le publica al proveedor de inferencia.
+severidad:
+	@./.venv/bin/python -m honeyml.agent.severidad
+
 # Entrena el clasificador final, lo persiste y calcula el ranking por permutación.
 # Tarda unos dos minutos: la parte lenta son las probabilidades fuera de muestra del umbral.
 modelo:

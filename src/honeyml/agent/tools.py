@@ -27,18 +27,41 @@ lookup, and it is not optional.
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 from typing import Any
 
 from ..api import queries
 from ..education import fingerprints
 from ..education.session_replay import anonymize
 from ..features import arquetipos
+from .consumer import EventoDelBus
+from .severidad import Severidad, maxima, piso_de
 
 # Cuántos comandos de una sesión se entregan. Doce es el mismo corte con que se publican las
 # familias de huellas, así que una sesión y su familia se comparan término a término.
 MAX_COMMANDS = 12
 # Cuántas acciones distintas se resumen del historial de una dirección.
 MAX_ACCIONES = 8
+
+# Ventana hacia atrás para detectar una ráfaga coordinada.
+#
+# Seis horas. Una campaña de botnet reparte su objetivo entre nodos en minutos u horas, no en días;
+# con una ventana de un día el conteo se llena del tráfico de fondo —unos treinta mil eventos
+# diarios— y deja de distinguir nada. Con una hora, una campaña lenta pasa desapercibida.
+VENTANA_RAFAGA_HORAS = 6
+
+
+def _restar_horas(marca: str, horas: int) -> str:
+    """`marca` menos `horas`, en el mismo formato ISO que usa el índice. Cadena vacía si no parsea.
+
+    Devolver vacío en vez de levantar: una marca temporal rara es un evento que no se puede
+    correlacionar, no una razón para tirar abajo el ciclo de razonamiento.
+    """
+    try:
+        t = datetime.fromisoformat(marca.replace("Z", "+00:00"))
+    except ValueError:
+        return ""
+    return (t - timedelta(hours=horas)).isoformat().replace("+00:00", "Z")
 
 
 def _buscar(body: dict[str, Any], es_url: str = queries.ES_URL) -> dict[str, Any]:
@@ -186,6 +209,123 @@ def origen_de_direccion(ip: str, es_url: str = queries.ES_URL) -> dict[str, Any]
         "red": origen.get("as", {}).get("organization", {}).get("name"),
         "sistema_autonomo": origen.get("as", {}).get("number"),
     }
+
+
+def trayectoria_de_direccion(ip: str, hasta: str, es_url: str = queries.ES_URL) -> dict[str, Any]:
+    """How far up the scale this address had already got, before this event.
+
+    `historial_de_direccion` counts what it did; this says how far it *reached*. The difference is
+    the one the severity scale is built on: an address with nine thousand prior events that never
+    got past a credential prompt is a different thing from one that ran commands last Tuesday, and
+    the raw count cannot tell them apart.
+
+    Returns the pairs of (category, outcome) it produced before the horizon, each mapped through the
+    same floor rule the engine is judged by — so "already reached ALTO" means exactly what it means
+    everywhere else, and not something this function invented.
+    """
+    if not ip or not hasta:
+        return {"conocida": False}
+
+    body = {
+        "size": 0,
+        "query": {
+            "bool": {
+                "filter": [
+                    {"term": {"source.ip": ip}},
+                    {"range": {"@timestamp": {"lt": hasta}}},
+                ]
+            }
+        },
+        "aggs": {
+            "categorias": {
+                "terms": {"field": "event.category", "size": MAX_ACCIONES},
+                "aggs": {"resultados": {"terms": {"field": "event.outcome", "size": 4}}},
+            }
+        },
+    }
+    r = _buscar(body, es_url)
+    if r["hits"]["total"]["value"] == 0:
+        return {"conocida": False}
+
+    alcanzados: list[Severidad] = []
+    detalle: dict[str, int] = {}
+    for cat in r["aggregations"]["categorias"]["buckets"]:
+        for res in cat["resultados"]["buckets"]:
+            nivel = piso_de(cat["key"], res["key"])
+            alcanzados.append(nivel)
+            detalle[nivel.value] = detalle.get(nivel.value, 0) + res["doc_count"]
+
+    tope = maxima(alcanzados)
+    return {
+        "conocida": True,
+        "maximo_alcanzado": tope.value if tope else None,
+        "eventos_por_nivel": detalle,
+    }
+
+
+def rafaga_en_la_ventana(
+    evento: EventoDelBus, ventana_horas: int = VENTANA_RAFAGA_HORAS, es_url: str = queries.ES_URL
+) -> dict[str, Any]:
+    """How many *other* addresses were doing the same thing in the hours before this event.
+
+    This is the one signal nothing else in the engine carries. The fingerprint families already say
+    how many addresses ever ran a sequence, but over the whole corpus: forty addresses spread across
+    three months is the background noise of the internet, and the same forty inside one hour is a
+    coordinated push. Only the second is a reason to look harder, and only a time-boxed count can
+    tell them apart.
+
+    Two counts, because they answer different questions. The action-and-protocol count is always
+    available and says whether this *kind* of traffic is spiking. The command count only exists for
+    events that carry one, and is far more specific: the same byte-identical command from thirty
+    addresses in an hour is not a coincidence.
+    """
+    desde = _restar_horas(evento.timestamp, ventana_horas)
+    if not desde:
+        return {"disponible": False, "motivo": "el evento no trae marca temporal utilizable"}
+
+    # La ventana termina en el evento, no en ahora: ver el encabezado del módulo. Contar lo que pasó
+    # después sería preguntarle al futuro si esto era una campaña.
+    ventana: list[dict[str, Any]] = [
+        {"range": {"@timestamp": {"gte": desde, "lt": evento.timestamp}}}
+    ]
+
+    aggs: dict[str, Any] = {
+        "por_accion": {
+            "filter": {
+                "bool": {
+                    "filter": [
+                        {"term": {"event.action": evento.action}},
+                        {"term": {"network.protocol": evento.protocol}},
+                    ]
+                }
+            },
+            "aggs": {"direcciones": {"cardinality": {"field": "source.ip"}}},
+        }
+    }
+    if evento.command:
+        # `process.command_line` está mapeado como `wildcard`, que admite `term` exacto.
+        aggs["por_comando"] = {
+            "filter": {"term": {"process.command_line": evento.command}},
+            "aggs": {"direcciones": {"cardinality": {"field": "source.ip"}}},
+        }
+
+    r = _buscar({"size": 0, "query": {"bool": {"filter": ventana}}, "aggs": aggs}, es_url)
+    agg = r["aggregations"]
+
+    salida: dict[str, Any] = {
+        "disponible": True,
+        "ventana_horas": ventana_horas,
+        "misma_accion": {
+            "eventos": agg["por_accion"]["doc_count"],
+            "direcciones": int(agg["por_accion"]["direcciones"]["value"]),
+        },
+    }
+    if "por_comando" in agg:
+        salida["mismo_comando"] = {
+            "eventos": agg["por_comando"]["doc_count"],
+            "direcciones": int(agg["por_comando"]["direcciones"]["value"]),
+        }
+    return salida
 
 
 def arquetipos_del_corpus() -> dict[str, Any] | None:

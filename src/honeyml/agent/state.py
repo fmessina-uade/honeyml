@@ -10,10 +10,11 @@ LangGraph merges what each node returns into the running state, key by key. A da
 every node to rebuild the whole object to change one field, and `total=False` lets a node return
 only what it actually touched — which is also the clearest possible statement of what it does.
 
-WHAT IS DELIBERATELY NOT HERE
-The severity vocabulary. Which levels exist and what separates them is fila 78, and guessing it
-here would mean the schema validation of fila 84 checks against a scale nobody agreed on. The
-envelope is fixed; the words that go in `severidad` are not yet.
+WHERE THE SEVERITY SCALE LIVES
+In `severidad.py`, not here. This module says a decision carries a level; that one says which levels
+exist, what evidence establishes each, and how far above the proven floor the engine may go. They
+are separate because the second is a statement about the domain that the panel, the validation node
+and the Fase 4 campaign all read — and only this one is about what travels between nodes.
 """
 
 from __future__ import annotations
@@ -23,6 +24,7 @@ from typing import Any, Literal, TypedDict
 from pydantic import BaseModel, Field
 
 from .consumer import EventoDelBus
+from .severidad import Severidad
 
 # Cuántas veces se le devuelve el reproche al proveedor antes de abandonar. Tres y no diez: si el
 # modelo no acertó el esquema con el error explicado dos veces, la vuelta once tampoco lo va a
@@ -40,9 +42,11 @@ class Decision(BaseModel):
     """
 
     doc_id: str = Field(description="identidad del evento en el índice")
-    # El vocabulario lo fija la fila 78. Acá se declara que hay un nivel y que es obligatorio, que
-    # es lo que el grafo necesita saber para transportarlo.
-    severidad: str = Field(description="nivel asignado; la escala la define la fila 78")
+    # Enum y no `str`: la validación de la fila 84 rechaza un nivel inventado sin escribir una sola
+    # comprobación, y el esquema que se le publica al proveedor lista los valores admitidos. Que un
+    # nivel además sea *defendible para este evento* es otra cosa, y la resuelve
+    # `severidad.dentro_de_limites`, que necesita el evento y por eso no puede vivir acá.
+    severidad: Severidad = Field(description="nivel asignado; la escala vive en severidad.py")
     confianza: float = Field(ge=0.0, le=1.0)
     tactica_mitre: str | None = Field(default=None, description="táctica observada, si aplica")
     justificacion: str = Field(min_length=1, description="por qué, en una o dos oraciones")

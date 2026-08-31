@@ -37,6 +37,7 @@ from typing import Any, cast
 from langgraph.graph import END, StateGraph
 
 from .nodes import contexto as nodo_contexto
+from .nodes import historial as nodo_historial
 from .state import MAX_INTENTOS, EstadoTriaje
 
 # Un nodo devuelve el estado *parcial* que tocó, no un diccionario cualquiera. `EstadoTriaje` es
@@ -83,7 +84,10 @@ def _pendiente(nombre: str) -> Nodo:
 
 def nodos_disponibles() -> dict[str, Nodo]:
     """The real implementations that exist today; the rest come back as placeholders."""
-    reales: dict[str, Nodo] = {CONTEXTO: nodo_contexto.construir}
+    reales: dict[str, Nodo] = {
+        CONTEXTO: nodo_contexto.construir,
+        HISTORIAL: nodo_historial.recuperar,
+    }
     return {nombre: reales.get(nombre) or _pendiente(nombre) for nombre in ORDEN}
 
 

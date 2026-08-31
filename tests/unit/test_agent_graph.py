@@ -18,10 +18,12 @@ from typing import Any
 from urllib.error import URLError
 
 import pytest
+from pydantic import ValidationError
 
 from honeyml.agent import graph, tools
 from honeyml.agent.consumer import EventoDelBus
 from honeyml.agent.nodes import contexto as nodo_contexto
+from honeyml.agent.severidad import Severidad
 from honeyml.agent.state import MAX_INTENTOS, Contexto, Decision, estado_inicial
 
 
@@ -41,7 +43,26 @@ def _evento(**kw: Any) -> EventoDelBus:
 
 
 def _decision() -> Decision:
-    return Decision(doc_id="abc123", severidad="media", confianza=0.8, justificacion="porque sí")
+    return Decision(
+        doc_id="abc123",
+        severidad=Severidad.MEDIO,
+        confianza=0.8,
+        justificacion="entró con credenciales del señuelo",
+    )
+
+
+def test_el_esquema_rechaza_un_nivel_que_no_existe() -> None:
+    """El enum de la fila 78 hace este control sin que nadie escriba una comprobación.
+
+    Lo atrapó de entrada: el marcador de estas pruebas decía "media" y el nivel es "medio".
+    """
+    with pytest.raises(ValidationError):
+        Decision(
+            doc_id="abc123",
+            severidad="media",  # type: ignore[arg-type]
+            confianza=0.8,
+            justificacion="x",
+        )
 
 
 # ---- topología ----------------------------------------------------------------------------
