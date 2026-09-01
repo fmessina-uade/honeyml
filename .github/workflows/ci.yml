@@ -1,8 +1,8 @@
 name: CI
 
 # Runs on every push/PR to main. Keeps infra + configs honest before they reach the VPS.
-# Covered: shell/yaml/compose linting, python unit tests, honeypot config sanity checks.
-# Not yet: integration tests (need Docker + live honeypots) and the ML/agent code (still ahead).
+# Covered: shell/yaml/compose linting, python unit tests, format and type checks, honeypot config
+# sanity checks. Not covered: the integration tests, which need Docker and live sensors.
 
 on:
   push:
@@ -77,8 +77,14 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: install pytest
-        run: pip install pytest
+      # El proyecto con los extras que las pruebas importan de verdad, no solo pytest.
+      #
+      # `[agent]` trae langgraph, redis y pydantic; `[analysis]` trae numpy, pandas y scikit-learn,
+      # que entran por la cadena `agent/tools.py` -> `features/arquetipos.py`. Mientras las únicas
+      # pruebas leían archivos de configuración alcanzaba con pytest suelto, y el día que una
+      # importó el paquete el job pasó a fallar por dependencias faltantes, no por el código.
+      - name: install
+        run: pip install -e ".[agent,analysis,dev]"
 
       - name: pytest
         run: pytest tests/unit/ -v --tb=short
@@ -97,18 +103,23 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      # Las mismas bibliotecas que declara el hook de mypy en .pre-commit-config.yaml, para que
-      # los dos den el mismo veredicto. Si se agrega una allá, va acá también.
+      # Todos los extras que usa src/, para que mypy vea los mismos tipos que ve en local.
+      #
+      # Sin `[agent]` no hay langgraph, y entonces el grafo se verifica contra un módulo que mypy
+      # no puede leer: la puerta dice verificar tipos y verifica menos que la máquina de quien
+      # escribe. Con los extras completos, esto y `make lint` dan el mismo veredicto.
       - name: install
-        run: pip install -e ".[dev]" fastapi "redis>=5.0" types-requests
+        run: pip install -e ".[agent,analysis,api,dev]" types-requests
 
       - name: ruff
         run: |
           ruff check src/ scripts/ tests/
           ruff format --check src/ scripts/ tests/
 
+      # Sin `--ignore-missing-imports` en la línea: ya está en [tool.mypy] de pyproject.toml, y
+      # repetirlo acá invitaba a que las dos configuraciones se separaran sin que nadie lo notara.
       - name: mypy
-        run: mypy --ignore-missing-imports src/
+        run: mypy src/
 
   # honeypot config gotchas that break things silently if wrong
   config-validation:
