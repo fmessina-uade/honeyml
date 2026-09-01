@@ -26,8 +26,8 @@ from honeyml.agent.severidad import (
     techo,
 )
 
-# Reparto real del bus al 25/08, sensor · categoría · resultado · mensajes. Es el mismo cuadro que
-# figura en el encabezado de `severidad.py` y en el documento de estado de la fase.
+# Reparto real del bus al 25/08/2026, sensor · categoría · resultado · mensajes. Es el mismo cuadro
+# que figura en el encabezado de `severidad.py`.
 BUS_REAL = [
     ("cowrie", "process", "unknown", 30_334),
     ("cowrie", "authentication", "success", 11_712),
@@ -77,7 +77,7 @@ def test_un_comando_fallido_sigue_siendo_una_intrusion() -> None:
 
 
 def test_dionaea_sin_resultado_no_se_asume_exitoso() -> None:
-    """Mismo criterio que la fila 67: se prefiere no saber antes que suponer.
+    """Mismo criterio que aplica el pipeline al inferir resultados: mejor no saber que suponer.
 
     MySQL y MSSQL no registran actividad posterior, así que el sensor no puede observar si la
     credencial sirvió. Tratar ese desconocido como acceso inflaría un cuarto del bus.
@@ -90,7 +90,7 @@ def test_dionaea_sin_resultado_no_se_asume_exitoso() -> None:
 
 
 def test_nunca_por_debajo_de_lo_que_prueba_el_registro() -> None:
-    """La guarda sobre la que se apoya la validación de la fila 84."""
+    """La guarda sobre la que se apoya el nodo de validación del grafo."""
     evento = _evento("file")
     for nivel in (Severidad.INFORMATIVO, Severidad.BAJO, Severidad.MEDIO, Severidad.ALTO):
         assert not dentro_de_limites(nivel, evento)
@@ -176,6 +176,6 @@ def test_el_reparto_sobre_el_bus_real_no_es_degenerado() -> None:
 
 
 def test_el_reconocimiento_no_llega_por_el_bus() -> None:
-    """Está en la escala a propósito, pero declarar que llega sería falso: lo filtra la fila 66."""
+    """Está en la escala a propósito, pero declarar que llega sería falso: lo filtra el bus."""
     assert Severidad.INFORMATIVO not in LLEGAN_POR_EL_BUS
     assert Severidad.INFORMATIVO in ORDEN

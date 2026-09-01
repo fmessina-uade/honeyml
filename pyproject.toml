@@ -34,6 +34,11 @@ agent = [
     "langgraph>=0.2",
     "redis>=5.0",
     "pydantic>=2.9",
+    # Solo el paquete de certificados raíz, no un cliente HTTP: el adaptador habla por `urllib`.
+    # Se declara porque el adaptador lo usa de respaldo cuando el intérprete no tiene almacén de
+    # certificados —el caso del Python de python.org en macOS sin `Install Certificates.command`—,
+    # y hasta ahora venía arrastrado por otra dependencia, que es una forma frágil de depender.
+    "certifi>=2024.2",
 ]
 # Herramientas de verificación. Instalar con: pip install -e ".[dev]"
 # Estaban declaradas en la configuración de pytest y ruff pero no como dependencia, así que

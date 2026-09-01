@@ -7,7 +7,7 @@ silently if nobody wrote them down. Here there are three.
   asking the future whether this was a campaign.
 - The trajectory is ordered by the same floor rule the engine is judged by, not by a second opinion
   living inside the tool.
-- The node adds to the context instead of replacing it, so what fila 81 found still travels.
+- The node adds to the context instead of replacing it, so what the previous node found survives.
 """
 
 from __future__ import annotations
@@ -157,13 +157,13 @@ def test_agrega_sin_pisar_lo_que_encontro_el_nodo_anterior(
     monkeypatch.setattr(tools, "rafaga_en_la_ventana", lambda e: {"disponible": True})
 
     ctx = nodo.recuperar(_estado())["contexto"]
-    assert ctx.hallazgos["origen"] == {"pais": "BG"}  # lo de la fila 81 sigue ahí
+    assert ctx.hallazgos["origen"] == {"pais": "BG"}  # lo del nodo anterior sigue ahí
     assert ctx.hallazgos["trayectoria"] == {"conocida": True}
     assert ctx.hallazgos["rafaga"] == {"disponible": True}
 
 
 def test_declara_que_los_precedentes_no_se_consultaron(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Distinto de que no haya precedentes: el almacén es la fila 85 y todavía no existe."""
+    """Distinto de que no haya precedentes: todavía no existe el almacén de decisiones."""
     monkeypatch.setattr(tools, "trayectoria_de_direccion", lambda ip, h: None)
     monkeypatch.setattr(tools, "rafaga_en_la_ventana", lambda e: None)
 

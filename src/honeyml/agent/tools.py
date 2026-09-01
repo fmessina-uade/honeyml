@@ -20,9 +20,9 @@ constants below, and each one is a declared limit rather than a surprise.
 
 *Cut off at the event's own timestamp.* History means what was known *before* this event, not
 everything in the index today. Without the cut, the engine judges an early event using evidence
-from a later one, scores better than it could ever score live, and the adversarial campaign of
-Fase 4 ends up measuring a system that cannot exist. The horizon is a parameter of every historical
-lookup, and it is not optional.
+from a later one, scores better than it could ever score live, and the adversarial validation
+campaign ends up measuring a system that cannot exist. The horizon is a parameter of every
+historical lookup, and it is not optional.
 """
 
 from __future__ import annotations

@@ -13,6 +13,7 @@ SSH_PORT     ?= 2200
 SSH_USER     ?= honeyml
 SSH_KEY      ?= ~/.ssh/honeyml_ed25519_v2
 
+
 help:
 	@echo ""
 	@echo "  HoneyML - Comandos de infraestructura"
@@ -324,3 +325,7 @@ api:
 
 dash:
 	@cd dashboard && npm run dev
+
+# Comprobación en vivo del proveedor de inferencia. Necesita GROQ_API_KEY exportada.
+inferencia-ok:
+	@./.venv/bin/python -c "import sys; from honeyml.agent.adapters.servicio import comprobar; sys.exit(comprobar())"

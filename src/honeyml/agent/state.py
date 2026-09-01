@@ -14,7 +14,8 @@ WHERE THE SEVERITY SCALE LIVES
 In `severidad.py`, not here. This module says a decision carries a level; that one says which levels
 exist, what evidence establishes each, and how far above the proven floor the engine may go. They
 are separate because the second is a statement about the domain that the panel, the validation node
-and the Fase 4 campaign all read — and only this one is about what travels between nodes.
+and the adversarial validation campaign all read — and only this one is about what travels between
+nodes.
 """
 
 from __future__ import annotations
@@ -48,7 +49,7 @@ class Decision(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     doc_id: str = Field(description="identidad del evento en el índice")
-    # Enum y no `str`: la validación de la fila 84 rechaza un nivel inventado sin escribir una sola
+    # Enum y no `str`: el nodo de validación rechaza un nivel inventado sin escribir una sola
     # comprobación, y el esquema que se le publica al proveedor lista los valores admitidos. Que un
     # nivel además sea *defendible para este evento* es otra cosa, y la resuelve
     # `severidad.dentro_de_limites`, que necesita el evento y por eso no puede vivir acá.
@@ -66,7 +67,7 @@ class Decision(BaseModel):
 
 
 class Contexto(BaseModel):
-    """Everything the model gets to reason over. Assembled by fila 81, never by the model itself.
+    """Everything the model gets to reason over. Assembled by the context node, never by the model.
 
     Kept as a declared structure rather than a free-form string so that what was shown to the
     provider is reproducible after the fact. A prompt built by concatenation cannot be reconstructed
@@ -81,7 +82,7 @@ class Contexto(BaseModel):
     usuario: str = ""
     comando: str = ""
     momento: str = ""
-    # Lo que aportan las herramientas de la fila 73. Vacío es un estado válido: una dirección vista
+    # Lo que aportan las consultas de `tools.py`. Vacío es un estado válido: una dirección vista
     # por primera vez no tiene historial, y eso es información, no una falla.
     hallazgos: dict[str, Any] = Field(default_factory=dict)
 
@@ -109,11 +110,10 @@ class EstadoTriaje(TypedDict, total=False):
     # Los errores de validación, redactados para devolvérselos al proveedor.
     #
     # El `operator.add` no es decoración: LangGraph **reemplaza** el valor de una clave con lo que
-    # devuelve el nodo, salvo que se declare un reductor. Sin él, la acumulación que este comentario
-    # describía no ocurría —cada vuelta pisaba los reproches de la anterior— y el modelo que arregla
-    # el campo que le señalaron y rompe otro se queda alternando entre dos errores hasta agotar los
-    # intentos, sin ver nunca los dos juntos. Con el reductor, cada nodo devuelve solo los reproches
-    # nuevos y el estado conserva la historia.
+    # devuelve el nodo, salvo que se declare un reductor. Sin él, cada vuelta pisa los reproches de
+    # la anterior, y un modelo que arregla el campo que le señalaron y rompe otro se queda
+    # alternando entre dos errores hasta agotar los intentos, sin ver nunca los dos juntos. Con el
+    # reductor, cada nodo devuelve solo los reproches nuevos y el estado conserva la historia.
     reproches: Annotated[list[str], operator.add]
     motivo_de_corte: MotivoDeCorte
 

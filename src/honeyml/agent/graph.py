@@ -53,14 +53,14 @@ INFERENCIA = "inferencia"
 VALIDACION = "validacion"
 PERSISTENCIA = "persistencia"
 
-# Qué fila del cronograma le debe una implementación a cada nodo. Está acá y no en un comentario
-# suelto porque es lo que hace accionable el error cuando falta una: el mensaje nombra la tarea.
-DUENO: dict[str, str] = {
-    CONTEXTO: "fila 81 — nodo de construcción de contexto",
-    HISTORIAL: "fila 82 — nodo de recuperación de información histórica",
-    INFERENCIA: "fila 83 — nodo de consulta al servicio de inferencia",
-    VALIDACION: "fila 84 — nodo de validación de esquema con reintentos correctivos",
-    PERSISTENCIA: "fila 85 — nodo de persistencia de la decisión",
+# Qué hace cada nodo, en una línea. Está acá y no solo en el módulo de cada uno porque es lo que
+# vuelve accionable el error cuando falta una implementación: el mensaje dice qué falta escribir.
+RESPONSABILIDAD: dict[str, str] = {
+    CONTEXTO: "arma el contexto del evento a partir de las consultas de solo lectura",
+    HISTORIAL: "agrega la trayectoria de la dirección y la correlación de ráfaga",
+    INFERENCIA: "le pide al servicio de inferencia una decisión sobre el contexto",
+    VALIDACION: "verifica el esquema y los límites, y redacta el reproche cuando no cumple",
+    PERSISTENCIA: "guarda la decisión de forma durable",
 }
 
 ORDEN = [CONTEXTO, HISTORIAL, INFERENCIA, VALIDACION, PERSISTENCIA]
@@ -75,16 +75,16 @@ LIMITE_DE_PASOS = 2 + 2 * (MAX_INTENTOS + 2) + 1
 
 
 def _pendiente(nombre: str) -> Nodo:
-    """Placeholder for a node whose row has not been built yet.
+    """Placeholder for a node that has not been written yet.
 
     Fails when the graph *runs*, not when it is imported, so the topology stays inspectable and
-    testable while the engine is half-written. The message names the task, so hitting it reads as
-    "this is not built yet" and not as a bug.
+    testable while the engine is half-written. The message says what the missing node would do, so
+    hitting it reads as "this is not built yet" and not as a bug.
     """
 
     def nodo(_: EstadoTriaje) -> EstadoTriaje:
         raise NotImplementedError(
-            f"El nodo '{nombre}' todavía no está implementado: {DUENO[nombre]}"
+            f"El nodo '{nombre}' todavía no está implementado: {RESPONSABILIDAD[nombre]}"
         )
 
     nodo.__name__ = f"pendiente_{nombre}"
@@ -114,15 +114,15 @@ def ruta_tras_contexto(estado: EstadoTriaje) -> str:
 def intentos_gastados(estado: EstadoTriaje) -> int:
     """How many attempts this cycle has already spent.
 
-    El máximo entre el contador y los reproches acumulados, y no solo el contador, porque el
-    contador lo lleva un nodo que todavía no existe. Una auditoría del grafo lo mostró sin lugar a
-    dudas: con la validación rechazando y nadie incrementando `intentos`, el ciclo dio **10.007
-    vueltas** antes de que LangGraph lo cortara por límite de recursión —diez mil llamadas pagas
-    sobre un solo evento, y un error genérico al final que no nombra la causa.
+    El máximo entre el contador y los reproches acumulados, y no solo el contador. Quien incrementa
+    `intentos` es el nodo de inferencia, y si algún día deja de hacerlo el ciclo no termina: con la
+    validación rechazando y el contador quieto, el bucle da diez mil vueltas antes de que LangGraph
+    lo corte por recursión. Son diez mil llamadas pagas sobre un solo evento, y un error genérico
+    al final que no nombra la causa.
 
     Como la validación no puede rechazar sin dejar un reproche —es lo que se le devuelve al
-    proveedor para que corrija—, contar reproches es un segundo camino hacia el mismo número. Que
-    las filas 83 y 84 se olviden del contador deja de ser catastrófico y pasa a ser inocuo.
+    proveedor para que corrija—, contar reproches es un segundo camino hacia el mismo número, y
+    olvidarse del contador deja de ser catastrófico para pasar a ser inocuo.
     """
     return max(int(estado.get("intentos", 0)), len(estado.get("reproches", [])))
 
@@ -130,14 +130,13 @@ def intentos_gastados(estado: EstadoTriaje) -> int:
 def decision_utilizable(estado: EstadoTriaje) -> bool:
     """Whether the decision may be persisted as the engine's answer.
 
-    Dos condiciones, no una. Que exista, y que sea defendible **para este evento**: la fila 78
-    definió la escala anclada a la evidencia justamente para que una severidad por debajo del piso
-    —un `informativo` sobre un evento que documenta una transferencia de archivo— sea una
-    contradicción con el registro y no una diferencia de criterio.
+    Dos condiciones, no una. Que exista, y que sea defendible **para este evento**: la escala de
+    `severidad.py` está anclada a la evidencia justamente para que un nivel por debajo del piso —un
+    `informativo` sobre un evento que documenta una transferencia de archivo— sea una contradicción
+    con el registro y no una diferencia de criterio.
 
-    Esa guardia existía y estaba probada desde la fila 78, pero **no estaba cableada**: el grafo
-    solo preguntaba si había decisión, así que una severidad imposible llegaba a persistencia sin
-    que nada la mirara. La auditoría lo encontró en el escenario 5.
+    Comprobar solo la existencia deja pasar esa contradicción sin que nada la mire, que es lo que
+    hace este grafo si a alguien le parece que la segunda condición sobra.
     """
     decision = estado.get("decision")
     if decision is None:
@@ -176,13 +175,13 @@ def ruta_tras_validar(estado: EstadoTriaje) -> str:
 def resultado_del_ciclo(estado: EstadoTriaje) -> MotivoDeCorte | None:
     """Why this cycle is ending. `None` means it ended with a decision worth persisting.
 
-    Lo usa el nodo de persistencia (fila 85) para saber qué está guardando. Vive acá y no allá
-    porque es la contracara de `ruta_tras_validar`: las dos leen el mismo estado para responder la
-    misma pregunta, y separarlas dejaría que una diga "andá a persistir" y la otra no sepa por qué.
+    Lo usa el nodo de persistencia para saber qué está guardando. Vive acá y no allá porque es la
+    contracara de `ruta_tras_validar`: las dos leen el mismo estado para responder la misma
+    pregunta, y separarlas dejaría que una diga "andá a persistir" y la otra no sepa por qué.
 
-    La auditoría mostró el hueco en el escenario 3: con los intentos agotados el ciclo llegaba a
-    persistencia sin decisión **y sin motivo**, así que el nodo no podía distinguir un esquema
-    irrecuperable de cualquier otra cosa que hubiera salido mal.
+    Sin esto, con los intentos agotados el ciclo llega a persistencia sin decisión **y sin motivo**,
+    y el nodo no puede distinguir un esquema irrecuperable de cualquier otra cosa que haya salido
+    mal.
     """
     declarado = estado.get("motivo_de_corte")
     if declarado:
@@ -242,7 +241,7 @@ def describir() -> str:
         listo = not disponibles[nombre].__name__.startswith("pendiente_")
         marca = "✅" if listo else "⏳"
         flecha = "   │" if i < len(ORDEN) - 1 else ""
-        lineas.append(f"  {marca} {nombre:<14} {DUENO[nombre]}")
+        lineas.append(f"  {marca} {nombre:<14} {RESPONSABILIDAD[nombre]}")
         if flecha:
             lineas.append(flecha)
     lineas += [

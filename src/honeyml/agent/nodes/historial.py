@@ -1,10 +1,10 @@
 """Second node: what the past says about a case like this one.
 
-The line between this node and the context node of fila 81 is worth stating, because both read from
-the index and it would be easy to collapse them into one.
+The line between this node and the context node is worth stating, because both read from the index
+and it would be easy to collapse them into one.
 
-    fila 81 · contexto     ¿qué es este evento?      el hecho y sus circunstancias
-    fila 82 · historial    ¿es parte de algo mayor?  la trayectoria y la ráfaga
+    contexto     ¿qué es este evento?      el hecho y sus circunstancias
+    historial    ¿es parte de algo mayor?  la trayectoria y la ráfaga
 
 The context node answers with facts about the event: who, from where, in which session, running
 what. This one answers a question that no single event can settle — whether the address had already
@@ -24,16 +24,18 @@ push. The window is what makes the count mean something.
 
 WHAT IT IS ALLOWED TO CONCLUDE: NOTHING
 
-Same rule as fila 81. This node retrieves and records; it does not weigh. `maximo_alcanzado` is
-reported as the fact it is —"this address had already reached ALTO"— and never turned into a
-recommendation to escalate. The margin of `severidad.MARGEN_DE_ESCALADA` is the engine's to spend,
-with a justification, and pre-spending it here would hide the decision inside a lookup.
+Same rule as the context node. This node retrieves and records; it does not weigh.
+`maximo_alcanzado` is reported as the fact it is —"this address had already reached ALTO"— and never
+turned into a recommendation to escalate. The margin of `severidad.MARGEN_DE_ESCALADA` is the
+engine's to spend, with a justification, and pre-spending it here would hide the decision inside a
+lookup.
 
 THE PRECEDENT SEAM
 The obvious third source of history is what the engine itself already decided about similar events,
-which is what would make its answers consistent over time. That store is fila 85 and does not exist
-yet. Rather than pretend, the absence is written into `hallazgos` explicitly: a model told that
-precedents were not consulted reasons differently from one that believes there are none.
+which is what would make its answers consistent over time. That store belongs to the persistence
+node and does not exist yet. Rather than pretend, the absence is written into `hallazgos`
+explicitly: a model told that precedents were not consulted reasons differently from one that
+believes there are none.
 """
 
 from __future__ import annotations
@@ -48,8 +50,9 @@ from ..state import EstadoTriaje
 # se anota y sigue. Ver el encabezado de `nodes/contexto.py`.
 SIN_INDICE = (URLError, ConnectionError, TimeoutError)
 
-# Lo que la fila 85 va a poder responder y hoy no. Se declara para que quede en los hallazgos.
-PRECEDENTES_PENDIENTES = "no consultados: el almacén de decisiones es la fila 85"
+# Lo que se va a poder responder cuando exista el almacén de decisiones, y hoy no. Se declara para
+# que la ausencia quede escrita en los hallazgos en vez de parecer un resultado vacío.
+PRECEDENTES_PENDIENTES = "no consultados: todavía no hay almacén de decisiones"
 
 
 def _intentar(nombre: str, hallazgos: dict[str, Any], fn: Any, *args: Any) -> Any:

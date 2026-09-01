@@ -19,7 +19,7 @@ THREE THINGS IT SETTLES, NONE OF WHICH THE JOBLIB CAN SAY BY ITSELF
 
 2. *The feature ranking.* Permutation importance over the fifteen original columns, measured on the
    model that actually ships. The report cites a ranking from the random forest that was discarded
-   in fila 88; that ranking answers what mattered to a classifier nobody runs.
+   in the model comparison; that ranking answers what mattered to a classifier nobody runs.
 
 3. *Provenance.* Library versions, class order, column list, row counts, and the digest of the
    artifact itself. A pickled sklearn object loaded under a different version fails in ways that
@@ -105,8 +105,8 @@ def _umbral_fuera_de_muestra(
         _fila(y_tr, _predecir_con_umbral(proba, clases, indice_debil, u), u) for u in UMBRALES
     ]
 
-    # Mismo criterio que la fila 89: mejor F1 macro. Elegir "el de más recall" siempre lleva al
-    # umbral más bajo, que dispara sobre casi todo y deja de informar.
+    # Mismo criterio que la búsqueda de hiperparámetros: mejor F1 macro. Elegir "el de más recall"
+    # siempre lleva al umbral más bajo, que dispara sobre casi todo y deja de informar.
     elegido = max(frontera, key=lambda f: f["f1_macro"])
     return elegido, frontera, referencia
 
@@ -158,7 +158,7 @@ def _veredicto(defecto: dict[str, Any], con_umbral: dict[str, Any]) -> dict[str,
         "detalle": [
             f"Compra {d_recall:+.4f} de recall sobre {WEAK_CLASS} pagando precisión y",
             f"{abs(d_macro):.4f} de F1 macro, que está dentro del ruido de {BANDA_RUIDO}.",
-            "Se adopta por el mismo criterio con que se eligió la familia en la fila 88: un falso",
+            "Se adopta por el mismo criterio con que se eligió la familia del modelo: un falso",
             "positivo cuesta una revisión y un falso negativo cuesta una intrusión no detectada.",
             "Enunciarlo como permuta y no como mejora es lo que lo hace defendible.",
         ],
@@ -312,7 +312,7 @@ def main() -> None:
         "modelo": {
             "familia": "HistGradientBoostingClassifier",
             "hiperparametros": {**BASE, "class_weight": "balanced", "random_state": RANDOM_STATE},
-            "eleccion": "fila 88 por F1 macro y por la clase débil; la fila 89 no la mejoró",
+            "eleccion": "elegida por F1 macro y por la clase débil; el ajuste no la mejoró",
         },
         "entrada": {
             "columnas_numericas": NUMERIC,
@@ -349,7 +349,7 @@ def main() -> None:
             "n_prueba": int(len(x_te)),
             "casos_clase_debil_en_prueba": int((y_te == WEAK_CLASS).sum()),
             "particion": f"train_test_split estratificado, test_size=0.25, semilla {RANDOM_STATE}",
-            "nota": "misma partición que las filas 88 y 89, para que las métricas sean comparables",
+            "nota": "misma partición que la comparación y el ajuste, para poder comparar métricas",
         },
         "importancia_por_permutacion": {
             "metodo": "permutation_importance sobre columnas originales, criterio F1 macro",

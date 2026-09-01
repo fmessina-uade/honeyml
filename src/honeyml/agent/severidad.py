@@ -1,7 +1,7 @@
 """The severity scale: which levels exist, what establishes each one, and how far the engine may go.
 
-Fila 78. Everything else in the engine was written against a `severidad` that was declared to exist
-and deliberately left without a vocabulary; this is the vocabulary.
+The rest of the engine is written against a `severidad` that it only knows how to carry. This is
+where the vocabulary itself is decided.
 
 THE SCALE IS THE INTRUSION FUNNEL, NOT AN OPINION
 The panel already measures how far each address got: knocked, tried credentials, got in, ran
@@ -12,14 +12,14 @@ checked against the evidence by someone who does not trust the engine.**
 
 WHY THAT PROPERTY IS LOAD-BEARING, TWICE
 
-*Validation (fila 84).* An answer that puts a file transfer at "informativo" is not a matter of
-judgement, it contradicts the record. The floor below turns that into a rejection instead of a
-decision nobody caught.
+*Validation.* An answer that puts a file transfer at "informativo" is not a matter of judgement, it
+contradicts the record. The floor below turns that into a rejection instead of a decision nobody
+caught.
 
-*The adversarial campaign (Fase 4, fila 102).* "Comparación entre clasificación obtenida y esperada"
-needs an *expected*. With severity defined by observable evidence, the expected label is computed
-from the events themselves — mechanically, with no second opinion to argue about. A scale that only
-a model could apply would leave that row with nothing to compare against.
+*Measuring the engine.* Comparing what the engine decided against what it should have decided needs
+an *expected*, and with severity defined by observable evidence that label is computed from the
+events themselves — mechanically, with no second opinion to argue about. A scale that only a model
+could apply would leave nothing to compare against.
 
 SO WHAT IS THE MODEL FOR?
 A fair question, and the answer has to be stated rather than dodged: if the floor is mechanical, an
@@ -32,7 +32,7 @@ A fair question, and the answer has to be stated rather than dodged: if the floo
    bounded, so it stays a judgement and not a free hand.
 3. **MITRE attribution.** Which tactic the behaviour corresponds to.
 4. **The context the rule ignores.** Repeat offender, known command family, hosting-provider origin.
-   These are what the tools of fila 73 return, and this is what they are for.
+   These are what the lookups in `tools.py` return, and this is what they are for.
 
 The bound is one level. See `MARGEN_DE_ESCALADA`.
 
@@ -48,7 +48,8 @@ cincuenta comandos produce cincuenta decisiones**, casi todas del mismo nivel. Q
 el panel, agrupando por sesión y por dirección, que es información que ya tiene. Agregar en el motor
 sería mover el problema al lado donde cuesta una llamada de inferencia por reagrupamiento.
 
-**Medido sobre los 52.165 mensajes que había en el bus al 25/08**, el piso mecánico reparte así:
+**Medido sobre los 52.165 mensajes que había en el bus al 25/08/2026**, el piso mecánico reparte
+así:
 
     bajo       4.245   8,1 %
     medio     13.871  26,6 %
@@ -156,10 +157,10 @@ CRITERIOS: dict[Severidad, Criterio] = {
 def piso_de(categoria: str, outcome: str = "") -> Severidad:
     """The floor for a (category, outcome) pair, with no event object in hand.
 
-    Es el primitivo real, y `piso` es la comodidad sobre él. Existe separado porque la fila 82
-    necesita ordenar por severidad lo que devuelve una agregación de Elasticsearch —pares de
-    categoría y resultado, sin documentos— y fabricar eventos falsos para poder preguntar habría
-    metido una estructura de mentira en el único lugar del motor que dice qué prueba el registro.
+    Es el primitivo real, y `piso` es la comodidad sobre él. Existe separado porque hay que ordenar
+    por severidad lo que devuelve una agregación de Elasticsearch —pares de categoría y resultado,
+    sin documentos—, y fabricar eventos falsos para poder preguntar metería una estructura de
+    mentira en el único lugar del motor que dice qué prueba el registro.
     """
     if categoria == "file":
         return Severidad.CRITICO
@@ -176,8 +177,8 @@ def piso(evento: EventoDelBus) -> Severidad:
 
     Deliberately conservative: it answers "what does the record prove", not "how bad does this
     look". Dionaea's credential attempts against MySQL and MSSQL land on `BAJO` and not higher
-    because that sensor cannot observe the outcome — the same reasoning as fila 67, where an
-    unknown was preferred over an unsupported success.
+    because that sensor cannot observe the outcome. Same reasoning the pipeline applies when it
+    infers results: an unknown is preferred over an unsupported success.
     """
     return piso_de(evento.category, evento.outcome)
 
@@ -233,11 +234,11 @@ def reproche(nivel: Severidad, evento: EventoDelBus) -> str | None:
 
 # Qué niveles puede producir hoy el motor por el camino real.
 #
-# El filtro de la fila 66 publica al bus autenticaciones exitosas, ejecución de comandos y
+# El filtro del pipeline publica al bus autenticaciones exitosas, ejecución de comandos y
 # transferencia de archivos: el reconocimiento —el 82,6 % del volumen— no dispara ningún ciclo. Así
 # que `INFORMATIVO` está definido pero no llega por acá.
 #
-# No se lo saca de la escala por dos motivos: la campaña adversaria de la Fase 4 va a generar
+# No se lo saca de la escala por dos motivos: la campaña de validación adversaria va a generar
 # reconocimiento y su etiqueta esperada tiene que existir, y una escala que empieza en "ya probó
 # credenciales" no se puede leer sin explicar antes qué quedó afuera.
 LLEGAN_POR_EL_BUS: set[Severidad] = {

@@ -46,8 +46,8 @@ def _decision() -> Decision:
     """Una decisión válida **para `_evento()`**, que es de categoría `process`.
 
     El nivel no es decorativo: con `MEDIO` esta decisión quedaba por debajo del piso del evento y
-    el grafo la rechazaba, con razón. Lo destapó cablear la guardia de la fila 78 —antes cualquier
-    nivel pasaba— y es exactamente el defecto que la guardia existe para atrapar.
+    el grafo la rechaza, con razón: es exactamente el defecto que la guardia de límites existe
+    para atrapar.
     """
     return Decision(
         doc_id="abc123",
@@ -58,9 +58,10 @@ def _decision() -> Decision:
 
 
 def test_el_esquema_rechaza_un_nivel_que_no_existe() -> None:
-    """El enum de la fila 78 hace este control sin que nadie escriba una comprobación.
+    """El enum de `severidad.py` hace este control sin que nadie escriba una comprobación.
 
-    Lo atrapó de entrada: el marcador de estas pruebas decía "media" y el nivel es "medio".
+    El nivel es "medio", no "media": una diferencia de una letra que sin el enum llegaría a
+    persistirse tal cual.
     """
     with pytest.raises(ValidationError):
         Decision(
@@ -126,11 +127,11 @@ def test_el_grafo_recorre_los_cinco_nodos_con_implementaciones_de_prueba() -> No
     assert visitados == graph.ORDEN
 
 
-# ---- las tres guardias que encontró la auditoría de escenarios ------------------------------
+# ---- las guardias del ciclo correctivo ------------------------------------------------------
 #
-# Las tres nacieron de recorrer el grafo escenario por escenario en lugar de leerlo, y las tres
-# son contratos con nodos que todavía no existen —83 y 84—. Sin estas pruebas, la fila que los
-# implemente puede incumplirlos sin que nada se ponga en rojo.
+# Son contratos entre el grafo y los nodos de inferencia y validación. Ninguno se rompe de forma
+# visible: el ciclo sigue andando, más caro o con una decisión que no debería haberse guardado.
+# Sin estas pruebas, un cambio en cualquiera de los dos nodos puede incumplirlos en silencio.
 
 
 def _recorrer(cfg: dict[str, Any], evento: Any = None) -> tuple[list[str], Any]:
@@ -153,10 +154,10 @@ _CTX: dict[str, Any] = {"contexto": Contexto(doc_id="abc123", resumen="x")}
 
 
 def test_el_ciclo_termina_aunque_nadie_cuente_los_intentos() -> None:
-    """El hallazgo más caro de la auditoría: daba 10.007 vueltas, o sea 10.007 llamadas pagas.
+    """Sin esta guardia el ciclo da diez mil vueltas: diez mil llamadas pagas sobre un evento.
 
-    El contador lo lleva un nodo que todavía no existe. Contar también los reproches acumulados
-    hace que olvidarse de incrementarlo sea inocuo en vez de catastrófico.
+    El contador lo lleva el nodo de inferencia. Contar también los reproches acumulados hace que
+    olvidarse de incrementarlo sea inocuo en vez de catastrófico.
     """
     visitados, final = _recorrer(
         {
@@ -173,7 +174,7 @@ def test_el_ciclo_termina_aunque_nadie_cuente_los_intentos() -> None:
 
 
 def test_los_reproches_se_acumulan_en_vez_de_pisarse() -> None:
-    """Sin el reductor de `state.py`, cada vuelta borraba el reproche de la anterior.
+    """Sin el reductor de `state.py`, cada vuelta pisa el reproche de la anterior.
 
     Y entonces un modelo que arregla el campo señalado y rompe otro nunca ve los dos juntos.
     """
@@ -190,7 +191,7 @@ def test_los_reproches_se_acumulan_en_vez_de_pisarse() -> None:
 
 
 def test_una_severidad_por_debajo_del_piso_no_llega_a_persistirse() -> None:
-    """La guardia de la fila 78 existía y estaba probada, pero no estaba cableada al grafo.
+    """El grafo tiene que mirar los límites, no solo la existencia de la decisión.
 
     `informativo` sobre un evento que documenta ejecución de comandos no es una diferencia de
     criterio: contradice el registro.
