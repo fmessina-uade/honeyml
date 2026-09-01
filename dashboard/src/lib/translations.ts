@@ -125,7 +125,7 @@ const es = {
   },
   dictionary: {
     usersTitle: 'Usuarios más probados',
-    usersHint: 'Los atacantes no adivinan: prueban los nombres que casi siempre existen.',
+    usersHint: 'Los atacantes prueban los nombres que casi siempre existen. No hay adivinanza.',
     passTitle: 'Contraseñas más probadas',
     passHint: 'Todas salen de diccionarios públicos armados con filtraciones reales.',
     unitUsers: 'intentos de acceso con este usuario',
@@ -137,7 +137,7 @@ const es = {
   mitre: {
     coverageTitle: 'Cobertura del marco',
     coverageNote:
-      'De las catorce tácticas de MITRE ATT&CK Enterprise, estas son las que aparecen en las sesiones capturadas. Las ausentes no son un vacío del panel: son etapas que un señuelo de baja interacción no llega a observar.',
+      'De las catorce tácticas de MITRE ATT&CK Enterprise, estas son las que aparecen en las sesiones capturadas. Las ausentes corresponden a etapas que un señuelo de baja interacción no llega a observar, así que no representan un vacío del panel.',
     observed: 'observadas',
     notObserved: 'no observadas en este señuelo',
     sessions: 'sesiones observadas',
@@ -228,7 +228,7 @@ const es = {
     script: 'El guion exacto',
     truncated: (n: number) => `… y ${n - 12} comandos más`,
     lesson:
-      'Casi todas las sesiones capturadas no son ataques distintos: son el mismo guion ejecutado por muchas máquinas. Agrupar por secuencia exacta de comandos lo hace evidente, y de paso muestra por qué contar alertas no sirve para medir amenazas. Una familia con miles de sesiones desde un puñado de direcciones no son miles de atacantes: es un programa, repetido.',
+      'Casi todas las sesiones capturadas son el mismo guion ejecutado por muchas máquinas, y no ataques distintos. Agrupar por secuencia exacta de comandos lo hace evidente, y de paso muestra por qué contar alertas no sirve para medir amenazas. Una familia con miles de sesiones desde un puñado de direcciones no son miles de atacantes: es un programa, repetido.',
   },
   archetypes: {
     addresses: 'direcciones',
@@ -260,7 +260,7 @@ const es = {
     downloaded: 'Descargó archivo',
     gotIn: 'Logró acceso',
     lesson:
-      'Las huellas agrupan ataques por la secuencia exacta de comandos, y por eso no ven a quien nunca llegó a una consola. Esto va al revés: toma el comportamiento de cada dirección observada —cuánto insistió, a qué hora, si probó credenciales, si descargó algo— y deja que los datos decidan dónde caen los límites. El resultado es contundente: la enorme mayoría solo golpea la puerta, y un grupo muy chico es el que efectivamente entra y actúa.',
+      'Las huellas agrupan ataques por la secuencia exacta de comandos, y por eso no ven a quien nunca llegó a una consola. Esta vista trabaja al revés. Toma el comportamiento de cada dirección observada (cuánto insistió, a qué hora, si probó credenciales, si descargó algo) y deja que los datos decidan dónde caen los límites. La enorme mayoría solo golpea la puerta. Un grupo muy chico es el que entra y actúa.',
     method: (dirs: string, feats: number, groups: number) =>
       `Agrupamiento no supervisado sobre ${dirs} direcciones y ${feats} características de comportamiento. La cantidad de grupos (${groups}) se eligió por el criterio de silueta, no a mano. Los grupos son descriptivos: no existe una clave externa que diga cuántos tipos de atacante hay, y los nombres son una interpretación de cada perfil.`,
     groups: {
@@ -295,7 +295,7 @@ const es = {
     tookHint: 'Descargaron un archivo: es la señal de un compromiso real',
     survives: (p: string) => `sobrevive el ${p}% del escalón anterior`,
     lesson: (total: string, fin: string, porc: string) =>
-      `De ${total} direcciones que golpearon la puerta, ${fin} llegaron a descargar algo: el ${porc}%. Esa caída es el argumento central del triaje automático — tratar cada evento como una alerta significa revisar catorce mil cosas para encontrar doscientas. Lo que el motor tiene que hacer no es detectar más, es descartar mejor.`,
+      `De ${total} direcciones que golpearon la puerta, ${fin} llegaron a descargar algo: el ${porc}%. En esa caída se apoya el triaje automático. Tratar cada evento como una alerta obliga a revisar catorce mil cosas para encontrar doscientas, así que la tarea del motor pasa más por descartar bien que por detectar más.`,
   },
   geography: {
     byCountry: 'Por país',
@@ -329,7 +329,7 @@ const es = {
     weekend: 'Fin de semana',
     vsOffice: (r: string) => `${r}× la actividad de oficina`,
     verdictAutomated:
-      'Ahí está la prueba de que no hay nadie del otro lado. Un sistema operado por personas se enciende de lunes a viernes en horario de oficina y se apaga de noche y los fines de semana. Acá pasa lo contrario: la madrugada y el fin de semana superan al horario laboral. No es que los atacantes trabajen de noche, es que no duermen, porque son programas corriendo sin supervisión.',
+      'Acá está la prueba de que no hay nadie del otro lado. Un sistema operado por personas se enciende de lunes a viernes en horario de oficina y se apaga de noche y los fines de semana. Acá pasa lo contrario: la madrugada y el fin de semana superan al horario laboral. Los atacantes no trabajan de noche. Simplemente no duermen, porque son programas corriendo sin supervisión.',
     verdictMixed:
       'La distribución no reproduce un horario humano, pero tampoco es del todo pareja. Conviene mirar las celdas más intensas: suelen corresponder a una campaña puntual y no a un patrón sostenido.',
   },
@@ -479,7 +479,7 @@ const en: typeof es = {
   },
   dictionary: {
     usersTitle: 'Most attempted usernames',
-    usersHint: 'Attackers do not guess: they try the names that almost always exist.',
+    usersHint: 'Attackers try the names that almost always exist. There is no guesswork.',
     passTitle: 'Most attempted passwords',
     passHint: 'They all come from public dictionaries built from real breaches.',
     unitUsers: 'access attempts with this username',
@@ -491,7 +491,7 @@ const en: typeof es = {
   mitre: {
     coverageTitle: 'Framework coverage',
     coverageNote:
-      'Of the fourteen MITRE ATT&CK Enterprise tactics, these are the ones that appear in the captured sessions. The missing ones are not a gap in the panel: they are stages a low-interaction decoy never gets to observe.',
+      'Of the fourteen MITRE ATT&CK Enterprise tactics, these are the ones that appear in the captured sessions. The missing ones correspond to stages a low-interaction decoy never gets to observe, so they do not represent a gap in the panel.',
     observed: 'observed',
     notObserved: 'not observed in this decoy',
     sessions: 'sessions observed',
@@ -582,7 +582,7 @@ const en: typeof es = {
     script: 'The exact script',
     truncated: (n: number) => `… and ${n - 12} more commands`,
     lesson:
-      'Almost every captured session is not a distinct attack: it is the same script run by many machines. Grouping by exact command sequence makes that obvious, and shows why counting alerts does not measure threat. A family with thousands of sessions from a handful of addresses is not thousands of attackers: it is one program, repeated.',
+      'Almost every captured session is the same script run by many machines rather than a distinct attack. Grouping by exact command sequence makes that obvious, and shows why counting alerts does not measure threat. A family with thousands of sessions from a handful of addresses is not thousands of attackers: it is one program, repeated.',
   },
   archetypes: {
     addresses: 'addresses',
@@ -612,7 +612,7 @@ const en: typeof es = {
     downloaded: 'Downloaded a file',
     gotIn: 'Got access',
     lesson:
-      'Fingerprints group attacks by their exact command sequence, and so they cannot see anyone who never reached a shell. This works the other way round: it takes how each observed address behaved — how hard it pushed, at what hour, whether it tried credentials, whether it downloaded anything — and lets the data draw the boundaries. The result is stark: the overwhelming majority only knock, and a very small group is the one that actually gets in and acts.',
+      'Fingerprints group attacks by their exact command sequence, and so they cannot see anyone who never reached a shell. This view works the other way round. It takes how each observed address behaved (how hard it pushed, at what hour, whether it tried credentials, whether it downloaded anything) and lets the data draw the boundaries. The overwhelming majority only knock. A very small group is the one that gets in and acts.',
     method: (dirs: string, feats: number, groups: number) =>
       `Unsupervised grouping over ${dirs} addresses and ${feats} behavioural features. The number of groups (${groups}) was chosen by the silhouette criterion, not by hand. The groups are descriptive: there is no external key saying how many kinds of attacker exist, and the names are an interpretation of each profile.`,
     groups: {
@@ -647,7 +647,7 @@ const en: typeof es = {
     tookHint: 'Downloaded a file: the mark of a real compromise',
     survives: (p: string) => `${p}% of the previous step survives`,
     lesson: (total: string, fin: string, porc: string) =>
-      `Out of ${total} addresses that knocked, ${fin} got as far as downloading something: ${porc}%. That drop-off is the whole case for automated triage — treating every event as an alert means reviewing fourteen thousand things to find two hundred. What the engine has to do is not detect more, it is discard better.`,
+      `Out of ${total} addresses that knocked, ${fin} got as far as downloading something: ${porc}%. That drop-off is what automated triage rests on. Treating every event as an alert means reviewing fourteen thousand things to find two hundred, so the engine's job has more to do with discarding well than with detecting more.`,
   },
   geography: {
     byCountry: 'By country',
@@ -679,7 +679,7 @@ const en: typeof es = {
     weekend: 'Weekend',
     vsOffice: (r: string) => `${r}× office-hours activity`,
     verdictAutomated:
-      'There is the proof that nobody is on the other side. A system run by people lights up on weekdays during office hours and goes quiet at night and on weekends. Here the opposite happens: the small hours and the weekend beat the working day. It is not that attackers work nights — they do not sleep, because they are programs running unattended.',
+      'There is the proof that nobody is on the other side. A system run by people lights up on weekdays during office hours and goes quiet at night and on weekends. Here the opposite happens: the small hours and the weekend beat the working day. Attackers do not work nights. They simply do not sleep, because they are programs running unattended.',
     verdictMixed:
       'The distribution does not reproduce a human schedule, but it is not perfectly even either. The most intense cells are worth a look: they usually mark a one-off campaign rather than a sustained pattern.',
   },
