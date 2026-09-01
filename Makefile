@@ -297,14 +297,24 @@ features:
 	@./.venv/bin/python -m honeyml.features.build_features
 	@./.venv/bin/python -m honeyml.features.command_encoding
 
-# Everything that reads from the index or from the consolidated table. Order matters:
-# `consolidate` produces the table the feature engineering depends on.
-artifacts: consolidate features snapshot replays fingerprints passwords
+# Everything that reads from the index or from the consolidated table. El orden importa:
+# `consolidate` produce la tabla de la que dependen tanto la ingeniería de características como la
+# serie horaria, y `arquetipos` necesita las características ya calculadas.
+#
+# `arquetipos` faltaba en esta lista: una regeneración dejaba la tabla de características nueva y el
+# agrupamiento viejo, así que la sección de tipos de atacante mostraba números de otro corpus que el
+# resto del panel.
+artifacts: consolidate features snapshot serie-horaria replays fingerprints passwords arquetipos
 	@echo ""
 	@echo "Artefactos al día."
 
 snapshot:
 	@./.venv/bin/python -m honeyml.api.offline
+
+# Serie horaria del respaldo, calculada desde la tabla consolidada y no desde el índice. Es lo que
+# hace que la vista por hora del panel funcione con el stack apagado.
+serie-horaria:
+	@./.venv/bin/python -m honeyml.api.offline --horario
 
 fingerprints:
 	@./.venv/bin/python -m honeyml.education.fingerprints
