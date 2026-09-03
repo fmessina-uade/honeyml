@@ -1,33 +1,37 @@
-"""Fit the final classifier once, and persist it with everything needed to trust it later.
+"""Ajusta el clasificador final una vez y lo persiste con todo lo necesario para confiar en él.
 
-Until now the model was trained and thrown away on every run. That is fine while the question is
-*which* model, and useless once the answer is *this* model: the triage engine cannot re-train on
-every event, and a number in a report that nobody can reproduce is a claim, not a result.
+Hasta acá el modelo se entrenaba y se descartaba en cada corrida. Eso está bien mientras la pregunta
+es cuál modelo, y deja de servir cuando la respuesta es este modelo: el motor de triaje no puede
+reentrenar en cada evento, y un número en un informe que nadie puede reproducir es una afirmación,
+no un resultado.
 
-So this module produces two files that travel together:
+El módulo produce dos archivos que viajan juntos:
 
-  models/uwf_tactica.joblib   the fitted pipeline — preprocessing and classifier in one object
-  models/uwf_tactica.json     the card: what it was trained on, how it scores, what it needs
+    models/uwf_tactica.joblib   el pipeline ajustado, preprocesamiento y clasificador en un objeto
+    models/uwf_tactica.json     la tarjeta: con qué se entrenó, cuánto puntúa, qué necesita
 
-THREE THINGS IT SETTLES, NONE OF WHICH THE JOBLIB CAN SAY BY ITSELF
+Deja resueltas tres cosas que el joblib no puede decir por sí solo.
 
-1. *The operating point.* The threshold study (`uwf_umbral`) carved validation out of the training
-   half, which cost it 20 % of the data and left its baseline (0,8741) below the full model's
-   (0,8782) — a caveat that had to be explained every time the two were put side by side. Here the
-   threshold comes from out-of-fold probabilities over the *entire* training half, so the exported
-   model trains on all of it and the threshold still never sees a row it was fitted on.
+El punto de operación. El estudio del umbral (`uwf_umbral`) recortó la validación de la mitad de
+entrenamiento, lo que le costó el 20 % de los datos y dejó su línea base (0,8741) por debajo de la
+del modelo completo (0,8782), una salvedad que había que explicar cada vez que se los ponía lado a
+lado. Acá el umbral sale de probabilidades fuera de muestra sobre la mitad de entrenamiento entera,
+así que el modelo exportado se entrena con toda ella y el umbral sigue sin ver una fila con la que
+se ajustó.
 
-2. *The feature ranking.* Permutation importance over the fifteen original columns, measured on the
-   model that actually ships. The report cites a ranking from the random forest that was discarded
-   in the model comparison; that ranking answers what mattered to a classifier nobody runs.
+El ranking de características. Importancia por permutación sobre las quince columnas originales,
+medida sobre el modelo que efectivamente se despliega. El informe cita un ranking del bosque
+aleatorio que se descartó en la comparación, y ese ranking responde qué le importaba a un
+clasificador que nadie corre.
 
-3. *Provenance.* Library versions, class order, column list, row counts, and the digest of the
-   artifact itself. A pickled sklearn object loaded under a different version fails in ways that
-   look like a data problem, and the card is what turns that into a one-line diagnosis.
+Y la procedencia. Versiones de las bibliotecas, orden de clases, lista de columnas, tamaños de
+partición y el resumen criptográfico del propio artefacto. Un objeto de sklearn cargado bajo otra
+versión falla de formas que parecen un problema de datos, y la tarjeta convierte eso en un
+diagnóstico de una línea.
 
-Usage:
+Uso:
     python -m honeyml.features.uwf_export
-    python -m honeyml.features.uwf_export --sin-permutacion   # skip the slowest step
+    python -m honeyml.features.uwf_export --sin-permutacion   # omite el paso más lento
 """
 
 from __future__ import annotations
@@ -71,7 +75,7 @@ REPETICIONES_PERMUTACION = 5
 
 
 def _digest(path: Path) -> str:
-    """SHA-256 of the artifact, so the card cannot silently drift from the file it describes."""
+    """SHA-256 del artefacto, para que la tarjeta no se despegue en silencio del archivo."""
     h = hashlib.sha256()
     with path.open("rb") as f:
         for bloque in iter(lambda: f.read(1 << 20), b""):
@@ -82,11 +86,11 @@ def _digest(path: Path) -> str:
 def _umbral_fuera_de_muestra(
     x_tr: pd.DataFrame, y_tr: pd.Series, clases: np.ndarray, indice_debil: int
 ) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
-    """Sweep the threshold on out-of-fold probabilities over the whole training half.
+    """Barre el umbral sobre probabilidades fuera de muestra, en toda la mitad de entrenamiento.
 
-    Every row gets its probability from a model that did not see it, which is the property that
-    makes the sweep honest. Unlike a held-out slice it costs no training data, so the model that
-    ships is fitted on all of it.
+    Cada fila recibe su probabilidad de un modelo que no la vio, que es la propiedad que hace
+    honesto el barrido. A diferencia de reservar una porción, no cuesta datos de entrenamiento, así
+    que el modelo que se publica se ajusta sobre toda la mitad.
     """
     print(f"  probabilidades fuera de muestra ({PARTICIONES} particiones)…", end="", flush=True)
     comenzado = time.monotonic()
@@ -118,13 +122,14 @@ BANDA_RUIDO = 0.005
 
 
 def _veredicto(defecto: dict[str, Any], con_umbral: dict[str, Any]) -> dict[str, Any]:
-    """State plainly what the threshold bought on unseen data, and what it cost.
+    """Dice sin vueltas qué compró el umbral sobre datos no vistos, y qué costó.
 
-    The threshold is picked on out-of-fold probabilities, where every model is fitted on two thirds
-    of the training half and therefore scores below the one that ships. That surface is the right
-    one to *choose* on — it never sees a row it was fitted on — but it is systematically pessimistic
-    about the default rule, so a threshold can win there and lose here. Saying so is the point of
-    this block: the alternative is a card that reports the choice without reporting its price.
+    El umbral se elige sobre probabilidades fuera de muestra, donde cada modelo se ajusta con dos
+    tercios de la mitad de entrenamiento y por eso puntúa por debajo del que se publica. Esa
+    superficie es la correcta para elegir, porque nunca ve una fila con la que se ajustó, pero es
+    sistemáticamente pesimista sobre la regla por defecto, así que un umbral puede ganar ahí y
+    perder acá. Decirlo es el punto de este bloque: la alternativa es una tarjeta que informa la
+    elección sin informar su precio.
     """
     d_macro = con_umbral["f1_macro"] - defecto["f1_macro"]
     d_recall = con_umbral["recall_debil"] - defecto["recall_debil"]
@@ -168,7 +173,7 @@ def _veredicto(defecto: dict[str, Any], con_umbral: dict[str, Any]) -> dict[str,
 
 
 def _importancia(pipe: Pipeline, x_te: pd.DataFrame, y_te: pd.Series) -> list[dict[str, Any]]:
-    """Permutation importance over the original columns, on the model being exported."""
+    """Importancia por permutación sobre las columnas originales, en el modelo que se exporta."""
     if len(x_te) > MUESTRA_PERMUTACION:
         # Estratificada: con 140 casos de la clase débil en toda la prueba, un muestreo al azar
         # podría dejar fuera casi todos y el F1 macro pasaría a medir cinco clases.
@@ -376,11 +381,12 @@ def main() -> None:
 
 
 def cargar_modelo() -> tuple[Pipeline, dict[str, Any]]:
-    """Load the exported model and its card, refusing to hand back a mismatched pair.
+    """Carga el modelo exportado y su tarjeta, y se niega a devolver un par que no coincide.
 
-    The engine has no way to notice that the card describes a different file than the one it just
-    loaded — the pipeline predicts happily either way, with the wrong operating point. Checking the
-    digest here turns that into an error at load time instead of a wrong answer at decision time.
+    El motor no tiene forma de notar que la tarjeta describe un archivo distinto del que acaba de
+    cargar, porque el pipeline predice igual con el punto de operación equivocado. Comparar el
+    resumen criptográfico acá convierte eso en un error al cargar, en vez de una respuesta
+    equivocada al decidir.
     """
     if not MODEL_FILE.exists():
         raise FileNotFoundError(

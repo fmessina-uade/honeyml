@@ -1,69 +1,34 @@
-"""The severity scale: which levels exist, what establishes each one, and how far the engine may go.
+"""La escala de severidad: qué niveles hay, qué establece cada uno y cuánto puede mover el motor.
 
-The rest of the engine is written against a `severidad` that it only knows how to carry. This is
-where the vocabulary itself is decided.
+La escala es el embudo de intrusión y no una opinión. El panel ya mide hasta dónde llegó cada
+dirección: tocó la puerta, probó credenciales, entró, ejecutó comandos, se llevó algo. Esa escalera
+es observable en la telemetría y cada escalón es un umbral real, así que reutilizarla da la
+propiedad que más importa acá: cualquiera puede verificar el nivel contra la evidencia sin confiar
+en el motor. De ahí salen el rechazo de la validación (poner una transferencia de archivo en
+"informativo" contradice el registro, no es criterio) y la posibilidad de medir el motor contra un
+valor esperado que se calcula desde los propios eventos.
 
-THE SCALE IS THE INTRUSION FUNNEL, NOT AN OPINION
-The panel already measures how far each address got: knocked, tried credentials, got in, ran
-commands, took something. That ladder is observable in the telemetry, it is already computed, and
-every step is a real threshold rather than a feeling about how bad something looks. Reusing it as
-the severity scale costs nothing and buys the property that matters most here — **the level can be
-checked against the evidence by someone who does not trust the engine.**
+Si el piso es mecánico, ¿para qué está el modelo? Por cuatro cosas que un `if` no produce: el rastro
+auditable en palabras, la escalada acotada (para la regla, `uname -a` y `chmod +x` son los dos
+"ejecutó un comando"), la atribución MITRE, y el contexto que la regla ignora, que es lo que
+devuelven las consultas de `tools.py`. El margen es de un nivel, ver `MARGEN_DE_ESCALADA`.
 
-WHY THAT PROPERTY IS LOAD-BEARING, TWICE
+La unidad es el evento y no la sesión ni la dirección, porque el bus entrega eventos y una sesión
+abierta no termina nunca. La consecuencia a tener presente es que una sesión de cincuenta comandos
+produce cincuenta decisiones, casi todas del mismo nivel; eso lo absorbe el panel agrupando, que es
+información que ya tiene.
 
-*Validation.* An answer that puts a file transfer at "informativo" is not a matter of judgement, it
-contradicts the record. The floor below turns that into a rejection instead of a decision nobody
-caught.
-
-*Measuring the engine.* Comparing what the engine decided against what it should have decided needs
-an *expected*, and with severity defined by observable evidence that label is computed from the
-events themselves — mechanically, with no second opinion to argue about. A scale that only a model
-could apply would leave nothing to compare against.
-
-SO WHAT IS THE MODEL FOR?
-A fair question, and the answer has to be stated rather than dodged: if the floor is mechanical, an
-`if` would do. The engine earns its place on four things the rule cannot produce.
-
-1. **The audit trail.** A justification in words, and the specific facts it rests on. The rule
-   outputs a label; a triage decision that cannot be read is not triage.
-2. **Escalation within declared bounds.** A `uname -a` and a `chmod +x` are both "ran a command" to
-   the rule. Whether this one deserves the level above is exactly the judgement being delegated —
-   bounded, so it stays a judgement and not a free hand.
-3. **MITRE attribution.** Which tactic the behaviour corresponds to.
-4. **The context the rule ignores.** Repeat offender, known command family, hosting-provider origin.
-   These are what the lookups in `tools.py` return, and this is what they are for.
-
-The bound is one level. See `MARGEN_DE_ESCALADA`.
-
-EL ALCANCE: QUÉ SE CLASIFICA, Y QUÉ NO
-
-**La unidad es el evento, no la sesión ni la dirección.** El bus entrega eventos, el consumidor
-deduplica por `doc_id` y el CU-03 describe presentar un evento con su estado de procesamiento. Poner
-la decisión en otra unidad obligaría al motor a esperar a que una sesión termine —y una sesión
-abierta no termina— o a reclasificar hacia atrás cada vez que llega algo nuevo.
-
-Tiene una consecuencia que conviene decir antes de que la descubra otro: **una sesión que corre
-cincuenta comandos produce cincuenta decisiones**, casi todas del mismo nivel. Quien absorbe eso es
-el panel, agrupando por sesión y por dirección, que es información que ya tiene. Agregar en el motor
-sería mover el problema al lado donde cuesta una llamada de inferencia por reagrupamiento.
-
-**Medido sobre los 52.165 mensajes que había en el bus al 25/08/2026**, el piso mecánico reparte
-así:
+Medido sobre los 52.165 mensajes que había en el bus al 25/08/2026, el piso mecánico reparte así:
 
     bajo       4.245   8,1 %
     medio     13.871  26,6 %
     alto      33.501  64,2 %
     critico      548   1,1 %
 
-El 1,1 % de crítico concuerda con lo que encontró el agrupamiento no supervisado por otro camino
-—1,5 % de las direcciones llegan a intrusión efectiva—, y esa coincidencia entre dos métodos
-independientes es la mejor señal de que la escala está bien puesta.
-
-Que el 64 % caiga en `alto` no es un defecto de la escala sino su consecuencia honesta: el filtro
-del bus ya selecciona eventos donde el atacante *hizo* algo. Sobre ese grupo el margen deja al motor
-una sola decisión —si esto además es crítico— que es exactamente la pregunta que vale la pena
-delegar.
+El 1,1 % de crítico coincide con lo que encontró el agrupamiento no supervisado por otro camino
+(1,5 % de las direcciones llegan a intrusión efectiva), y que dos métodos independientes den lo
+mismo es la mejor señal de que la escala está bien puesta. Que el 64 % caiga en `alto` no es un
+defecto: el filtro del bus ya selecciona eventos donde el atacante hizo algo.
 """
 
 from __future__ import annotations
@@ -76,7 +41,7 @@ from .consumer import EventoDelBus
 
 
 class Severidad(StrEnum):
-    """The five levels, ordered. `StrEnum` so it serialises as its own name and needs no mapping."""
+    """Los cinco niveles, en orden. `StrEnum` para que se serialice con su propio nombre."""
 
     INFORMATIVO = "informativo"
     BAJO = "bajo"
@@ -85,9 +50,9 @@ class Severidad(StrEnum):
     CRITICO = "critico"
 
 
-# El orden es la escala. Se declara explícito y no se deduce del orden de definición del enum:
-# comparar severidades por su posición acá es una operación del dominio, y dejarla atada a cómo
-# quedaron escritas las líneas de arriba la volvería frágil ante un reordenamiento inocente.
+# El orden es la escala, y se declara explícito en vez de deducirlo del orden de definición del
+# enum: comparar por posición es una operación del dominio, y atarla a cómo quedaron escritas las
+# líneas de arriba la vuelve frágil ante un reordenamiento inocente.
 ORDEN: list[Severidad] = [
     Severidad.INFORMATIVO,
     Severidad.BAJO,
@@ -96,17 +61,14 @@ ORDEN: list[Severidad] = [
     Severidad.CRITICO,
 ]
 
-# Cuántos niveles por encima del piso puede subir el motor con una justificación.
-#
-# Uno, y no dos ni ilimitado. Con margen amplio, un modelo que ante la duda exagera lleva todo a
-# crítico y la escala deja de ordenar nada —que es la forma habitual en que estas escalas mueren—.
-# Con margen cero no haría falta modelo. Uno deja que la diferencia entre `uname -a` y `chmod +x`
-# se note, y mantiene acotado cuánto puede desviarse de lo que el registro prueba.
+# Cuántos niveles por encima del piso puede subir el motor con una justificación. Uno: con margen
+# amplio, un modelo que ante la duda exagera lleva todo a crítico y la escala deja de ordenar nada,
+# que es como mueren estas escalas; con margen cero no haría falta modelo.
 MARGEN_DE_ESCALADA = 1
 
 
 class Criterio(NamedTuple):
-    """What establishes a level, in the two registers that matter: evidence and plain words."""
+    """Qué establece un nivel, en los dos registros que importan: la evidencia y cómo se explica."""
 
     nivel: Severidad
     #: Qué tiene que haber pasado, en términos de la telemetría.
@@ -155,12 +117,10 @@ CRITERIOS: dict[Severidad, Criterio] = {
 
 
 def piso_de(categoria: str, outcome: str = "") -> Severidad:
-    """The floor for a (category, outcome) pair, with no event object in hand.
+    """El piso para un par (categoría, resultado), sin necesidad de un objeto evento.
 
-    Es el primitivo real, y `piso` es la comodidad sobre él. Existe separado porque hay que ordenar
-    por severidad lo que devuelve una agregación de Elasticsearch —pares de categoría y resultado,
-    sin documentos—, y fabricar eventos falsos para poder preguntar metería una estructura de
-    mentira en el único lugar del motor que dice qué prueba el registro.
+    Es el primitivo, y `piso` es la comodidad sobre él. Va separado porque hay que ordenar por
+    severidad lo que devuelve una agregación de Elasticsearch, que trae pares sin documentos.
     """
     if categoria == "file":
         return Severidad.CRITICO
@@ -173,21 +133,20 @@ def piso_de(categoria: str, outcome: str = "") -> Severidad:
 
 
 def piso(evento: EventoDelBus) -> Severidad:
-    """The level the telemetry establishes on its own, with no interpretation involved.
+    """El nivel que la telemetría establece sola, sin interpretación de por medio.
 
-    Deliberately conservative: it answers "what does the record prove", not "how bad does this
-    look". Dionaea's credential attempts against MySQL and MSSQL land on `BAJO` and not higher
-    because that sensor cannot observe the outcome. Same reasoning the pipeline applies when it
-    infers results: an unknown is preferred over an unsupported success.
+    Conservador a propósito: contesta qué prueba el registro y no qué tan grave parece. Los intentos
+    de credenciales de Dionaea contra MySQL y MSSQL quedan en `BAJO` porque ese sensor no puede
+    observar el resultado, y mejor un desconocido que un éxito sin respaldo.
     """
     return piso_de(evento.category, evento.outcome)
 
 
 def maxima(niveles: Iterable[Severidad]) -> Severidad | None:
-    """The highest of several levels, or None when there are none.
+    """El mayor de varios niveles, o None si no hay ninguno.
 
-    Ordena por `ORDEN` y no por el nombre del miembro: `max()` sobre un `StrEnum` compara cadenas,
-    y alfabéticamente 'medio' le gana a 'critico'.
+    Ordena por `ORDEN` y no por el nombre del miembro. `max()` sobre un `StrEnum` compara cadenas, y
+    alfabéticamente 'medio' le gana a 'critico'.
     """
     encontrados = list(niveles)
     if not encontrados:
@@ -196,25 +155,24 @@ def maxima(niveles: Iterable[Severidad]) -> Severidad | None:
 
 
 def techo(evento: EventoDelBus) -> Severidad:
-    """The highest level the engine may assign to this event, floor plus the declared margin."""
     i = ORDEN.index(piso(evento))
     return ORDEN[min(i + MARGEN_DE_ESCALADA, len(ORDEN) - 1)]
 
 
 def dentro_de_limites(nivel: Severidad, evento: EventoDelBus) -> bool:
-    """Whether an assigned level is defensible for this event.
+    """Si un nivel asignado es defendible para este evento.
 
-    Below the floor is never defensible — that is contradicting the record, not judging it. Above
-    the ceiling is the inflation the margin exists to prevent.
+    Por debajo del piso nunca es defendible, porque eso contradice el registro en vez de juzgarlo.
+    Por encima del techo es la inflación que el margen existe para evitar.
     """
     return ORDEN.index(piso(evento)) <= ORDEN.index(nivel) <= ORDEN.index(techo(evento))
 
 
 def reproche(nivel: Severidad, evento: EventoDelBus) -> str | None:
-    """Why a level is out of bounds, phrased to be handed back to the provider.
+    """Por qué un nivel quedó fuera de límites, redactado para devolvérselo al proveedor.
 
-    Returns None when the level is fine. The text names the evidence rather than the rule, because
-    "the event records a file transfer" is correctable and "violates constraint 3" is not.
+    Devuelve None si el nivel está bien. El texto nombra la evidencia y no la regla, porque "el
+    evento documenta una transferencia de archivo" es corregible y "viola la restricción 3" no.
     """
     if dentro_de_limites(nivel, evento):
         return None
@@ -227,20 +185,15 @@ def reproche(nivel: Severidad, evento: EventoDelBus) -> str | None:
         )
     return (
         f"La severidad '{nivel}' supera en más de un nivel a lo que prueba el registro. El evento "
-        f"documenta {CRITERIOS[p].evidencia} —piso '{p}'—, y con justificación se admite hasta "
+        f"documenta {CRITERIOS[p].evidencia}, con piso '{p}'. Con justificación se admite hasta "
         f"'{t}'."
     )
 
 
-# Qué niveles puede producir hoy el motor por el camino real.
-#
-# El filtro del pipeline publica al bus autenticaciones exitosas, ejecución de comandos y
-# transferencia de archivos: el reconocimiento —el 82,6 % del volumen— no dispara ningún ciclo. Así
-# que `INFORMATIVO` está definido pero no llega por acá.
-#
-# No se lo saca de la escala por dos motivos: la campaña de validación adversaria va a generar
-# reconocimiento y su etiqueta esperada tiene que existir, y una escala que empieza en "ya probó
-# credenciales" no se puede leer sin explicar antes qué quedó afuera.
+# Qué niveles puede producir hoy el motor por el camino real. El filtro del pipeline publica al bus
+# autenticaciones exitosas, ejecución de comandos y transferencia de archivos, así que
+# `INFORMATIVO` está definido pero no llega por acá. No se lo saca de la escala porque la campaña de
+# validación adversaria va a generar reconocimiento y su etiqueta esperada tiene que existir.
 LLEGAN_POR_EL_BUS: set[Severidad] = {
     Severidad.BAJO,
     Severidad.MEDIO,
@@ -250,10 +203,10 @@ LLEGAN_POR_EL_BUS: set[Severidad] = {
 
 
 def para_el_proveedor() -> str:
-    """The scale as it is handed to the inference service, floors included.
+    """La escala tal como se le entrega al servicio de inferencia, con los pisos incluidos.
 
-    Built from `CRITERIOS` and not written out a second time by hand: two copies of a scale drift,
-    and the copy the model reads is the one that decides what comes back.
+    Se arma desde `CRITERIOS` en vez de escribirla a mano una segunda vez: dos copias se terminan
+    desincronizando, y la que lee el modelo es la que decide qué vuelve.
     """
     lineas = [
         "Escala de severidad. Cada nivel se establece por evidencia observable en la telemetría:",
@@ -266,8 +219,8 @@ def para_el_proveedor() -> str:
         "",
         "El nivel que la evidencia prueba es el mínimo, nunca una sugerencia: asignar por debajo",
         "contradice el registro. Con justificación explícita se admite subir hasta",
-        f"{MARGEN_DE_ESCALADA} nivel —por ejemplo, un comando de persistencia o de evasión",
-        "frente a uno de reconocimiento— y nunca más que eso.",
+        f"{MARGEN_DE_ESCALADA} nivel (por ejemplo, un comando de persistencia o de evasión",
+        "frente a uno de reconocimiento) y nunca más que eso.",
     ]
     return "\n".join(lineas)
 

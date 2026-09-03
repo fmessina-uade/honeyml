@@ -8,22 +8,12 @@
 Es una máquina de estados y no una cadena por una sola arista: la validación puede devolverle la
 respuesta al nodo de inferencia con el error adjunto. Todo lo demás es una línea recta.
 
-Hay dos formas de fallar y terminan distinto, que es la parte que más cuesta ver leyendo el código.
-
-Si el proveedor contestó pero nunca con la forma pedida, después de MAX_INTENTOS el ciclo deja de
-insistir y persiste una decisión no concluyente. El evento queda cerrado: el proveedor está vivo y
-reintentar mañana no le va a cambiar la gramática. Dejarlo pendiente gastaría una llamada paga por
-cada reentrega, para siempre.
-
-Si el proveedor no se pudo alcanzar, el nodo levanta, la excepción sale del grafo y el consumidor
-no confirma, así que otro consumidor lo reclama más tarde. No se persiste nada porque no se decidió
-nada.
-
-Confundir las dos es fácil: una caída es temporal y merece reintento, un modelo que no puede seguir
-un esquema no lo es.
-
-Los nodos se inyectan (ver `construir_grafo`). Eso permitió construir y probar la topología antes
-de que existieran, y que cada nodo entre después sin tocar la forma del grafo.
+La parte que más cuesta ver leyendo el código es que hay dos formas de fallar y terminan distinto.
+Si el proveedor contestó pero nunca con la forma pedida, después de MAX_INTENTOS se persiste una
+decisión no concluyente y el evento queda cerrado: el proveedor está vivo y reintentar mañana no le
+va a cambiar la gramática. Si en cambio no se lo pudo alcanzar, el nodo levanta, la excepción sale
+del grafo y el consumidor no confirma, así que otro lo reclama más tarde y no se persiste nada.
+Confundirlas es fácil, pero una caída es temporal y un modelo que no puede seguir un esquema no.
 """
 
 from __future__ import annotations
@@ -39,10 +29,8 @@ from .nodes import inferencia as nodo_inferencia
 from .severidad import dentro_de_limites
 from .state import MAX_INTENTOS, EstadoTriaje, MotivoDeCorte
 
-# Un nodo devuelve el estado parcial que tocó, no un diccionario cualquiera. `EstadoTriaje` es
-# `total=False`, así que ese tipo ya dice eso: cualquier subconjunto de las claves del estado y
-# ninguna otra. Escribirlo como `dict[str, Any]` aceptaba claves inventadas que LangGraph después
-# descarta en silencio.
+# Un nodo devuelve el estado parcial que tocó, no un diccionario cualquiera: con `dict[str, Any]`
+# entraban claves inventadas que LangGraph después descarta en silencio.
 Nodo = Callable[[EstadoTriaje], EstadoTriaje]
 
 CONTEXTO = "contexto"
@@ -51,8 +39,8 @@ INFERENCIA = "inferencia"
 VALIDACION = "validacion"
 PERSISTENCIA = "persistencia"
 
-# Qué hace cada nodo, en una línea. Está acá y no solo en el módulo de cada uno porque es lo que
-# vuelve accionable el error cuando falta una implementación: el mensaje dice qué falta escribir.
+# Qué hace cada nodo, en una línea. Está acá porque es lo que vuelve accionable el error cuando
+# falta una implementación: el mensaje dice qué falta escribir.
 RESPONSABILIDAD: dict[str, str] = {
     CONTEXTO: "arma el contexto del evento a partir de las consultas de solo lectura",
     HISTORIAL: "agrega la trayectoria de la dirección y la correlación de ráfaga",
@@ -63,21 +51,18 @@ RESPONSABILIDAD: dict[str, str] = {
 
 ORDEN = [CONTEXTO, HISTORIAL, INFERENCIA, VALIDACION, PERSISTENCIA]
 
-# Techo de pasos de una corrida, derivado de la topología y no elegido a ojo.
-#
-# El camino más largo legítimo es contexto, historial, un par (inferencia, validación) por intento,
-# y persistencia. Con el margen de una vuelta, cualquier corrida que lo supere está en un bucle que
-# el diseño no contempla. Conviene que muera rápido y con un número que se pueda relacionar con
-# esta línea, en vez del 10.007 por defecto de LangGraph, que no le dice nada a nadie.
+# Techo de pasos, derivado de la topología y no elegido a ojo: contexto, historial, un par
+# (inferencia, validación) por intento, persistencia, y una vuelta de margen. Cualquier corrida que
+# lo supere está en un bucle que el diseño no contempla, y conviene que muera rápido con un número
+# que se pueda relacionar con esta línea, en vez del 10.007 por defecto de LangGraph.
 LIMITE_DE_PASOS = 2 + 2 * (MAX_INTENTOS + 2) + 1
 
 
 def _pendiente(nombre: str) -> Nodo:
     """Marcador para un nodo que todavía no está escrito.
 
-    Falla cuando el grafo corre, no cuando se importa, así la topología se puede inspeccionar y
-    probar con el motor a medio hacer. El mensaje dice qué haría el nodo que falta, para que se lea
-    como "esto no está construido" y no como un error.
+    Falla cuando el grafo corre y no cuando se importa, así la topología se puede inspeccionar y
+    probar con el motor a medio hacer.
     """
 
     def nodo(_: EstadoTriaje) -> EstadoTriaje:
@@ -102,10 +87,9 @@ def nodos_disponibles() -> dict[str, Nodo]:
 def ruta_tras_contexto(estado: EstadoTriaje) -> str:
     """Salta directo a persistencia cuando no había nada sobre lo que razonar.
 
-    Un evento sin dirección de origen no tiene con qué correlacionarse: ni historial, ni origen, ni
-    sesión. Mandarlo por el camino completo gastaría una llamada de inferencia para que nos digan lo
-    que la ausencia del campo ya dice. Igual se persiste, marcado como no concluyente, así el evento
-    no desaparece entre que llega y que se clasifica.
+    Un evento sin dirección de origen no tiene con qué correlacionarse, y mandarlo por el camino
+    completo gastaría una llamada de inferencia para que nos digan lo que la ausencia del campo ya
+    dice. Igual se persiste, marcado como no concluyente, así no desaparece.
     """
     return PERSISTENCIA if estado.get("motivo_de_corte") else HISTORIAL
 
@@ -113,14 +97,11 @@ def ruta_tras_contexto(estado: EstadoTriaje) -> str:
 def intentos_gastados(estado: EstadoTriaje) -> int:
     """Cuántos intentos gastó ya este ciclo.
 
-    Devuelve el máximo entre el contador y los reproches acumulados, no solo el contador. Quien
-    incrementa `intentos` es el nodo de inferencia, y si algún día deja de hacerlo el ciclo no
-    termina: con la validación rechazando y el contador quieto, el bucle da diez mil vueltas antes
-    de que LangGraph lo corte por recursión. Son diez mil llamadas pagas sobre un solo evento.
-
-    Como la validación no puede rechazar sin dejar un reproche (es lo que se le devuelve al
-    proveedor para que corrija), contar reproches llega al mismo número por otro camino. Con eso,
-    olvidarse del contador deja de ser catastrófico.
+    El máximo entre el contador y los reproches acumulados, no solo el contador. Quien incrementa
+    `intentos` es el nodo de inferencia, y si algún día deja de hacerlo, con la validación
+    rechazando y el contador quieto el bucle da diez mil vueltas pagas antes de que LangGraph lo
+    corte. Como la validación no puede rechazar sin dejar un reproche, contarlos llega al mismo
+    número por otro camino.
     """
     return max(int(estado.get("intentos", 0)), len(estado.get("reproches", [])))
 
@@ -128,12 +109,9 @@ def intentos_gastados(estado: EstadoTriaje) -> int:
 def decision_utilizable(estado: EstadoTriaje) -> bool:
     """Si la decisión se puede guardar como la respuesta del motor.
 
-    Son dos condiciones, no una: que exista, y que sea defendible para este evento. La escala de
-    `severidad.py` está anclada a la evidencia justamente para que un nivel por debajo del piso (un
-    `informativo` sobre un evento que documenta una transferencia de archivo) sea una contradicción
-    con el registro y no una diferencia de criterio.
-
-    Comprobar solo la existencia deja pasar esa contradicción sin que nada la mire.
+    Son dos condiciones y no una: que exista, y que sea defendible para este evento. Comprobar solo
+    la existencia deja pasar un `informativo` sobre una transferencia de archivo, que contradice el
+    registro en vez de ser una diferencia de criterio.
     """
     decision = estado.get("decision")
     if decision is None:
@@ -149,18 +127,16 @@ def decision_utilizable(estado: EstadoTriaje) -> bool:
 def ruta_tras_validar(estado: EstadoTriaje) -> str:
     """A dónde va el ciclo después de que la validación dijo lo suyo.
 
-    Las dos ramas que no reintentan van a persistencia a propósito. Una decisión que no se pudo
-    validar igual se guarda, marcada como no concluyente, porque la alternativa es un evento que
-    desaparece entre "llegó" y "clasificado" sin dejar rastro. Así el panel lo puede mostrar como
-    pendiente, que es lo que describe el CU-03, en vez de simplemente no listarlo.
+    Las dos ramas que no reintentan van a persistencia a propósito: una decisión que no se pudo
+    validar igual se guarda, marcada como no concluyente, así el panel la puede mostrar como
+    pendiente (CU-03) en vez de que el evento desaparezca sin dejar rastro.
     """
     if decision_utilizable(estado):
         return PERSISTENCIA
 
-    # Reintentar sin un reproche es repetir la misma llamada. El proveedor no recibiría nada que
-    # corregir y devolvería lo mismo, así que el ciclo se corta acá en vez de gastar tres llamadas
-    # idénticas. Cierra además el único camino por el que el bucle podía no terminar: una validación
-    # que devuelve una decisión inutilizable y no deja reproche no mueve ningún contador.
+    # Reintentar sin un reproche es repetir la misma llamada: el proveedor no recibiría nada que
+    # corregir. Cierra además el único camino por el que el bucle podía no terminar, porque una
+    # validación que rechaza sin dejar reproche no mueve ningún contador.
     if not estado.get("reproches"):
         return PERSISTENCIA
 
@@ -172,12 +148,8 @@ def ruta_tras_validar(estado: EstadoTriaje) -> str:
 def resultado_del_ciclo(estado: EstadoTriaje) -> MotivoDeCorte | None:
     """Por qué termina este ciclo. `None` significa que terminó con una decisión que vale guardar.
 
-    Lo usa el nodo de persistencia para saber qué está guardando. Vive acá y no allá porque es la
-    contracara de `ruta_tras_validar`: las dos leen el mismo estado para responder la misma
-    pregunta, y separarlas dejaría que una diga "andá a persistir" y la otra no sepa por qué.
-
-    Sin esto, con los intentos agotados el ciclo llega a persistencia sin decisión y sin motivo, y
-    el nodo no puede distinguir un esquema irrecuperable de cualquier otra cosa que haya salido mal.
+    Vive acá y no en persistencia porque es la contracara de `ruta_tras_validar`: separarlas dejaría
+    que una diga "andá a persistir" y la otra no sepa por qué.
     """
     declarado = estado.get("motivo_de_corte")
     if declarado:

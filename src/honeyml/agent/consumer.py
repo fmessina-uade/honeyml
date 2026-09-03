@@ -1,34 +1,30 @@
-"""Event bus consumption (Redis Streams) with a consumer group.
+"""Frontera de entrada del motor: lee el bus con un grupo de consumidores y entrega los eventos.
 
-This is the engine's ingestion boundary. Everything downstream — context building, retrieval,
-inference, validation, persistence — receives events from here and never talks to the bus itself.
+Todo lo que viene después (contexto, recuperación, inferencia, validación, persistencia) recibe
+eventos de acá y nunca habla con el bus.
 
-Why a consumer group and not a plain read:
+El contrato del manejador es una sola regla: si levanta una excepción el evento no se confirma y
+vuelve, y si retorna, la decisión es durable y se confirma. Nada más. Eso permitió que los nodos del
+grafo se enchufaran después sin tocar una línea de este módulo.
 
-- **Explicit acknowledgement.** An event is only settled once the handler finished. A consumer that
-  dies mid-decision leaves it pending, not lost.
-- **Reclaiming orphans.** Whatever stays pending past an idle threshold is taken over by another
-  consumer. This is what makes the engine survivable rather than merely restartable.
-- **Horizontal split.** Several consumers in the same group divide the stream without coordination,
-  which is the growth path if one instance stops keeping up.
+Hay cuatro problemas resueltos a propósito, y los cuatro son silenciosos si no se los atiende.
 
-Delivery is *at least once*, by design and not by accident: on the bus side, a Logstash restart
-replays whatever was between checkpoints. Measured on the real corpus: 52.165 messages carried
-52.156 distinct document ids. So the consumer deduplicates by `doc_id` — the same identifier
-Elasticsearch uses — and skipping is decided *before* the handler runs but recorded *after* it
-succeeds, so a failure never marks work as done.
+Los repetidos: el bus entrega al menos una vez por diseño, así que se deduplica por `doc_id`, que es
+el mismo identificador del índice, y la marca se escribe después de que el manejador tuvo éxito y
+nunca antes. Un fallo no puede marcar trabajo como hecho.
 
-Two failure modes are handled explicitly because both are silent otherwise:
+El consumidor caído: lo que queda pendiente más allá de un umbral de inactividad lo toma otro con
+`XCLAIM`. Es lo que separa "el motor reinicia" de "el motor no pierde nada".
 
-- **Poison message.** An event that always fails would be reclaimed forever, blocking the group's
-  progress and burning inference budget on every round. After a delivery ceiling it is moved to a
-  dead-letter stream and acknowledged, so the queue advances and the event stays inspectable.
-- **Handler failure.** Not acknowledged, so it stays pending for a later reclaim. The event is never
-  dropped just because one attempt failed.
+El evento venenoso: uno que siempre falla se reclamaría para siempre, frenando al grupo y gastando
+una llamada de inferencia por vuelta. Pasado un techo de entregas va a un stream de descartados y se
+confirma, así la cola avanza y el evento queda inspeccionable.
 
-Usage:
-    python -m honeyml.agent.consumer --limite 20        # take 20 events and exit
-    python -m honeyml.agent.consumer                     # follow the stream until interrupted
+Y el corte a mitad de decisión: `SIGTERM` y `SIGINT` terminan el lote en curso en lugar de cortar.
+No es pérdida, porque lo no confirmado se reclama, pero evita desperdiciar una llamada paga.
+
+Se usa `XPENDING` y no `XAUTOCLAIM` para reclamar, porque solo el primero informa cuántas veces se
+entregó cada mensaje, que es lo que distingue un evento lento de uno venenoso.
 """
 
 from __future__ import annotations
@@ -45,54 +41,55 @@ from typing import Any, cast
 
 import redis
 
-# Defaults match infra/redis/docker-compose.yml: the bus is bound to loopback and never reachable
-# from outside the analysis zone (RNF-03).
+# Los valores por defecto coinciden con infra/redis/docker-compose.yml: el bus escucha solo en
+# loopback y no se alcanza desde afuera de la zona de análisis (RNF-03).
 HOST = os.getenv("BUS_HOST", "127.0.0.1")
 PORT = int(os.getenv("BUS_PORT", "6379"))
 STREAM = os.getenv("BUS_STREAM", "honeyml:events")
 GROUP = os.getenv("BUS_GROUP", "triaje")
 
-# A message that failed this many deliveries is treated as poison and set aside.
+# Un mensaje que falló esta cantidad de entregas se considera venenoso y se aparta.
 MAX_ENTREGAS = int(os.getenv("BUS_MAX_ENTREGAS", "3"))
 STREAM_MUERTOS = os.getenv("BUS_STREAM_MUERTOS", "honeyml:events:muertos")
 
-# How long a pending message must sit untouched before another consumer may take it over. Long
-# enough that a slow decision isn't stolen mid-flight, short enough that a crash isn't parked
-# for an hour.
+# Cuánto tiene que quedarse quieto un mensaje pendiente antes de que otro consumidor lo pueda
+# tomar. Lo bastante largo para no robarle el evento a una decisión lenta, lo bastante corto para
+# que una caída no quede estacionada una hora.
 INACTIVIDAD_MS = int(os.getenv("BUS_INACTIVIDAD_MS", "60000"))
 
-# Dedup marks. One key per document, so each expires on its own schedule instead of the whole set
-# dropping at once. A day covers the replay window by a wide margin — duplicates arrive within
-# minutes of a restart, never a day later.
+# Marcas de deduplicación. Una clave por documento, así cada una vence por su cuenta en lugar de
+# caerse todo el conjunto junto. Un día sobra para la ventana de reenvío: los duplicados llegan a
+# los minutos de un reinicio, nunca un día después.
 PREFIJO_VISTO = "honeyml:visto:"
 TTL_VISTO = int(os.getenv("BUS_TTL_VISTO", "86400"))
 
 
-# One message as Redis hands it over with decode_responses on: the entry id and its flat field map.
+# Un mensaje tal como lo entrega Redis con decode_responses activo: el id de entrada y sus campos.
 Mensaje = tuple[str, dict[str, str]]
 
 
 def _mensajes(respuesta: Any) -> list[Mensaje]:
-    """Narrow a Redis stream response to the shape the protocol actually guarantees.
+    """Reduce la respuesta de un stream de Redis a la forma que el protocolo sí garantiza.
 
-    redis-py annotates these commands with wide unions (`bytes | str`, nested optionals) because
-    the real shape depends on the command and on whether `decode_responses` is on. The client here
-    is built with it on, so every value comes back as `str` — but that is a runtime fact the type
-    checker cannot see.
+    redis-py anota estos comandos con uniones anchas (`bytes | str`, opcionales anidados) porque la
+    forma real depende del comando y de si `decode_responses` está activo. Acá el cliente se
+    construye con esa opción prendida, así que todo vuelve como `str`, pero eso es un hecho de
+    ejecución que el verificador de tipos no puede ver.
 
-    The whole untyped boundary is concentrated in this one function on purpose. The alternative is
-    scattering suppressions over every call site, which silences the checker in the places where a
-    genuine mistake would show up.
+    Toda la frontera sin tipar queda concentrada en esta única función a propósito. La alternativa
+    es repartir supresiones por cada llamada, que es justamente apagar el verificador en los
+    lugares donde un error de verdad se notaría.
     """
     return cast("list[Mensaje]", respuesta or [])
 
 
 @dataclass
 class EventoDelBus:
-    """One message as the engine sees it.
+    """Un mensaje como lo ve el motor.
 
-    `entry_id` is the bus coordinate, needed to acknowledge. `doc_id` is the document identity in
-    the index, which is what the rest of the engine reasons about and what deduplication uses.
+    `entry_id` es la coordenada en el bus, la que hace falta para confirmar. `doc_id` es la
+    identidad del documento en el índice, que es sobre lo que razona el resto del motor y lo que
+    usa la deduplicación.
     """
 
     entry_id: str
@@ -132,7 +129,7 @@ class EventoDelBus:
         )
 
     def resumen(self) -> str:
-        """One line, for logs. Deliberately short: the full event lives in the index."""
+        """Una línea para los registros. El evento entero vive en el índice."""
         que = self.command or self.user or self.action
         return f"{self.honeypot}/{self.category} {self.source_ip} {self.protocol} · {que[:60]}"
 
@@ -147,21 +144,21 @@ class Contadores:
 
     @property
     def atendidos(self) -> int:
-        """Events the loop actually took a decision about, whichever way it went.
+        """Eventos sobre los que el ciclo tomó una decisión, haya salido como haya salido.
 
-        `reclamados` is excluded on purpose: reclaiming is picking an event up, not resolving it.
-        Every reclaimed event lands in one of the other four counters afterwards, so adding it here
-        would count the same work twice.
+        `reclamados` queda afuera a propósito: reclamar es levantar un evento, no resolverlo. Todo
+        evento reclamado termina cayendo en alguno de los otros cuatro contadores, así que sumarlo
+        acá contaría el mismo trabajo dos veces.
         """
         return self.procesados + self.repetidos + self.fallados + self.descartados
 
 
 class ConsumidorDelBus:
-    """Reads the stream as part of a consumer group and hands events to a handler.
+    """Lee el stream como parte de un grupo de consumidores y le pasa los eventos a un manejador.
 
-    The handler raises on failure. That is the whole contract: raising means "not settled", so the
-    message stays pending and someone will take it again. Returning means the decision is durable
-    and the message can be acknowledged.
+    El manejador levanta una excepción cuando falla. Ese es todo el contrato: levantar significa
+    "no resuelto", así que el mensaje queda pendiente y alguien lo va a volver a tomar. Retornar
+    significa que la decisión ya es durable y el mensaje se puede confirmar.
     """
 
     def __init__(
@@ -182,13 +179,13 @@ class ConsumidorDelBus:
         self.manejador = manejador
         self.stream = stream
         self.grupo = grupo
-        # Derived from the stream when not given, so a throwaway stream gets a throwaway
-        # dead-letter and a test can never write into the production one.
+        # Si no lo pasan, se deriva del stream: un stream descartable se lleva su propia cola de
+        # muertos y una prueba nunca puede escribir en la de producción.
         self.stream_muertos = stream_muertos or (
             STREAM_MUERTOS if stream == STREAM else f"{stream}:muertos"
         )
-        # Identifies this consumer inside the group. Host and pid so that two instances on the same
-        # machine don't collide and a stuck one can be traced back to a process.
+        # Identifica a este consumidor dentro del grupo. Equipo y pid, así dos instancias en la
+        # misma máquina no chocan y una colgada se puede rastrear hasta un proceso.
         self.nombre = nombre or f"{socket.gethostname()}-{os.getpid()}"
         self.lote = lote
         self.bloqueo_ms = bloqueo_ms
@@ -204,11 +201,11 @@ class ConsumidorDelBus:
     # ---------------------------------------------------------------- ciclo de vida
 
     def asegurar_grupo(self, desde_ahora: bool = False) -> None:
-        """Create the group if missing. Idempotent, so it is safe on every start.
+        """Crea el grupo si no está. Es idempotente, así que se puede llamar en cada arranque.
 
-        `desde_ahora` decides what a brand-new group sees: only what arrives from now on, or the
-        whole backlog. The default is the backlog, because on this system the accumulated events
-        are precisely the ones waiting to be triaged.
+        `desde_ahora` decide qué ve un grupo recién creado: solo lo que llegue de ahora en más, o
+        todo lo acumulado. Por defecto, lo acumulado, porque en este sistema esos eventos viejos
+        son justamente los que están esperando el triaje.
         """
         inicio = "$" if desde_ahora else "0"
         try:
@@ -220,10 +217,10 @@ class ConsumidorDelBus:
             print(f"  grupo '{self.grupo}' ya existía")
 
     def escuchar_senales(self) -> None:
-        """SIGTERM/SIGINT stop the loop after the current batch instead of cutting mid-decision.
+        """SIGTERM/SIGINT cortan el ciclo al terminar el lote, no en medio de una decisión.
 
-        An abrupt stop is not a data loss here — unacknowledged events are reclaimed — but it does
-        waste an inference call, and those cost money.
+        Un corte abrupto no pierde datos, porque lo no confirmado se reclama, pero sí desperdicia
+        una llamada de inferencia, y esas cuestan plata.
         """
 
         def parar(signum: int, _frame: Any) -> None:
@@ -244,7 +241,7 @@ class ConsumidorDelBus:
             self.r.set(PREFIJO_VISTO + doc_id, "1", ex=TTL_VISTO)
 
     def _a_muertos(self, evento: EventoDelBus, motivo: str) -> None:
-        """Set aside a message that cannot be processed, and settle it so the group advances."""
+        """Aparta un mensaje que no se puede procesar y lo resuelve, para que el grupo avance."""
         # dict[Any, Any] y no dict[str, str] por la invarianza de los diccionarios: xadd declara
         # claves y valores como una unión ancha, y un dict[str, str] no es subtipo de eso aunque
         # cada valor sí lo sea. No hay incompatibilidad real, solo una regla del sistema de tipos.
@@ -258,25 +255,25 @@ class ConsumidorDelBus:
         print(f"  ✗ descartado tras {evento.entregas} entregas: {evento.resumen()}")
 
     def procesar(self, evento: EventoDelBus) -> None:
-        """Run one event through the handler and settle it according to the outcome."""
+        """Pasa un evento por el manejador y lo resuelve según cómo haya salido."""
         if self._ya_procesado(evento.doc_id):
-            # Already decided in a previous delivery. Acknowledging is the right move: the work is
-            # done, and leaving it pending would make it come back forever.
+            # Ya se decidió en una entrega anterior. Confirmarlo es lo correcto: el trabajo está
+            # hecho, y dejarlo pendiente haría que vuelva para siempre.
             self.r.xack(self.stream, self.grupo, evento.entry_id)
             self.contadores.repetidos += 1
             return
 
         try:
             self.manejador(evento)
-        except Exception as exc:  # noqa: BLE001 - the handler's failure must not stop the loop
+        except Exception as exc:  # noqa: BLE001 - que falle el manejador no puede cortar el ciclo
             self.contadores.fallados += 1
             print(f"  ! falló ({type(exc).__name__}: {exc}): {evento.resumen()}")
-            # Deliberately not acknowledged: it stays pending and will be reclaimed.
+            # A propósito no se confirma: queda pendiente y después se reclama.
             return
 
-        # Order matters: mark first, acknowledge second. If the process dies in between, the event
-        # comes back and is skipped as already processed. The reverse order could settle an event
-        # whose completion was never recorded.
+        # El orden importa: primero marcar, después confirmar. Si el proceso muere en el medio, el
+        # evento vuelve y se saltea por estar ya procesado. Al revés se podría dar por resuelto un
+        # evento cuya finalización nunca quedó anotada.
         self._marcar_procesado(evento.doc_id)
         self.r.xack(self.stream, self.grupo, evento.entry_id)
         self.contadores.procesados += 1
@@ -284,10 +281,10 @@ class ConsumidorDelBus:
     # ---------------------------------------------------------------- lectura
 
     def reclamar_huerfanos(self) -> list[EventoDelBus]:
-        """Take over messages left pending by a consumer that is no longer answering.
+        """Toma los mensajes que dejó pendientes un consumidor que ya no responde.
 
-        Uses XPENDING and not XAUTOCLAIM because only the former reports the delivery count, which
-        is what tells a slow event apart from a poisonous one.
+        Usa XPENDING y no XAUTOCLAIM porque solo el primero informa la cantidad de entregas, que es
+        lo que distingue un evento lento de uno venenoso.
         """
         pendientes: Any = self.r.xpending_range(
             self.stream, self.grupo, min="-", max="+", count=self.lote, idle=self.inactividad_ms
@@ -327,23 +324,23 @@ class ConsumidorDelBus:
         return rescatados
 
     def leer_nuevos(self) -> list[EventoDelBus]:
-        """Read messages never delivered to this group. Blocks so the loop doesn't spin."""
+        """Lee mensajes nunca entregados al grupo. Bloquea para que el ciclo no gire en falso."""
         respuesta: Any = self.r.xreadgroup(
             self.grupo, self.nombre, {self.stream: ">"}, count=self.lote, block=self.bloqueo_ms
         )
         if not respuesta:
             return []
-        # One entry per stream read; only one is ever requested, so the first is the one.
+        # Una entrada por stream leído; siempre se pide uno solo, así que la primera es esa.
         _, crudo = respuesta[0]
         return [EventoDelBus.desde_mensaje(eid, campos) for eid, campos in _mensajes(crudo)]
 
     def correr(self, limite: int | None = None, desde_ahora: bool = False) -> Contadores:
-        """Main loop. With `limite` it attends to that many and returns; otherwise it follows.
+        """Ciclo principal. Con `limite` atiende esa cantidad y vuelve; si no, se queda escuchando.
 
-        `limite` bounds *attempts*, not successes. Counting only successes would make a bounded run
-        with a failing handler spin: the failed event goes back to pending, gets reclaimed, fails
-        again, and the counter never moves. A run asked for twenty events has to end after twenty
-        events regardless of how they turned out.
+        `limite` acota los intentos, no los éxitos. Contar solo los éxitos haría que una corrida
+        acotada con un manejador que falla gire para siempre: el evento fallado vuelve a pendiente,
+        se reclama, falla de nuevo, y el contador no se mueve nunca. Una corrida a la que se le
+        pidieron veinte eventos tiene que terminar a los veinte, hayan salido como hayan salido.
         """
         self.asegurar_grupo(desde_ahora=desde_ahora)
         self.escuchar_senales()
@@ -352,8 +349,8 @@ class ConsumidorDelBus:
         ultimo_reclamo = 0.0
         vacios = 0
         while not self._parar:
-            # Reclaiming is checked on a slower cadence than reading: it is a recovery path, not the
-            # normal one, and XPENDING on every iteration would be pure overhead.
+            # El reclamo se revisa con menos frecuencia que la lectura: es un camino de
+            # recuperación y no el normal, y un XPENDING por iteración sería puro costo.
             ahora = time.monotonic()
             eventos: list[EventoDelBus] = []
             if ahora - ultimo_reclamo >= self.inactividad_ms / 1000:
@@ -367,8 +364,8 @@ class ConsumidorDelBus:
 
             if not eventos:
                 vacios += 1
-                # In bounded mode an empty read means the backlog is drained; there is nothing to
-                # wait for. Following mode keeps blocking, which is the point.
+                # En modo acotado, una lectura vacía significa que ya no queda atraso y no hay
+                # nada que esperar. En modo seguimiento se sigue bloqueando, que es la gracia.
                 if limite is not None and vacios >= 2:
                     break
                 continue
@@ -384,11 +381,11 @@ class ConsumidorDelBus:
 
 
 def manejador_de_registro(evento: EventoDelBus) -> None:
-    """Default handler: prints the event and settles it.
+    """Manejador por defecto: imprime el evento y lo da por resuelto.
 
-    A placeholder with a purpose — it exercises the whole acknowledgement cycle without an
-    inference provider, so the consumer can be verified on its own. Rows 81-86 replace it with the
-    graph, and nothing else in this module changes.
+    Es un relleno con una razón de ser: ejercita el ciclo de confirmación completo sin depender de
+    un proveedor de inferencia, así el consumidor se puede verificar solo. El grafo de triaje lo
+    reemplaza sin que cambie nada más de este módulo.
     """
     print(f"  · {evento.resumen()}")
 

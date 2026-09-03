@@ -6,7 +6,7 @@ import { n } from '../lib/format';
 
 type Result = { found: boolean; count: number } | null;
 
-/** SHA-256 of the typed text, hex, computed in the browser. */
+/** SHA-256 del texto tipeado, en hexadecimal, calculado en el navegador. */
 async function sha256Hex(text: string): Promise<string> {
   const bytes = new TextEncoder().encode(text);
   const digest = await crypto.subtle.digest('SHA-256', bytes);
@@ -14,12 +14,12 @@ async function sha256Hex(text: string): Promise<string> {
 }
 
 /**
- * Lets a visitor check their own password against the captured ones — without sending it.
+ * Deja que un visitante compare su propia contraseña con las capturadas, sin mandarla.
  *
- * The browser hashes locally and asks only for the first five characters of the digest; the
- * service answers with every captured hash sharing that prefix and the comparison finishes here.
- * In a panel about credential attacks, a form that transmitted the password would contradict
- * everything the panel argues, so the mechanism is shown rather than hidden.
+ * El navegador hashea localmente y pide solo los primeros cinco caracteres del resumen; el servicio
+ * contesta con todos los hashes capturados que comparten ese prefijo y la comparación termina acá.
+ * En un panel sobre ataques a credenciales, un formulario que transmitiera la contraseña
+ * contradiría todo lo que el panel argumenta, así que el mecanismo se muestra en vez de esconderse.
  */
 export default function PasswordCheck() {
   const { t } = useI18n();

@@ -1,21 +1,21 @@
-"""Compare candidate classifiers on the reference dataset, under identical conditions.
+"""Compara clasificadores candidatos sobre el conjunto de referencia, en igualdad de condiciones.
 
-The project already reports metrics for one model. This module answers the question that leaves
-open: was that the right choice? It trains several families on the same split, with the same
-preprocessing, and ranks them by the metric that actually matters here.
+El proyecto ya informa métricas de un modelo. Este módulo responde la pregunta que eso deja
+abierta: ¿era esa la elección correcta? Entrena varias familias sobre la misma partición, con el
+mismo preprocesamiento, y las ordena por la métrica que acá realmente importa.
 
-That metric is the macro average of the F1 score, not accuracy. Two of the six classes hold 96 %
-of the observations, so accuracy rewards a classifier that ignores the rest. The macro average
-weighs every class equally, which is what a security use case needs: the rare tactic is the one
-worth detecting.
+Esa métrica es el promedio macro del F1, no la exactitud. Dos de las seis clases se llevan el 96 %
+de las observaciones, así que la exactitud premia a un clasificador que ignore al resto. El promedio
+macro pesa todas las clases igual, que es lo que necesita un caso de uso de seguridad: la táctica
+rara es justamente la que vale la pena detectar.
 
-The comparison pays particular attention to the weakest class, exfiltration, whose F1 sat at 0,11
-with the baseline. A candidate that lifts it matters more than one that shaves a decimal off the
-aggregate.
+La comparación mira con particular atención la clase más débil, exfiltración, cuyo F1 quedaba en
+0,11 con la configuración de partida. Un candidato que la levante importa más que uno que le rasque
+una décima al agregado.
 
-Usage:
+Uso:
     python -m honeyml.features.uwf_comparison
-    python -m honeyml.features.uwf_comparison --rapido    # subsample, for iterating
+    python -m honeyml.features.uwf_comparison --rapido    # submuestreado, para iterar
 """
 
 from __future__ import annotations
@@ -45,13 +45,13 @@ from ..eda.uwf_loader import features_target, load_uwf
 from .uwf_selection import CATEGORICAL, NUMERIC
 
 OUT_FILE = Path("data/processed/uwf_comparison.json")
-# the class the baseline handles worst; tracked separately because the aggregate hides it
+# la clase que peor maneja la configuración de partida; va aparte porque el agregado la tapa
 WEAK_CLASS = "Exfiltration"
 RANDOM_STATE = 42
 
 
 def _preprocessor(scale: bool) -> ColumnTransformer:
-    """Shared preprocessing. Only the linear model needs its features scaled."""
+    """El preprocesamiento común. Solo el modelo lineal necesita las características escaladas."""
     numeric: list[Any] = [SimpleImputer(strategy="constant", fill_value=0)]
     if scale:
         numeric.append(StandardScaler())
@@ -65,10 +65,10 @@ def _preprocessor(scale: bool) -> ColumnTransformer:
 
 
 def candidates() -> dict[str, tuple[BaseEstimator, bool]]:
-    """Each candidate with whether it needs scaled features.
+    """Cada candidato, y si necesita o no las características escaladas.
 
-    Every one that supports it carries class balancing, so the comparison isolates the effect of
-    the model family rather than re-measuring the imbalance.
+    Todos los que lo admiten llevan balanceo de clases, así la comparación aísla el efecto de la
+    familia del modelo en vez de volver a medir el desbalance.
     """
     return {
         "bosque_aleatorio": (
@@ -146,11 +146,11 @@ def evaluate(
 
 
 def cargar_y_partir() -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
-    """Load the reference dataset and split it, always the same way.
+    """Carga el conjunto de referencia y lo parte, siempre de la misma forma.
 
-    Extracted so that hyperparameter tuning trains and measures on exactly the same partition as
-    this comparison. If each module built its own split, an apparent improvement could just be an
-    easier test set, and there would be no way to tell the difference from the numbers.
+    Se extrajo acá para que el ajuste de hiperparámetros entrene y mida sobre exactamente la misma
+    partición que esta comparación. Si cada módulo armara la suya, una mejora aparente podría ser
+    nada más una partición de prueba más fácil, y desde los números no habría manera de notarlo.
     """
     df = load_uwf()
     x, y = features_target(df)
@@ -160,8 +160,8 @@ def cargar_y_partir() -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]
             x[c] = x[c].astype(int)
 
     # train_test_split no está tipada: devuelve una lista sin anotar. El cast declara la forma que
-    # el llamador puede confiar —cuatro objetos, en el orden entrenamiento/prueba de x y después de
-    # y— en lugar de dejar que se propague un Any por todo el módulo de ajuste.
+    # el llamador puede confiar (cuatro objetos, en el orden entrenamiento/prueba de x y después de
+    # y) en lugar de dejar que se propague un Any por todo el módulo de ajuste.
     partes = train_test_split(x, y, test_size=0.25, stratify=y, random_state=RANDOM_STATE)
     return cast("tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]", tuple(partes))
 
@@ -180,7 +180,7 @@ def main() -> None:
     y = pd.concat([y_tr, y_te])
 
     if args.rapido:
-        # stratified subsample so every class survives, including the rare ones
+        # submuestreo estratificado, así sobreviven todas las clases, incluidas las raras
         x_tr, _, y_tr, _ = train_test_split(
             x_tr, y_tr, train_size=0.15, stratify=y_tr, random_state=RANDOM_STATE
         )
@@ -194,7 +194,7 @@ def main() -> None:
         print(f"  entrenando {name}…", end="", flush=True)
         try:
             res = evaluate(name, model, scale, x_tr, y_tr, x_te, y_te)
-        except Exception as exc:  # a candidate failing must not sink the comparison
+        except Exception as exc:  # que falle un candidato no puede hundir la comparación
             print(f" falló: {type(exc).__name__}: {exc}")
             continue
         resultados.append(res)

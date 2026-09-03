@@ -6,26 +6,27 @@ import Tooltip, { useTooltip } from '../Tooltip';
 import { n, pct } from '../../lib/format';
 import { useI18n } from '../../lib/i18n';
 
-// The four tactics the captures actually exercise, in the order an intrusion walks them.
+// Las cuatro tácticas que las capturas ejercitan de verdad, en el orden en que las recorre una intrusión.
 const OBSERVED = ['Descubrimiento', 'Ejecución', 'Evasión de defensas', 'Persistencia'] as const;
 
-// The ones a low-interaction decoy structurally cannot see. Showing them greyed out is the point:
-// the gap is a property of the sensor, not an omission of the panel, and saying so is what turns
-// a coverage chart into an explanation.
+// Las que un señuelo de baja interacción estructuralmente no puede ver. Mostrarlas en gris es la
+// gracia: el hueco es una propiedad del sensor y no una omisión del panel, y decirlo es lo que
+// convierte un gráfico de cobertura en una explicación.
 const NOT_OBSERVED = ['Acceso a credenciales', 'Movimiento lateral', 'Impacto'] as const;
 
 /**
- * MITRE ATT&CK tactics lit up with the project's own captures.
+ * Las tácticas de MITRE ATT&CK encendidas con las capturas del propio proyecto.
  *
- * Teaches the framework using evidence the reader just saw in the replay, and — more importantly —
- * is explicit about what the decoy cannot observe. A matrix that only shows hits suggests full
- * coverage; one that shows the misses, with the reason, teaches how to read any coverage claim.
+ * Enseña el marco con evidencia que el lector acaba de ver en el replay y, más importante, es
+ * explícita sobre lo que el señuelo no puede observar. Una matriz que solo muestra aciertos sugiere
+ * cobertura total; una que muestra los huecos, con el motivo, enseña a leer cualquier afirmación de
+ * cobertura.
  */
 export default function MitreMatrix({ replays, stages }: { replays: Replay[]; stages: Bucket[] }) {
   const { t } = useI18n();
   const tip = useTooltip();
 
-  // how many captured sessions touched each tactic, and how many replay steps
+  // cuántas sesiones capturadas tocaron cada táctica, y cuántos pasos del replay
   const sessionsPer = new Map<string, number>();
   const stepsPer = new Map<string, number>();
   const techniquesPer = new Map<string, Set<string>>();
@@ -45,7 +46,7 @@ export default function MitreMatrix({ replays, stages }: { replays: Replay[]; st
   const maxSteps = Math.max(...stepsPer.values(), 1);
   const totalStages = stages.reduce((a, b) => a + b.count, 0);
 
-  // every distinct technique observed, with the tactic it belongs to and how often it appeared
+  // cada técnica distinta observada, con la táctica a la que pertenece y cuántas veces apareció
   const techniques = new Map<string, { tactic: string; steps: number }>();
   for (const r of replays) {
     for (const s of r.steps) {

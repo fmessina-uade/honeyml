@@ -1,15 +1,15 @@
-"""The graph's shape and the context node, with no Elasticsearch and no provider.
+"""La forma del grafo y el nodo de contexto, sin Elasticsearch y sin proveedor.
 
-What is worth pinning here is not that the code runs — it is the handful of decisions that are easy
-to reverse by accident later:
+Lo que vale la pena fijar acá no es que el código corra, sino las pocas decisiones que después es
+fácil revertir sin querer.
 
-- an unusable answer still reaches persistence instead of vanishing
-- an unreachable index stops the cycle instead of producing a confident decision about nothing
-- a lookup that merely fails is written down rather than passing for an empty result
-- history never includes what happened after the event being judged
+Una respuesta inutilizable igual llega a persistencia en vez de desaparecer. Un índice inalcanzable
+corta el ciclo en lugar de producir una decisión confiada sobre nada. Una consulta que simplemente
+falla queda anotada y no pasa por un resultado vacío. Y el historial nunca incluye lo que pasó
+después del evento que se está juzgando.
 
-Every one of those is a rule someone could "simplify away" while refactoring, and none of them would
-show up as a test failure without this file.
+Cada una de esas es una regla que alguien podría "simplificar" en un refactor, y ninguna aparecería
+como prueba en rojo sin este archivo.
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ def _evento(**kw: Any) -> EventoDelBus:
 
 
 def _decision() -> Decision:
-    """Una decisión válida **para `_evento()`**, que es de categoría `process`.
+    """Una decisión válida para el evento de `_evento()`, que es de categoría `process`.
 
     El nivel no es decorativo: con `MEDIO` esta decisión quedaba por debajo del piso del evento y
     el grafo la rechaza, con razón: es exactamente el defecto que la guardia de límites existe

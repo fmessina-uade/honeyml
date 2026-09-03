@@ -1,1 +1,1 @@
-"""Educational layer: turns raw captures into annotated material for the teaching dashboard."""
+"""Capa educativa: convierte las capturas crudas en material anotado para el panel."""

@@ -1,15 +1,15 @@
-"""Report the state of the event bus: stream, consumer groups and pending entries.
+"""Informa el estado del bus de eventos: stream, grupos de consumidores y entradas pendientes.
 
-Written against the Redis protocol directly over a socket, with no client library. The reason is
-the same one behind the rest of the project's tooling: this has to run from the plain virtual
-environment, and adding a dependency to answer "is the bus alive and is anyone behind" is not
-worth the pin.
+Escrito directamente contra el protocolo de Redis sobre un socket, sin biblioteca cliente. El motivo
+es el mismo que en el resto de las herramientas del proyecto: esto tiene que correr desde el entorno
+virtual pelado, y agregar una dependencia para contestar "¿el bus está vivo y hay alguien atrasado?"
+no justifica el pin.
 
-What matters operationally is the pending count. A consumer group with entries taken but never
-acknowledged means the triage engine picked up events and died before persisting a decision —
-those events are recoverable, but only if somebody notices.
+Lo que importa en operación es la cuenta de pendientes. Un grupo de consumidores con entradas
+tomadas y nunca confirmadas significa que el motor de triaje levantó eventos y se murió antes de
+persistir una decisión. Esos eventos se recuperan, pero solo si alguien se da cuenta.
 
-Usage:
+Uso:
     python scripts/bus_status.py
 """
 
@@ -29,7 +29,7 @@ class RedisError(RuntimeError):
 
 
 def _encode(*args: str) -> bytes:
-    """RESP array of bulk strings — the only request shape we need."""
+    """Arreglo RESP de cadenas, que es la única forma de pedido que necesitamos."""
     out = [f"*{len(args)}\r\n".encode()]
     for a in args:
         raw = a.encode()
@@ -69,7 +69,7 @@ def command(sock_file: Any, sock: socket.socket, *args: str) -> Any:
 
 
 def as_dict(pairs: list[Any] | None) -> dict[str, Any]:
-    """Redis returns maps as flat [k1, v1, k2, v2, ...] lists."""
+    """Redis devuelve los mapas como listas planas [k1, v1, k2, v2, ...]."""
     if not pairs:
         return {}
     return {pairs[i]: pairs[i + 1] for i in range(0, len(pairs) - 1, 2)}
@@ -121,7 +121,7 @@ def main() -> int:
 
         def entry_id(key: str) -> str:
             entry = stream.get(key)
-            return entry[0] if entry else "—"
+            return entry[0] if entry else "-"
 
         print(f"\n  stream '{args.stream}'")
         print(f"    entradas: {stream.get('length', '?')}")

@@ -10,8 +10,8 @@ interface CountUpProps {
 }
 
 /**
- * Animated counter. Same easing as the public site, with thousands separators: the dashboard
- * shows figures in the millions and they are unreadable without them.
+ * Contador animado. La misma curva que el sitio público, con separador de miles: el panel muestra
+ * cifras en millones y sin separadores no se leen.
  */
 export default function CountUp({
   end,
@@ -33,8 +33,8 @@ export default function CountUp({
     const start = performance.now();
     let raf = 0;
     const tick = (now: number) => {
-      // clamp both ends: requestAnimationFrame can hand back a timestamp from before the
-      // performance.now() captured just above, and a negative t renders a negative figure
+      // se acota de los dos lados: requestAnimationFrame puede devolver una marca anterior al
+      // performance.now() de arriba, y una t negativa dibuja un número negativo
       const t = Math.min(1, Math.max(0, (now - start) / duration));
       setValue(end * (1 - Math.pow(1 - t, 3)));
       if (t < 1) raf = requestAnimationFrame(tick);

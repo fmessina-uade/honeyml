@@ -1,43 +1,35 @@
-"""Client for the inference provider, with rate limits and consumption accounting.
+"""Cliente del proveedor de inferencia, con límites de tasa y contabilidad de consumo.
 
-Habla el dialecto compatible con OpenAI que expone Groq, por HTTP y con `urllib` —el mismo camino
-por el que el proyecto ya consulta Elasticsearch—. No trae ningún cliente HTTP: el proveedor se
-alcanza por un adaptador, así que su dependencia pertenece al adaptador y no al motor.
+Habla el dialecto compatible con OpenAI que expone Groq, por HTTP y con `urllib`, que es el mismo
+camino por el que el proyecto ya consulta Elasticsearch. No trae ningún cliente HTTP: el proveedor
+se alcanza por un adaptador, así que esa dependencia pertenece al adaptador y no al motor.
 
 La única dependencia que sí agrega es `certifi`, y no es un cliente sino el paquete de certificados
-raíz. Ver `_contexto_tls`: se usa como respaldo cuando el intérprete no tiene almacén propio, que
-es el caso del Python de python.org en macOS mientras no se corra su `Install Certificates.command`.
-Venía arrastrado por otra dependencia y ahora está declarado, que es la diferencia entre usarlo y
-que funcione por casualidad.
+raíz. Ver `_contexto_tls`: se usa como respaldo cuando el intérprete no tiene almacén propio, que es
+el caso del Python de python.org en macOS mientras no se corra su `Install Certificates.command`.
 
-"MANEJO DE CONSUMO" SON TRES COSAS DISTINTAS, Y LAS TRES ESTÁN
+"Manejo de consumo" son tres cosas distintas y las tres están acá.
 
-**Límites de tasa.** Un 429 no es un fallo, es el proveedor pidiendo que se espere. Se respeta el
-`retry-after` que manda y se reintenta con retroceso acotado. Agotados los reintentos, se levanta:
-un límite de tasa es transitorio, así que el evento tiene que volver al bus y reintentarse más
-tarde, no persistirse como no concluyente.
+Los límites de tasa. Un 429 no es un fallo, es el proveedor pidiendo que se espere. Se respeta el
+`retry-after` que manda y se reintenta con retroceso acotado. Agotados los reintentos se levanta,
+porque un límite de tasa es transitorio y el evento tiene que volver al bus en vez de persistirse
+como no concluyente.
 
-**Contabilidad.** Cada respuesta trae cuántos tokens costó. Se acumulan, y con los precios de más
-abajo se traduce a pesos. No es telemetría decorativa: "cuánto sale clasificar un evento" es una
-métrica operativa que hay que reportar, y medirla desde el principio evita tener que reconstruirla
-después.
+La contabilidad. Cada respuesta trae cuántos tokens costó, se acumulan y se traducen a dólares con
+los precios de abajo. No es telemetría decorativa: "cuánto sale clasificar un evento" es una métrica
+operativa que hay que reportar, y medirla desde el principio evita reconstruirla después.
 
-**La distinción que el grafo necesita.** El grafo separa "el proveedor contestó mal" de "el
-proveedor no contestó", y las trata distinto —una persiste, la otra reintenta—. Esa distinción se
-sostiene acá:
+Y la distinción que el grafo necesita. El grafo separa "el proveedor contestó mal" de "el proveedor
+no contestó" y las trata distinto (una persiste, la otra reintenta). Esa distinción se sostiene en
+la taxonomía de excepciones de este módulo: una red caída, un timeout o un 5xx dan
+`ProveedorInalcanzableError` y el motor no confirma el evento; un 4xx que no es 429 da
+`PedidoRechazadoError`, que es un defecto nuestro y tiene que verse.
 
-| Situación | Excepción | Qué hace el motor |
-|---|---|---|
-| Red caída, DNS, timeout, 5xx | `ProveedorInalcanzableError` | no confirma; otro lo reclama |
-| Límite de tasa agotado tras reintentos | `ProveedorInalcanzableError` | ídem: es transitorio |
-| 4xx que no es 429 | `PedidoRechazadoError` | es un defecto nuestro y tiene que verse |
-
-SALIDA ESTRUCTURADA ESTRICTA
-Se pide `json_schema` con `strict: true`, que en Groq usa decodificación restringida: la respuesta
-cumple el esquema o no se emite. Tiene dos requisitos que `esquema_estricto` se encarga de cumplir
-—todas las propiedades obligatorias y objetos cerrados— y una limitación que este diseño ya
-respetaba: no admite herramientas ni streaming. El motor arma el contexto por su cuenta en las filas
-81 y 82, así que no las necesita.
+Sobre la salida estructurada: se pide `json_schema` con `strict: true`, que en Groq usa
+decodificación restringida, así que la respuesta cumple el esquema o no se emite. Tiene dos
+requisitos que `esquema_estricto` se encarga de cumplir (todas las propiedades obligatorias y
+objetos cerrados) y una limitación que este diseño ya respetaba: no admite herramientas ni
+streaming. El motor arma el contexto por su cuenta en los nodos anteriores, así que no las necesita.
 """
 
 from __future__ import annotations
@@ -82,14 +74,14 @@ ESPERA_BASE = 2.0
 ESPERA_MAXIMA = 30.0
 
 
-# Identificación del cliente. No es cortesía: sin ella, `urllib` manda `Python-urllib/3.12` y el
-# borde de Cloudflare que tiene el proveedor adelante lo rechaza con un 403 y el código 1010
-# —"navegador vedado"— *antes* de que el proveedor llegue a ver la petición.
+# Identificación del cliente. No es cortesía: sin ella `urllib` manda `Python-urllib/3.12`, y el
+# borde de Cloudflare que el proveedor tiene adelante lo rechaza con un 403 y el código 1010
+# ("navegador vedado") antes de que el proveedor llegue a ver la petición.
 #
-# El síntoma es cruel: la misma petición por `curl` funciona, así que todo apunta a la credencial
-# cuando la credencial está perfecta. Verificado midiendo las dos respuestas con una clave inválida
-# a propósito: con el agente por defecto da 403/1010, con este da 401 "Invalid API Key", que es el
-# error honesto de alguien que sí llegó al proveedor.
+# El síntoma es cruel, porque la misma petición por `curl` funciona y entonces todo apunta a la
+# credencial cuando la credencial está perfecta. Lo medimos con una clave inválida a propósito: con
+# el agente por defecto da 403/1010, y con este da 401 "Invalid API Key", que es el error honesto de
+# alguien que sí llegó al proveedor.
 AGENTE = "honeyml/0.1 (+https://www.honeyml.com.ar)"
 
 # Código de Cloudflare para "agente bloqueado". Se distingue de un rechazo de credencial porque
@@ -108,19 +100,18 @@ AYUDA_CERTIFICADOS = (
 
 @lru_cache(maxsize=1)
 def _contexto_tls() -> ssl.SSLContext:
-    """The TLS context to verify the provider with. Never disables verification.
+    """El contexto TLS con el que se verifica al proveedor. Nunca desactiva la verificación.
 
-    Por la conexión viaja la credencial, así que verificar no es negociable y desactivarlo no es
+    Por esta conexión viaja la credencial, así que verificar no es negociable y desactivarlo no es
     una opción disponible, ni siquiera para depurar.
 
-    Lo que sí hace es cubrir un caso concreto y muy común: el intérprete de python.org en macOS
-    apunta su almacén de certificados a `…/etc/openssl/cert.pem`, un archivo que **su propio
-    instalador crea recién cuando se corre `Install Certificates.command`**. Sin ese paso, toda
-    conexión HTTPS falla con un mensaje de OpenSSL que no nombra ninguna causa.
+    Lo que sí hace es cubrir un caso concreto y bastante común: el intérprete de python.org en macOS
+    apunta su almacén de certificados a `…/etc/openssl/cert.pem`, un archivo que su instalador crea
+    recién cuando se corre `Install Certificates.command`. Sin ese paso, toda conexión HTTPS
+    falla con un mensaje de OpenSSL que no nombra ninguna causa.
 
-    Cuando el almacén configurado no existe se recurre al paquete de `certifi`, que es exactamente
-    el mismo que instala ese script. No se sustituye un almacén que funcione: solo se provee uno
-    cuando no hay ninguno.
+    Cuando el almacén configurado no existe se recurre al paquete de `certifi`, que es el mismo que
+    instala ese script. No se sustituye un almacén que funcione, solo se provee uno cuando no hay.
     """
     rutas = ssl.get_default_verify_paths()
     hay_almacen = bool(
@@ -138,16 +129,16 @@ def _contexto_tls() -> ssl.SSLContext:
 
 
 class ProveedorInalcanzableError(RuntimeError):
-    """Transport failure, or a rate limit that outlasted the retries. Temporary by nature."""
+    """Fallo de transporte, o un límite de tasa que sobrevivió a los reintentos. Es transitorio."""
 
 
 class PedidoRechazadoError(RuntimeError):
-    """The provider understood the request and refused it. That is a defect on our side."""
+    """El proveedor entendió el pedido y lo rechazó. Eso es un defecto de este lado."""
 
 
 @dataclass
 class Consumo:
-    """Running total of what the engine has spent. Feeds the reported operational metrics."""
+    """Acumulado de lo que gastó el motor. Alimenta las métricas operativas que hay que reportar."""
 
     llamadas: int = 0
     tokens_entrada: int = 0
@@ -162,7 +153,7 @@ class Consumo:
         self.segundos += segundos
 
     def costo_estimado(self, modelo: str) -> float | None:
-        """Cost in dollars, or None for a model with no published price on record."""
+        """Costo en dólares, o None si el modelo no tiene precio registrado."""
         precios = PRECIOS.get(modelo)
         if precios is None:
             return None
@@ -184,7 +175,7 @@ class Consumo:
 
 @dataclass
 class Respuesta:
-    """One answer, plus what it cost. The content is raw text: parsing it is the caller's job."""
+    """Una respuesta y lo que costó. El contenido viene crudo: parsearlo es tarea de quien llama."""
 
     contenido: str
     tokens_entrada: int
@@ -196,15 +187,15 @@ class Respuesta:
 
 
 def esquema_estricto(esquema: dict[str, Any]) -> dict[str, Any]:
-    """Turn a Pydantic JSON Schema into the shape strict mode requires.
+    """Lleva un JSON Schema de Pydantic a la forma que exige el modo estricto.
 
     Tres reglas, todas impuestas por el proveedor y ninguna negociable:
 
-    - **Todo obligatorio.** Un campo opcional se expresa como unión con `null`, no omitiéndolo. El
-      modelo `Decision` ya declara así `tactica_mitre`.
-    - **Objetos cerrados.** `additionalProperties: false` en cada objeto.
-    - **Sin `default`.** La decodificación restringida no rellena: si el campo es obligatorio, el
-      modelo lo emite, y un valor por defecto en el esquema solo confunde sobre quién decide.
+    Todo tiene que ser obligatorio: un campo opcional se expresa como unión con `null` y no
+    omitiéndolo, que es como ya declara `tactica_mitre` el modelo `Decision`. Los objetos tienen que
+    estar cerrados, con `additionalProperties: false`. Y no puede haber `default`, porque la
+    decodificación restringida no rellena: si el campo es obligatorio el modelo lo emite, y un valor
+    por defecto en el esquema solo confunde sobre quién decide.
 
     Se trabaja sobre una copia. Mutar el esquema que devuelve Pydantic afectaría a todo el proceso,
     porque lo cachea por clase.
@@ -232,7 +223,7 @@ def esquema_estricto(esquema: dict[str, Any]) -> dict[str, Any]:
 
 
 class ClienteDeInferencia:
-    """Talks to the provider. One instance per consumer: the accounting is per instance."""
+    """Habla con el proveedor. Una instancia por consumidor: la contabilidad es por instancia."""
 
     def __init__(self, config: ConfigInferencia | None = None) -> None:
         self.config = config or ConfigInferencia.desde_entorno()
@@ -241,7 +232,7 @@ class ClienteDeInferencia:
     # -- transporte -----------------------------------------------------------------------
 
     def _postear(self, cuerpo: dict[str, Any]) -> dict[str, Any]:
-        """One HTTP round trip. Raises the taxonomy the module header declares."""
+        # Levanta la taxonomía de excepciones que declara el encabezado del módulo.
         pedido = urllib.request.Request(
             f"{self.config.base_url}/chat/completions",
             data=json.dumps(cuerpo).encode("utf-8"),
@@ -266,7 +257,7 @@ class ClienteDeInferencia:
             if 500 <= exc.code < 600:
                 raise _TransitorioError(f"HTTP {exc.code}") from exc
             # Un 403 con el código 1010 no lo emite el proveedor sino el borde que tiene adelante,
-            # y culpar a la credencial —que es lo que hacía esta rama antes— manda a revisar algo
+            # y culpar a la credencial, que es lo que hacía esta rama antes, manda a revisar algo
             # que está bien. Los dos rechazos se ven casi iguales y se arreglan de forma opuesta.
             if exc.code == 403 and CODIGO_AGENTE_BLOQUEADO in detalle:
                 raise PedidoRechazadoError(
@@ -295,7 +286,7 @@ class ClienteDeInferencia:
             raise ProveedorInalcanzableError(f"No se pudo alcanzar al proveedor: {exc}") from exc
 
     def _con_reintentos(self, cuerpo: dict[str, Any]) -> dict[str, Any]:
-        """Retry on rate limits and transient failures, honouring `retry-after` when it comes."""
+        """Reintenta ante límites de tasa y fallas pasajeras, respetando `retry-after` si viene."""
         ultimo: Exception | None = None
         for intento in range(MAX_REINTENTOS):
             try:
@@ -328,7 +319,7 @@ class ClienteDeInferencia:
         modelo: str | None = None,
         temperatura: float = 0.0,
     ) -> Respuesta:
-        """Ask for one answer that conforms to `esquema`, and account for what it cost.
+        """Pide una respuesta que cumpla `esquema`, y contabiliza lo que costó.
 
         `temperatura` en 0 por defecto: dos corridas sobre el mismo evento tienen que dar lo mismo,
         o la campaña de validación estaría midiendo el azar además del motor.
@@ -377,7 +368,7 @@ class ClienteDeInferencia:
         )
 
 
-# Internas: separan los dos motivos por los que conviene reintentar. No salen del módulo —el
+# Internas: separan los dos motivos por los que conviene reintentar. No salen del módulo, porque el
 # llamador solo ve `ProveedorInalcanzableError`, que es la distinción que al grafo le importa.
 
 

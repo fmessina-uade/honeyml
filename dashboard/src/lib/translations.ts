@@ -1,8 +1,9 @@
-// Full ES/EN copy for the educational panel. Both objects share the exact same shape —
-// `Dict` is derived from the Spanish source of truth, so a missing English key is a type error.
+// Todos los textos ES/EN del panel educativo. Los dos objetos tienen exactamente la misma forma:
+// `Dict` se deriva del español, que es la fuente de verdad, así que una clave que falte en inglés
+// es un error de tipos.
 //
-// What is NOT here: the per-command explanations of the replay. Those come from the API, which
-// serves both languages (see honeyml/education/annotations.py).
+// Lo que NO está acá: las explicaciones por comando del replay. Esas vienen de la API, que sirve
+// los dos idiomas (ver honeyml/education/annotations.py).
 
 const es = {
   brand: {

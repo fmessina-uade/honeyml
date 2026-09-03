@@ -1,40 +1,28 @@
-"""The boundary the engine sees, and the policy that picks a model.
+"""La frontera que ve el motor, y la política que elige el modelo.
 
-El nodo de inferencia del grafo depende de `ServicioDeInferencia` y de nada más. No sabe
-qué proveedor hay del otro lado, no importa su cliente, y **no elige modelo**: pide una respuesta y
-recibe una. Todo lo específico de Groq vive de este lado de la frontera.
+El nodo de inferencia del grafo depende de `ServicioDeInferencia` y de nada más. No sabe qué
+proveedor hay del otro lado, no importa su cliente, y no elige modelo: pide una respuesta y recibe
+una. Todo lo específico de Groq vive de este lado de la frontera.
 
-Eso no es prolijidad arquitectónica: el proyecto ya tuvo que sustituir un proveedor a mitad de
-desarrollo. Cuando vuelva a pasar, lo que se reescribe es este archivo.
+No es prolijidad arquitectónica. El proyecto ya tuvo que sustituir un proveedor a mitad de
+desarrollo, y cuando vuelva a pasar lo que se reescribe es este archivo.
 
-LA SELECCIÓN DE MODELO: BARATO PRIMERO, CAPAZ AL REINTENTAR
-
-Hay dos modelos de producción con adherencia garantizada al esquema, y uno sale la mitad que el
-otro. La política es:
+La política de selección es barato primero, capaz al reintentar:
 
     intento 0        openai/gpt-oss-20b     mitad de precio, el doble de velocidad
     intento 1 y +    openai/gpt-oss-120b    el que razona mejor
 
-**Por qué escalar al reintentar y no al revés.** Un reintento existe porque la respuesta anterior no
-se pudo usar. La temperatura es 0, así que repetir con el mismo modelo cambia poco: lo único
-distinto es el reproche agregado al pedido. Puede alcanzar —a veces el modelo solo necesita que le
-señalen el campo— pero si el barato ya falló una vez, la diferencia de capacidad explica el fallo
-mejor que la redacción del pedido. Y el presupuesto son tres intentos: gastar dos en el modelo que
-ya falló es la peor de las apuestas disponibles.
+Escala al reintentar y no al revés porque un reintento existe justamente porque la anterior no se
+pudo usar. Con temperatura 0, repetir con el mismo modelo cambia poco: lo único distinto es el
+reproche. A veces alcanza, pero si el barato ya falló una vez la diferencia de capacidad explica el
+fallo mejor que la redacción, y con tres intentos de presupuesto gastar dos en el que ya falló es la
+peor apuesta disponible.
 
-**Por qué no se elige por características del evento.** Se evaluó decidir según cuánto margen deja
-el piso —cuando piso y techo coinciden no hay juicio que delegar, solo redacción—. Pero eso pasa
-únicamente en el 1,1 % de los eventos (los de transferencia de archivo, que ya arrancan en
-`critico`), así que el ahorro sería ruido y la regla, una complicación sin contrapartida medible.
+`HONEYML_MODELO` fija un modelo y desactiva la política entera, que es lo que va a hacer falta para
+medir uno contra otro sobre el mismo corpus en la campaña de validación adversaria.
 
-**El escape está declarado.** `HONEYML_MODELO` fija un modelo y desactiva la política entera. Sirve
-para medir un modelo contra el otro sobre el mismo corpus, que es exactamente lo que la campaña de
-la campaña de validación va a querer hacer.
-
-CONTABILIDAD POR MODELO
-El consumo se lleva separado por modelo. Sin eso, la política no se puede evaluar: "cuántos eventos
-resolvió el económico" es la única forma de saber si vale la pena, y además es una de las métricas
-operativas que hay que reportar.
+El consumo se lleva separado por modelo porque sin ese desglose la política no se puede evaluar:
+cuántos eventos resolvió el económico es la única forma de saber si vale la pena.
 """
 
 from __future__ import annotations
@@ -57,11 +45,11 @@ from .inferencia import (
 
 
 class ServicioDeInferencia(Protocol):
-    """What the engine is allowed to ask for. Deliberately small.
+    """Lo único que el motor puede pedir. Chico a propósito.
 
     Un solo método, y ningún parámetro que nombre un proveedor o un modelo. `intento` está para que
     la política pueda escalar, no para que el llamador elija: el nodo sabe en qué vuelta del ciclo
-    correctivo está —es información suya— y no sabe qué hacer con eso, que es información de acá.
+    correctivo está (es información suya) y no sabe qué hacer con eso, que es información de acá.
     """
 
     def completar(
@@ -76,14 +64,14 @@ class ServicioDeInferencia(Protocol):
 
 
 def elegir_modelo(intento: int, fijado: str | None = None) -> str:
-    """Which model this attempt should use. `fijado` overrides the policy entirely."""
+    """Qué modelo le toca a este intento. `fijado` pisa la política por completo."""
     if fijado:
         return fijado
     return MODELO_ALTERNATIVO if intento == 0 else MODELO_POR_DEFECTO
 
 
 class AdaptadorDeInferencia:
-    """The default implementation of the boundary, backed by the Groq-compatible client.
+    """La implementación por defecto de la frontera, apoyada en el cliente compatible con Groq.
 
     Se llama por lo que hace y no por el proveedor que usa hoy: si mañana hay que cambiarlo, el
     nombre sigue siendo cierto y el motor no se entera.
@@ -102,11 +90,11 @@ class AdaptadorDeInferencia:
 
     @property
     def modelo_fijado(self) -> str | None:
-        """The model pinned by configuration, or None when the policy is free to choose.
+        """El modelo clavado por configuración, o None cuando la política puede elegir.
 
         Se considera fijado solo cuando difiere del valor por defecto. Si no, arrancar sin
         `HONEYML_MODELO` clavaría el modelo de más capacidad en todos los intentos y la política
-        no se aplicaría nunca —silenciosamente, que es la peor forma de no aplicarse.
+        no se aplicaría nunca, y en silencio, que es la peor forma de no aplicarse.
         """
         return self.config.modelo if self.config.modelo != MODELO_POR_DEFECTO else None
 
@@ -133,7 +121,7 @@ class AdaptadorDeInferencia:
         return respuesta
 
     def resumen(self) -> str:
-        """Consumption broken down by model, which is how the policy gets evaluated."""
+        """El consumo desglosado por modelo, que es la forma de evaluar la política."""
         if not self.por_modelo:
             return "sin llamadas"
         lineas = [
@@ -149,10 +137,10 @@ class AdaptadorDeInferencia:
 
 
 def comprobar() -> int:
-    """One live round trip through the boundary, policy included. `make inferencia-ok`.
+    """Un viaje en vivo por la frontera, con política incluida. Es `make inferencia-ok`.
 
     Va por el adaptador y no por el cliente a propósito: así ejercita exactamente el camino que va a
-    usar el motor —incluida la selección de modelo— en vez de un atajo que funciona pero no prueba
+    usar el motor, incluida la selección de modelo, en vez de un atajo que funciona pero no prueba
     lo mismo. Es la única parte del frente de inferencia que no se puede verificar sin la
     credencial; todo lo demás está cubierto por pruebas que no tocan la red.
     """
@@ -165,7 +153,7 @@ def comprobar() -> int:
     adaptador = AdaptadorDeInferencia(config=config)
     fijado = adaptador.modelo_fijado
     print(f"Proveedor : {config.base_url}")
-    print(f"Modelo    : {fijado or f'por política — intento 0 usa {MODELO_ALTERNATIVO}'}")
+    print(f"Modelo    : {fijado or f'por política, intento 0 usa {MODELO_ALTERNATIVO}'}")
     print(f"Clave     : {config.enmascarada()}")
 
     esquema = {

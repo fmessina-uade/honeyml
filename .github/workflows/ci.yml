@@ -1,8 +1,10 @@
 name: CI
 
-# Runs on every push/PR to main. Keeps infra + configs honest before they reach the VPS.
-# Covered: shell/yaml/compose linting, python unit tests, format and type checks, honeypot config
-# sanity checks. Not covered: the integration tests, which need Docker and live sensors.
+# Corre en cada push y cada PR contra main. Mantiene honestas la infraestructura y las
+# configuraciones antes de que lleguen al VPS.
+# Cubre: linting de shell, yaml y compose, pruebas unitarias de Python, formato y tipos, y chequeos
+# de cordura sobre la configuración de los honeypots.
+# No cubre: las pruebas de integración, que necesitan Docker y sensores vivos.
 
 on:
   push:
@@ -11,7 +13,7 @@ on:
     branches: [main]
 
 jobs:
-  # everything that isn't python: shell scripts, yaml, compose files
+  # todo lo que no es Python: scripts de shell, yaml, archivos de compose
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -121,7 +123,7 @@ jobs:
       - name: mypy
         run: mypy src/
 
-  # honeypot config gotchas that break things silently if wrong
+  # trampas de la configuración de los honeypots que rompen cosas en silencio si están mal
   config-validation:
     name: Config Validation
     runs-on: ubuntu-latest
@@ -131,7 +133,7 @@ jobs:
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
 
-      # cowrie only loads userdb.txt if it's plain ascii
+      # cowrie solo carga userdb.txt si es ascii puro
       - name: userdb.txt is pure ascii
         run: |
           python3 -c "
@@ -144,7 +146,7 @@ jobs:
           print('OK: userdb.txt is pure ascii')
           "
 
-      # these must match cowrie's working dir, or the honeypot boots empty
+      # tienen que coincidir con el directorio de trabajo de cowrie, o el honeypot arranca vacío
       - name: cowrie.cfg paths
         run: |
           python3 -c "
@@ -162,7 +164,7 @@ jobs:
           print('OK: cowrie.cfg paths look right')
           "
 
-      # never leak keys or captured malware into the repo
+      # nunca dejar que se filtren claves ni malware capturado al repositorio
       - name: .gitignore covers secrets
         run: |
           python3 -c "

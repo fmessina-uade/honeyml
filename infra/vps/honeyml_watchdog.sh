@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# honeyml_watchdog.sh — Detecta y corrige el cuelgue conocido de Dionaea.
+# honeyml_watchdog.sh: detecta y corrige el cuelgue conocido de Dionaea.
 # Ejecutado por cron cada 10 minutos.
 #
 # El fallo, observado dos veces: bajo carga sostenida Dionaea entra en un bucle que satura un

@@ -1,11 +1,11 @@
 services:
 
-  # Redis Streams: real-time bus between the normalization pipeline and the triage engine.
+  # Redis Streams: bus en tiempo real entre el pipeline de normalización y el motor de triaje.
   #
-  # It sits in the analysis zone, not the capture zone: the sensors never reach it. The pipeline
-  # publishes here after normalizing, and the engine consumes with a consumer group, which is what
-  # gives explicit acknowledgement — an event taken and not confirmed stays pending and can be
-  # reclaimed if the consumer dies mid-processing.
+  # Vive en la zona de análisis y no en la de captura: los sensores nunca lo alcanzan. El pipeline
+  # publica acá después de normalizar, y el motor consume con un grupo de consumidores, que es lo
+  # que da el acuse explícito: un evento tomado y no confirmado queda pendiente, y se puede reclamar
+  # si el consumidor se muere en el medio.
   redis:
     image: redis:7.4-alpine
     container_name: redis
@@ -20,7 +20,7 @@ services:
       --save ""
     volumes:
       - redis_data:/data
-    # bound to loopback, never exposed on the VPS public interface (RNF-03)
+    # atado a loopback, nunca expuesto en la interfaz pública del VPS (RNF-03)
     ports:
       - "127.0.0.1:6379:6379"
     networks:
@@ -39,7 +39,7 @@ services:
         max-file: "3"
 
 networks:
-  # joins the analysis network so Logstash can publish without crossing zones
+  # se une a la red de análisis para que Logstash pueda publicar sin cruzar de zona
   elastic_net:
     external: true
     name: elastic_net

@@ -1,4 +1,4 @@
-"""The frozen fallback: what the panel can still answer with Elasticsearch down.
+"""El respaldo congelado: qué puede seguir contestando el panel con Elasticsearch abajo.
 
 Es la ruta que sostiene la demo y la que se usa para las capturas del informe, así que conviene que
 esté fijada. Lo que se prueba acá son las cuatro cosas que se rompen en silencio:

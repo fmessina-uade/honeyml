@@ -1,7 +1,8 @@
-"""Load and clean UWF-ZeekData24, the MITRE ATT&CK labeled benchmark for the supervised model.
+"""Carga y limpia UWF-ZeekData24, el conjunto de referencia etiquetado con MITRE ATT&CK.
 
-Concatenates the weekly parquet partitions, drops the rows the dataset itself flags as duplicates,
-and returns a tidy DataFrame. Zeek connection records labeled with label_tactic (the target).
+Concatena las particiones parquet semanales, descarta las filas que el propio conjunto marca como
+duplicadas y devuelve un DataFrame prolijo. Son registros de conexión de Zeek etiquetados con
+label_tactic, que es la variable objetivo del modelo supervisado.
 """
 
 from __future__ import annotations
@@ -13,7 +14,8 @@ import pandas as pd
 
 RAW_DIR = Path("data/raw/uwf_zeekdata24")
 
-# columns we never feed the model: identifiers (leak / don't generalize) and the other label columns
+# columnas que nunca entran al modelo: identificadores (filtran o no generalizan) y las otras
+# columnas de etiqueta
 DROP_COLS = [
     "uid",
     "community_id",
@@ -28,12 +30,13 @@ DROP_COLS = [
 
 
 def load_uwf(raw_dir: str | Path = RAW_DIR, drop_duplicates: bool = True) -> pd.DataFrame:
-    """Read every UWF-ZeekData24 parquet into one DataFrame.
+    """Lee todos los parquet de UWF-ZeekData24 en un solo DataFrame.
 
-    Parameters
+    Parámetros
     ----------
-    raw_dir : dir holding the weekly parquet partitions.
-    drop_duplicates : if True, drop the rows the dataset flags as Duplicate (in label_binary).
+    raw_dir : el directorio con las particiones parquet semanales.
+    drop_duplicates : si es True, descarta las filas que el conjunto marca como Duplicate en
+        label_binary.
     """
     files = sorted(glob.glob(str(Path(raw_dir) / "*" / "*.parquet")))
     if not files:
@@ -46,7 +49,7 @@ def load_uwf(raw_dir: str | Path = RAW_DIR, drop_duplicates: bool = True) -> pd.
 
 
 def features_target(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
-    """Split the frame into the model features (X) and the target (y = label_tactic)."""
+    """Parte el DataFrame en las características del modelo (X) y el objetivo (y = label_tactic)."""
     y = df["label_tactic"]
     x = df.drop(columns=[c for c in [*DROP_COLS, "label_tactic"] if c in df.columns])
     return x, y

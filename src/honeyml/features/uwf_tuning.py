@@ -1,29 +1,29 @@
-"""Hyperparameter tuning for the classifier chosen in the model comparison.
+"""Optimización de hiperparámetros del clasificador que ganó la comparación de modelos.
 
-The comparison picked the family: histogram gradient boosting, on default-ish settings. This module
-answers what is left — whether those settings were any good — and it does so on the same partition,
-the same preprocessing and the same metrics, so the two results can be read side by side.
+La comparación eligió la familia: potenciación por gradiente con histograma, en valores más o menos
+por defecto. Este módulo responde lo que quedaba pendiente, si esa configuración era buena, y lo
+hace sobre la misma partición, el mismo preprocesamiento y las mismas métricas, así los dos
+resultados se pueden leer uno al lado del otro.
 
-WHAT IS SEARCHED, AND WITH WHAT
-Successive halving, not an exhaustive grid. With 1,42 million training rows a single fit costs
-around 35 seconds, so a grid of a hundred combinations over three folds would run for hours.
-Halving spends little on many candidates, keeps the best third, and gives them more data; the
-budget goes where it can still change the answer.
+Se busca por halving sucesivo y no por grilla exhaustiva. Con 1,42 millones de filas de
+entrenamiento, un solo ajuste cuesta unos 35 segundos, así que una grilla de cien combinaciones
+sobre tres particiones correría durante horas. El halving gasta poco en muchos candidatos, se queda
+con el mejor tercio y les da más datos, de modo que el presupuesto va a donde todavía puede cambiar
+la respuesta.
 
-WHAT IS *NOT* SEARCHED
-Class balancing stays fixed at "balanced". It is not a hyperparameter here but a decision already
-taken and justified: without it the model ignores the rare classes, which are the ones worth
-detecting. Leaving it in the search would let the process trade away the thing the model exists for.
+Lo que no se busca es el balanceo de clases, que queda fijo en "balanced". Acá no es un
+hiperparámetro sino una decisión ya tomada y justificada: sin él el modelo ignora las clases raras,
+que son las que vale la pena detectar. Dejarlo dentro de la búsqueda permitiría que el proceso
+negocie justamente aquello para lo que el modelo existe.
 
-A LIMIT WORTH STATING
-Exfiltration has 559 observations in the whole dataset — 0,029 %. After the split, around 419 are
-available for training and 140 for measuring. Any F1 on that class is computed over those 140
-cases, so differences of a few hundredths are noise, not improvement. The search optimises the
-macro average and *reports* the weak class, rather than chasing it.
+Un límite que conviene declarar. Exfiltration tiene 559 observaciones en todo el conjunto, el
+0,029 %. Tras la partición quedan unas 419 para entrenar y 140 para medir, así que cualquier F1
+sobre esa clase se calcula sobre esos 140 casos y diferencias de centésimas son ruido y no mejora.
+La búsqueda optimiza el promedio macro e informa la clase débil, en vez de perseguirla.
 
-Usage:
-    python -m honeyml.features.uwf_tuning --rapido    # short search, to validate the setup
-    python -m honeyml.features.uwf_tuning             # full search, for the reported result
+Uso:
+    python -m honeyml.features.uwf_tuning --rapido    # búsqueda corta, para validar el armado
+    python -m honeyml.features.uwf_tuning             # búsqueda completa, para el resultado final
 """
 
 from __future__ import annotations
@@ -50,13 +50,13 @@ from .uwf_comparison import RANDOM_STATE, WEAK_CLASS, _preprocessor, cargar_y_pa
 
 OUT_FILE = Path("data/processed/uwf_tuning.json")
 
-# Settings the comparison used, kept as the reference point. Every number this module reports is
-# stated against these, so "it improved" always has something concrete to mean.
+# La configuración que usó la comparación, que queda como punto de referencia. Todo número que
+# informa este módulo se dice contra estos, así "mejoró" siempre significa algo concreto.
 BASE = {"max_iter": 150, "learning_rate": 0.1}
 
-# Search space. The ranges are deliberately wide on the two knobs that govern how much structure
-# the model may learn — depth of each tree and how much each one contributes — and narrower on
-# regularisation, which on this dataset moves the result far less than either of those.
+# Espacio de búsqueda. Los rangos son anchos a propósito en las dos perillas que gobiernan cuánta
+# estructura puede aprender el modelo (la profundidad de cada árbol y cuánto aporta cada uno) y más
+# angostos en regularización, que sobre este conjunto mueve el resultado mucho menos que las otras.
 ESPACIO: dict[str, list[Any]] = {
     "clf__learning_rate": [0.03, 0.05, 0.1, 0.2, 0.3],
     "clf__max_iter": [100, 200, 300, 500],
@@ -67,10 +67,10 @@ ESPACIO: dict[str, list[Any]] = {
 
 
 def _modelo(**kw: Any) -> HistGradientBoostingClassifier:
-    """The chosen classifier, with everything that is not under search held fixed."""
+    """El clasificador elegido, con todo lo que no está bajo búsqueda fijo."""
     # Todo lo que no está bajo búsqueda queda en su valor por defecto, a propósito. Así
-    # `_modelo(**BASE)` reproduce exactamente el candidato de la comparación —incluido el corte
-    # temprano, que sklearn activa solo por encima de 10.000 filas— y el ajustado difiere de él
+    # `_modelo(**BASE)` reproduce exactamente el candidato de la comparación, incluido el corte
+    # temprano que sklearn activa solo por encima de 10.000 filas, y el ajustado difiere de él
     # únicamente en los parámetros buscados. Fijar acá cualquier otra cosa metería una segunda
     # diferencia entre los dos, y ya no se sabría a cuál atribuir el cambio.
     return HistGradientBoostingClassifier(
@@ -100,10 +100,12 @@ def evaluar(
     x_te: pd.DataFrame,
     y_te: pd.Series,
 ) -> tuple[dict[str, float], float]:
-    """Train on the training half and measure on the held-out half. Never on the search folds.
+    """Entrena sobre la mitad de entrenamiento y mide sobre la reservada.
 
-    The cross-validation score guided the search and is therefore optimistic about it. The number
-    that gets reported has to come from data the search never saw.
+    Nunca sobre las particiones de la búsqueda.
+
+    El puntaje de validación cruzada guió la búsqueda y por eso es optimista respecto de ella. El
+    número que se informa tiene que salir de datos que la búsqueda nunca vio.
     """
     pipe = Pipeline([("prep", _preprocessor(scale=False)), ("clf", modelo)])
     inicio = time.monotonic()
@@ -131,7 +133,7 @@ def main() -> None:
     # Con un piso elegido a mano, la progresión geométrica casi nunca cae justo sobre el total: con
     # 200.000 y factor 3 daba 200k → 600k → 1,8M, y como 1,8M excede las 1.423.959 filas
     # disponibles, sklearn cortaba en 600k. El ganador quedaba elegido sobre el 42 % de los datos
-    # —pasó, y la auditoría de rondas de más abajo fue lo que lo destapó—.
+    # (pasó, y la auditoría de rondas de más abajo fue lo que lo destapó).
     #
     # Con "exhaust", sklearn calcula el piso hacia atrás desde el total, de modo que la última
     # ronda use todas las filas. Las primeras rondas quedan más chicas y por lo tanto más ruidosas,
@@ -164,15 +166,15 @@ def main() -> None:
 
     # Auditoría de la búsqueda. Lo que importa es la última ronda: si no llegó al total del
     # entrenamiento, el ganador se eligió sobre datos parciales y su ventaja puede no sobrevivir al
-    # conjunto entero. Ya pasó una vez —con un piso fijo la progresión cortaba en el 42 % de las
-    # filas— y esta comprobación es lo que lo destapó.
+    # conjunto entero. Ya pasó una vez, con un piso fijo la progresión cortaba en el 42 % de las
+    # filas, y esta comprobación es lo que lo destapó.
     rondas = list(zip(busqueda.n_candidates_, busqueda.n_resources_, strict=True))
     print(
         "  rondas (candidatos × filas):",
         "  ".join(f"{c}×{r:,}" for c, r in rondas).replace(",", "."),
     )
     # Con tolerancia y no con `<` a secas: la progresión geométrica deja un resto de unas pocas
-    # filas —1.423.953 de 1.423.959 en una corrida— y avisar por eso sería ruido que enseña a
+    # filas (1.423.953 de 1.423.959 en una corrida) y avisar por eso sería ruido que enseña a
     # ignorar el aviso. Lo que hay que detectar es una ronda final materialmente más chica.
     completa = rondas[-1][1] >= len(x_tr) * 0.99
     if not completa:
@@ -185,8 +187,8 @@ def main() -> None:
 
     mejores = {k.replace("clf__", ""): v for k, v in busqueda.best_params_.items()}
 
-    # Both are trained here, on the full training half, so the comparison is between two models
-    # fitted under identical conditions and measured on the same untouched test set.
+    # Los dos se entrenan acá, sobre la mitad de entrenamiento completa, así la comparación es
+    # entre dos modelos ajustados en las mismas condiciones y medidos sobre el mismo conjunto.
     print("  entrenando el ajustado sobre el total…", end="", flush=True)
     m_ajustado, s_ajustado = evaluar(_modelo(**mejores), x_tr, y_tr, x_te, y_te)
     print(f" {s_ajustado:.0f}s")

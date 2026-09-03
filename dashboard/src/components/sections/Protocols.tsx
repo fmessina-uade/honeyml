@@ -5,8 +5,8 @@ import { n, pct } from '../../lib/format';
 import { useI18n } from '../../lib/i18n';
 
 /**
- * What each exposed service is, and why someone knocks on it. The point of the section is that
- * SSH is the door everyone remembers to lock and the others are the ones left open.
+ * Qué es cada servicio expuesto, y por qué alguien golpea ahí. El punto de la sección es que SSH
+ * es la puerta que todo el mundo se acuerda de cerrar, y las otras son las que quedan abiertas.
  */
 const PROTOCOL_INFO: Record<string, { name: string; what: string; why: string; color: string }> = {
   smbd: {
@@ -102,7 +102,7 @@ const PROTOCOL_INFO_EN: Record<string, { name: string; what: string; why: string
 export default function Protocols({ detail }: { detail: ProtocolDetail[] }) {
   const { t, lang } = useI18n();
   const tip = useTooltip();
-  // the passive data channel is a side effect of FTP, not an attack surface of its own
+  // el canal de datos pasivo es un efecto secundario de FTP, no una superficie de ataque propia
   const vectors = detail.filter((d) => d.protocol !== 'ftpdatalisten');
   const totalEvents = vectors.reduce((a, b) => a + b.count, 0);
   const maxEvents = Math.max(...vectors.map((d) => d.count), 1);
@@ -191,7 +191,7 @@ export default function Protocols({ detail }: { detail: ProtocolDetail[] }) {
             why: '',
             color: 'var(--ghost-slate)',
           };
-          // events per source separates a worm retrying from a broad scan
+          // los eventos por origen separan un gusano que reintenta de un escaneo amplio
           const perSource = d.sources ? d.count / d.sources : 0;
 
           return (

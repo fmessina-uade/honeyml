@@ -1,1 +1,1 @@
-"""Exploratory data analysis (EDA) of the honeypot telemetry."""
+"""Análisis exploratorio (EDA) de la telemetría de los honeypots."""

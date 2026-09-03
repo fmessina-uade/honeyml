@@ -1,5 +1,5 @@
-// Single source of truth for brand colors in JS/canvas code.
-// CSS uses the equivalent custom properties defined in :root (index.css).
+// La única fuente de verdad de los colores de marca para el código JS y de canvas.
+// El CSS usa las propiedades personalizadas equivalentes, definidas en :root (index.css).
 export const COLORS = {
   abyss: '#0D1117',
   amber: '#D4860A',

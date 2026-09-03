@@ -1,11 +1,11 @@
-"""Knowledge base that turns a raw attacker command into something a reader learns from.
+"""Base de conocimiento que convierte un comando crudo del atacante en algo de lo que se aprende.
 
-Each entry explains what the command does, why an attacker runs it, and which MITRE ATT&CK
-tactic it maps to. This is the layer that makes the dashboard educational rather than analytical:
-the data alone shows *what* happened, these annotations explain *why it matters*.
+Cada entrada explica qué hace el comando, por qué lo corre un atacante y a qué táctica de MITRE
+ATT&CK corresponde. Es la capa que hace que el panel sea educativo y no analítico: los datos solos
+muestran qué pasó, estas anotaciones explican por qué importa.
 
-Every entry carries both Spanish and English: the panel has a language toggle, and leaving the
-replay explanations untranslated would break its most distinctive section.
+Cada entrada viene en español y en inglés porque el panel tiene selector de idioma, y dejar las
+explicaciones del replay sin traducir rompería su sección más distintiva.
 """
 
 from __future__ import annotations
@@ -16,17 +16,17 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Annotation:
-    """What a reader should understand when they see this command."""
+    """Lo que quien lee tiene que entender cuando ve este comando."""
 
-    what: str  # what the command does, in plain language
-    why: str  # why an attacker runs it at this point of the intrusion
-    tactic: str  # MITRE ATT&CK tactic
-    technique: str  # MITRE ATT&CK technique id, empty when it doesn't map cleanly
-    what_en: str = ""  # same, in English
+    what: str  # qué hace el comando, en palabras simples
+    why: str  # por qué lo corre un atacante en este punto de la intrusión
+    tactic: str  # táctica de MITRE ATT&CK
+    technique: str  # id de técnica MITRE ATT&CK; vacío cuando no mapea limpio
+    what_en: str = ""  # lo mismo, en inglés
     why_en: str = ""
 
 
-# Ordered: the first pattern that matches wins, so put the specific ones first.
+# El orden importa: gana el primer patrón que coincide, así que los específicos van arriba.
 RULES: list[tuple[re.Pattern[str], Annotation]] = [
     (
         re.compile(r"\buname\b", re.I),
@@ -329,7 +329,7 @@ FALLBACK = Annotation(
 
 
 def annotate(command: str) -> Annotation:
-    """Return the annotation for a command; falls back to a generic one when nothing matches."""
+    """Devuelve la anotación de un comando; si no coincide ninguna, cae en la genérica."""
     for pattern, annotation in RULES:
         if pattern.search(command):
             return annotation

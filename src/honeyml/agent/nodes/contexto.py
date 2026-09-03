@@ -1,29 +1,20 @@
-"""First node of the graph: turn a bus message into something worth reasoning about.
+"""Primer nodo del grafo: convierte un mensaje del bus en algo sobre lo que valga la pena razonar.
 
-What arrives from the bus is one line — this address, on this protocol, ran this. That is enough to
-know something happened and not enough to say whether it matters. This node calls the read-only
-lookups of `tools` and assembles the surroundings: what the address had already done, what else
-happened in the same session, whether the sequence is one the corpus has seen thousands of times,
-and what fraction of addresses ever get this far.
+Lo que llega del bus es una línea: esta dirección, por este protocolo, ejecutó esto. Alcanza para
+saber que algo pasó y no alcanza para decir si importa. Este nodo llama a las consultas de solo
+lectura de `tools` y arma las circunstancias: qué había hecho antes esa dirección, qué más pasó en
+la misma sesión, si la secuencia es una que el corpus ya vio miles de veces, y qué proporción de
+direcciones llega hasta ahí.
 
-TWO KINDS OF FAILURE, KEPT APART
+Hay dos tipos de falla y conviene no mezclarlos. Si el índice no responde, el nodo levanta: con
+todas las consultas vacías no sale una decisión peor sino una decisión confiada sobre nada, al
+precio de una llamada paga. Si en cambio una consulta puntual falla o no encuentra nada, se anota y
+se sigue, porque una dirección nueva no tiene historial y un evento de Dionaea no tiene sesión. Lo
+que importa es que el hueco quede escrito en `hallazgos`: un modelo que sabe que la consulta de
+historial falló razona distinto de uno que cree que la dirección es nueva.
 
-*The index is unreachable.* The node raises. Every lookup would come back empty, and an empty
-context does not produce a worse decision — it produces a confident decision about nothing, at the
-price of an inference call. Raising leaves the event unacknowledged so another consumer picks it up
-once Elasticsearch is back. This is the same rule the graph applies to an unreachable provider, for
-the same reason.
-
-*One lookup fails or finds nothing.* Recorded and carried on. An address seen for the first time has
-no history, and a Dionaea event has no session because that sensor does not have the concept — both
-are ordinary, and neither should stop the cycle. What matters is that the gap is written down in
-`hallazgos` rather than left implicit: a model that knows the history lookup failed reasons
-differently from one that believes the address is new.
-
-WHAT IT NEVER DOES
-Interpret. No severity, no scoring, no filtering of what looks unimportant. If this node started
-deciding what deserves attention, the classification would be partly made before the classifier
-runs, and there would be no way to tell which part.
+Lo que este nodo nunca hace es interpretar. Si empezara a decidir qué merece atención, la
+clasificación estaría hecha a medias antes de que corra el clasificador.
 """
 
 from __future__ import annotations
@@ -40,7 +31,7 @@ SIN_INDICE = (URLError, ConnectionError, TimeoutError)
 
 
 def _intentar(nombre: str, hallazgos: dict[str, Any], fn: Any, *args: Any) -> Any:
-    """Run one lookup, letting a transport failure through and recording anything else.
+    """Corre una consulta: deja pasar la falla de transporte y anota cualquier otra cosa.
 
     El `except Exception` es deliberadamente ancho: una consulta que devuelve una forma inesperada,
     un campo que no está en el mapeo, un JSON que no parsea. Ninguna de esas justifica perder el
@@ -56,7 +47,6 @@ def _intentar(nombre: str, hallazgos: dict[str, Any], fn: Any, *args: Any) -> An
 
 
 def construir(estado: EstadoTriaje) -> EstadoTriaje:
-    """Assemble the context for this event. Returns the only key it touches."""
     evento = estado["evento"]
 
     # Sin dirección de origen no hay nada que consultar y nada que correlacionar: el evento se corta

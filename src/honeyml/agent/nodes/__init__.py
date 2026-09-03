@@ -1,1 +1,1 @@
-"""Graph nodes, one module per responsibility of the triage cycle."""
+"""Nodos del grafo, un módulo por responsabilidad del ciclo de triaje."""

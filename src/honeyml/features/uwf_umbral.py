@@ -1,22 +1,24 @@
-"""Decision threshold for the weakest class, as an explicit operating point.
+"""Umbral de decisión para la clase más débil, como punto de operación explícito.
 
-Tuning the hyperparameters did not move this model: the defaults were already right, and the
-search closed that question with a negative result. What *does* move is where the decision is cut.
+Ajustar los hiperparámetros no movió este modelo: los valores por defecto ya eran los adecuados, y
+la búsqueda cerró esa pregunta con un resultado negativo. Lo que sí lo mueve es dónde se corta la
+decisión.
 
-A classifier predicts whichever class scores highest. That rule is not neutral — it happens to
-minimise the overall error rate, which on a dataset where two classes hold 96 % of the observations
-is close to saying "err on the side of the majority". For a class with 559 examples in 1,9 million,
-that default quietly favours missing it.
+Un clasificador predice la clase de mayor puntaje. Esa regla no es neutral: minimiza el error
+global, que sobre un conjunto donde dos clases se llevan el 96 % de las observaciones es casi lo
+mismo que decir "errá para el lado de la mayoría". Para una clase con 559 ejemplos en 1,9 millones,
+ese valor por defecto favorece perderla, y lo hace en silencio.
 
-So the cut becomes a choice, and this module makes it one: it sweeps the probability threshold for
-Exfiltration, measures the precision/recall frontier, and reports what each point costs elsewhere.
+Entonces el corte pasa a ser una elección, y este módulo lo convierte en eso: barre el umbral de
+probabilidad de Exfiltration, mide la frontera de precisión y exhaustividad, y reporta qué cuesta
+cada punto en el resto.
 
-WHERE THE THRESHOLD IS CHOSEN
-On a validation slice carved out of the training half, never on the test half. Picking it on the
-same data used to report would be choosing the answer and then measuring it: the number would look
-better and mean less. The test half stays untouched until the operating point is already fixed.
+Dónde se elige el umbral: sobre una porción de validación recortada de la mitad de entrenamiento,
+nunca sobre la de prueba. Elegirlo sobre los mismos datos con los que después se reporta sería
+elegir la respuesta y recién ahí medirla, y el número quedaría mejor y significaría menos. La mitad
+de prueba no se toca hasta que el punto de operación ya está fijado.
 
-Usage:
+Uso:
     python -m honeyml.features.uwf_umbral
 """
 
@@ -37,18 +39,18 @@ from .uwf_tuning import BASE, _modelo
 
 OUT_FILE = Path("data/processed/uwf_umbral.json")
 
-# Below 0,05 the class floods everything; above 0,60 it stops firing on a class this rare. The
-# range is wide on purpose: the point is to show the frontier, not to defend one value.
+# Por debajo de 0,05 la clase inunda todo; por encima de 0,60 deja de dispararse en una clase tan
+# rara. El rango es ancho a propósito: la idea es mostrar la frontera, no defender un valor.
 UMBRALES = [0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.40, 0.50, 0.60]
 
 
 def _predecir_con_umbral(
     proba: np.ndarray, clases: np.ndarray, indice_debil: int, umbral: float
 ) -> np.ndarray:
-    """Assign the weak class whenever it clears the threshold; otherwise the usual winner.
+    """Asigna la clase débil cuando supera el umbral; si no, el ganador de siempre.
 
-    Only the weak class gets a threshold. Giving one to every class would need a tie-break rule
-    between them, and would change the behaviour of five classes to fix one.
+    El umbral es solo para la clase débil. Darle uno a cada clase pediría además una regla de
+    desempate entre ellas, y cambiaría el comportamiento de cinco clases para arreglar una.
     """
     ganador = clases[proba.argmax(axis=1)]
     supera = proba[:, indice_debil] >= umbral

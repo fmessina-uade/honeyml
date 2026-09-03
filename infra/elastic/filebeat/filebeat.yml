@@ -1,8 +1,8 @@
-# Filebeat, production. Tails the honeypots' JSON logs into Logstash.
-# The honeypot volumes are mounted read-only (see docker-compose.yml).
+# Filebeat, producción. Sigue los registros JSON de los honeypots y los manda a Logstash.
+# Los volúmenes de los honeypots se montan de solo lectura (ver docker-compose.yml).
 
 filebeat.inputs:
-  # Cowrie SSH/Telnet honeypot. Its jsonlog output writes one event per line.
+  # Honeypot Cowrie de SSH y Telnet. Su salida jsonlog escribe un evento por línea.
   - type: filestream
     id: cowrie-json
     enabled: true
@@ -18,18 +18,19 @@ filebeat.inputs:
     fields:
       honeypot: cowrie
 
-  # Dionaea, multiprotocol. The log_json ihandler is baked into the image (Dockerfile).
-  # If the file doesn't exist yet, this input just finds nothing (no failure).
+  # Dionaea, multiprotocolo. El ihandler log_json viene cocinado en la imagen (Dockerfile).
+  # Si el archivo todavía no existe, esta entrada simplemente no encuentra nada, no falla.
   - type: filestream
     id: dionaea-json
     enabled: true
     paths:
-      # the honeypots_dionaea_var volume (=/opt/dionaea/var) is mounted at /logs/dionaea.
-      # log_json writes to var/lib/dionaea/dionaea.json -> /logs/dionaea/lib/dionaea/dionaea.json
+      # el volumen honeypots_dionaea_var (=/opt/dionaea/var) se monta en /logs/dionaea.
+      # log_json escribe en var/lib/dionaea/dionaea.json -> /logs/dionaea/lib/dionaea/dionaea.json
       - /logs/dionaea/lib/dionaea/dionaea.json
-      # logrotate rotates this file daily (see /etc/logrotate.d/dionaea). With delaycompress the
-      # most recent rotation stays uncompressed for one cycle, which is the window filestream can
-      # still read it in; compressed ones are excluded below because filestream cannot decompress.
+      # logrotate rota este archivo a diario (ver /etc/logrotate.d/dionaea). Con delaycompress, la
+      # rotación más reciente queda sin comprimir durante un ciclo, que es la ventana en la que
+      # filestream todavía la puede leer. Las comprimidas se excluyen abajo porque filestream no
+      # sabe descomprimir.
       - /logs/dionaea/lib/dionaea/dionaea.json.[0-9]*
     exclude_files: ['\.gz$']
     parsers:
@@ -41,13 +42,13 @@ filebeat.inputs:
     fields:
       honeypot: dionaea
 
-# Filebeat only ships; the ECS normalization happens in Logstash.
+# Filebeat solo transporta; la normalización ECS ocurre en Logstash.
 output.logstash:
   hosts: ["logstash:5044"]
 
 logging.level: info
 logging.to_files: false
 
-# no auto index/dashboard setup: Logstash + the template own the mapping.
+# sin configuración automática de índices ni tableros: el mapeo lo manejan Logstash y la plantilla.
 setup.ilm.enabled: false
 setup.template.enabled: false

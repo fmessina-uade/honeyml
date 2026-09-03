@@ -7,13 +7,13 @@ name = "honeyml"
 version = "0.1.0"
 description = "HoneyML - open-source threat intelligence platform: honeypots + Agentic AI"
 # 3.12 es lo que corre en todos lados: el servidor (Ubuntu 24.04 trae 3.12.3), el entorno de
-# desarrollo y el hook de pre-commit. Antes acá decía 3.11, que no corría en ningún lado —solo
-# estaba declarado en CI— y esa diferencia entre lo declarado y lo real hacía que la verificación
+# desarrollo y el hook de pre-commit. Antes acá decía 3.11, que no corría en ningún lado (solo
+# estaba declarado en CI), y esa diferencia entre lo declarado y lo real hacía que la verificación
 # de tipos no pudiera correr localmente.
 requires-python = ">=3.12"
 
 [project.optional-dependencies]
-# EDA and feature engineering. Install with: pip install -e ".[analysis]"
+# Análisis exploratorio e ingeniería de características. Se instala con: pip install -e ".[analysis]"
 analysis = [
     "pandas>=2.2",
     "numpy>=1.26",
@@ -22,21 +22,21 @@ analysis = [
     "scikit-learn>=1.4",
     "pyarrow>=15",
 ]
-# API that feeds the educational dashboard. Install with: pip install -e ".[api]"
+# La API que alimenta el panel educativo. Se instala con: pip install -e ".[api]"
 api = [
     "fastapi>=0.115",
     "uvicorn>=0.32",
 ]
-# Agentic triage engine. Install with: pip install -e ".[agent]"
-# The inference provider is deliberately absent: the engine reaches it through an adapter
-# (see ADR on provider substitution), so the dependency belongs to the adapter, not here.
+# Motor de triaje agéntico. Se instala con: pip install -e ".[agent]"
+# El proveedor de inferencia no está acá a propósito: el motor lo alcanza a través de un adaptador
+# (ver el ADR sobre sustitución de proveedor), así que la dependencia es del adaptador y no de acá.
 agent = [
     "langgraph>=0.2",
     "redis>=5.0",
     "pydantic>=2.9",
     # Solo el paquete de certificados raíz, no un cliente HTTP: el adaptador habla por `urllib`.
     # Se declara porque el adaptador lo usa de respaldo cuando el intérprete no tiene almacén de
-    # certificados —el caso del Python de python.org en macOS sin `Install Certificates.command`—,
+    # certificados (el caso del Python de python.org en macOS sin `Install Certificates.command`),
     # y hasta ahora venía arrastrado por otra dependencia, que es una forma frágil de depender.
     "certifi>=2024.2",
 ]
@@ -74,7 +74,7 @@ select = ["E", "F", "W", "I", "N", "UP"]
 
 [tool.mypy]
 # Tiene que coincidir con requires-python y con CI. Cuando decía 3.11 y el entorno real era 3.12,
-# mypy no podía parsear los stubs de numpy —que usan sintaxis de 3.12— y abortaba antes de mirar
+# mypy no podía parsear los stubs de numpy, que usan sintaxis de 3.12, y abortaba antes de mirar
 # una línea del proyecto, con lo que la verificación de tipos solo corría en el hook.
 python_version = "3.12"
 strict = true

@@ -3,15 +3,15 @@ import { n, pct } from '../lib/format';
 import { useI18n } from '../lib/i18n';
 
 /**
- * How many of the addresses that knocked got through each stage of an intrusion.
+ * Cuántas de las direcciones que golpearon la puerta pasaron cada etapa de una intrusión.
  *
- * The archetype cards already carry these numbers, but spread across three cards the reader has to
- * hold them in their head to see the shape. Stacked as one funnel the drop-off is the picture: the
- * bar for "knocked" is the width of the panel and the bar for "took something" is a sliver.
+ * Las tarjetas de arquetipos ya traen estos números, pero repartidos en tres tarjetas el lector
+ * tiene que sostenerlos en la cabeza para ver la forma. Apilados en un embudo, la caída es la
+ * imagen: la barra de "golpearon" es el ancho del panel y la de "se llevaron algo" es una astilla.
  *
- * Every figure is derived from the archetype profiles, so this cannot disagree with the cards
- * underneath it — the alternative was a second query returning slightly different totals for
- * reasons nobody would want to explain in a defence.
+ * Todos los números se derivan de los perfiles de arquetipos, así que esto no puede contradecir a
+ * las tarjetas de abajo. La alternativa era una segunda consulta devolviendo totales apenas
+ * distintos, por motivos que nadie querría explicar en una defensa.
  */
 
 /**

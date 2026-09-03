@@ -1,13 +1,12 @@
-"""The historical retrieval node and the two lookups it rests on.
+"""El nodo de recuperación histórica y las dos consultas sobre las que se apoya.
 
-Same intent as the other test files in this package: pin the decisions that would survive a refactor
-silently if nobody wrote them down. Here there are three.
+La intención es la misma que en los otros archivos de pruebas del paquete: fijar las decisiones que
+un refactor se llevaría puestas en silencio si nadie las escribió. Acá hay tres.
 
-- The burst window ends at the event, never at "now". Counting what happened afterwards would be
-  asking the future whether this was a campaign.
-- The trajectory is ordered by the same floor rule the engine is judged by, not by a second opinion
-  living inside the tool.
-- The node adds to the context instead of replacing it, so what the previous node found survives.
+La ventana de ráfaga termina en el evento y nunca en "ahora": contar lo que pasó después sería
+preguntarle al futuro si esto era una campaña. La trayectoria se ordena por la misma regla de piso
+con la que se juzga al motor, y no por una segunda opinión que viva adentro de la herramienta. Y el
+nodo suma al contexto en vez de reemplazarlo, así lo que encontró el nodo anterior sobrevive.
 """
 
 from __future__ import annotations

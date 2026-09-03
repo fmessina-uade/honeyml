@@ -62,12 +62,12 @@ repos:
       - id: conventional-pre-commit
         stages: [commit-msg]
         args:
-          - feat      # new feature
-          - fix       # bug fix
-          - docs      # docs only
-          - style     # formatting, no logic change
-          - refactor  # refactor, no new feature or fix
-          - test      # add or fix tests
-          - chore     # maintenance (deps, CI, tooling)
-          - infra     # infrastructure changes (VPS scripts, Docker)
-          - perf      # performance improvements
+          - feat      # funcionalidad nueva
+          - fix       # corrección de un defecto
+          - docs      # solo documentación y comentarios
+          - style     # formato, sin cambio de lógica
+          - refactor  # refactor, sin funcionalidad nueva ni corrección
+          - test      # se agregan o arreglan pruebas
+          - chore     # mantenimiento (dependencias, CI, herramientas)
+          - infra     # infraestructura (scripts del VPS, Docker)
+          - perf      # mejoras de rendimiento

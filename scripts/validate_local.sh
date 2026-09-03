@@ -1,6 +1,6 @@
 #!/bin/bash
-# validate_local.sh - pre-deploy check of the HoneyML stack locally.
-# Run it before pushing to the VPS to catch the obvious breakage.
+# validate_local.sh: chequeo local del stack de HoneyML antes de desplegar.
+# Se corre antes de subir al VPS, para agarrar lo que se rompe de forma obvia.
 #
 # Usage: bash scripts/validate_local.sh
 
@@ -107,7 +107,7 @@ echo "[ 5 ] Validación de cowrie.cfg (paths internos correctos)"
 
 COWRIE_CFG="infra/honeypots/cowrie/cowrie.cfg"
 
-# paths that must be present (learned while debugging the image)
+# rutas que tienen que estar; lo aprendimos depurando la imagen
 if grep -q "^contents_path = honeyfs" "$COWRIE_CFG"; then
     ok "cowrie.cfg: contents_path = honeyfs (directorio real en la imagen)"
 else
@@ -126,7 +126,7 @@ else
     fail "cowrie.cfg: auth_class faltante o incorrecto"
 fi
 
-# the docker-compose.yml volumes must use the container's real CWD
+# los volúmenes del docker-compose.yml tienen que usar el CWD real del contenedor
 if grep -q "/cowrie/cowrie-git/etc/cowrie.cfg" "$COMPOSE_FILE"; then
     ok "docker-compose.yml: volume cowrie.cfg apunta a /cowrie/cowrie-git/etc/"
 else
@@ -144,7 +144,7 @@ echo "[ 6 ] Validación de userdb.txt (formato y encoding)"
 
 USERDB="infra/honeypots/cowrie/userdb.txt"
 
-# 6a. ASCII only - Cowrie opens the file with no encoding= (defaults to ascii)
+# 6a. solo ASCII: Cowrie abre el archivo sin encoding=, así que usa ascii por defecto
 if python3 -c "
 import sys
 with open('$USERDB', 'rb') as f:
@@ -160,7 +160,7 @@ else
     info "  Causa probable: comentarios con ñ, tildes, em-dash u otros UTF-8"
 fi
 
-# 6b. user:x:password format (field 2 = 'x', not a numeric UID)
+# 6b. formato usuario:x:contraseña (el campo 2 es 'x', no un UID numérico)
 BAD_FORMAT=$(grep -v "^#" "$USERDB" | grep -v "^$" | grep -v "^[^:]*:x:" || true)
 if [[ -z "$BAD_FORMAT" ]]; then
     ok "userdb.txt: formato usuario:x:password correcto"
@@ -169,7 +169,7 @@ else
     echo "$BAD_FORMAT" | sed 's/^/     /'
 fi
 
-# 6c. no empty passwords (they cause IndexError in auth.py)
+# 6c. sin contraseñas vacías, que provocan un IndexError en auth.py
 EMPTY_PASS=$(grep -v "^#" "$USERDB" | grep -v "^$" | grep ":$" || true)
 if [[ -z "$EMPTY_PASS" ]]; then
     ok "userdb.txt: sin contraseñas vacías (evita IndexError en auth.py)"
@@ -216,35 +216,35 @@ SUBNET=$(docker network inspect honeypot_net --format='{{range .IPAM.Config}}{{.
 
 sleep 4
 
-# Cowrie SSH (port 2222 in dev)
+# Cowrie SSH (puerto 2222 en desarrollo)
 if nc -z -w5 127.0.0.1 2222 2>/dev/null; then
     ok "Cowrie SSH responde en localhost:2222"
 else
     fail "Cowrie SSH no responde en localhost:2222"
 fi
 
-# Cowrie Telnet (port 2323 in dev)
+# Cowrie Telnet (puerto 2323 en desarrollo)
 if nc -z -w5 127.0.0.1 2323 2>/dev/null; then
     ok "Cowrie Telnet responde en localhost:2323"
 else
     fail "Cowrie Telnet no responde en localhost:2323"
 fi
 
-# Dionaea HTTP (port 8080 in dev)
+# Dionaea HTTP (puerto 8080 en desarrollo)
 if nc -z -w5 127.0.0.1 8080 2>/dev/null; then
     ok "Dionaea HTTP responde en localhost:8080"
 else
     fail "Dionaea HTTP no responde en localhost:8080"
 fi
 
-# Dionaea SMB (port 4445 in dev)
+# Dionaea SMB (puerto 4445 en desarrollo)
 if nc -z -w5 127.0.0.1 4445 2>/dev/null; then
     ok "Dionaea SMB responde en localhost:4445"
 else
     fail "Dionaea SMB no responde en localhost:4445"
 fi
 
-# real SSH auth test with weak creds
+# prueba real de autenticación SSH con credenciales débiles
 if command -v sshpass &>/dev/null; then
     if sshpass -p 'root' ssh \
         -o StrictHostKeyChecking=no \

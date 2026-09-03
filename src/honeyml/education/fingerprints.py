@@ -1,13 +1,15 @@
-"""Group captured sessions by the exact sequence of commands they run.
+"""Agrupa las sesiones capturadas por la secuencia exacta de comandos que ejecutan.
 
-The finding this exists to show: most sessions are not distinct attacks. They are the same script
-replayed by many machines. Grouping by command sequence turns a volume figure into evidence that
-the attacker is a program, not a person — which is the premise the whole project rests on.
+El hallazgo que esto existe para mostrar: la mayoría de las sesiones no son ataques distintos, son
+el mismo script reproducido por muchas máquinas. Agrupar por secuencia de comandos convierte un
+número de volumen en evidencia de que el atacante es un programa y no una persona, que es la premisa
+sobre la que se apoya todo el proyecto.
 
-A family here is a set of sessions whose command sequence is byte-identical. That is a deliberately
-strict definition: it cannot produce false groupings, so any family it finds is real.
+Una familia acá es un conjunto de sesiones cuya secuencia de comandos es idéntica byte a byte. Es
+una definición estricta a propósito: no puede producir agrupaciones falsas, así que toda familia que
+encuentra es real.
 
-Usage:
+Uso:
     python -m honeyml.education.fingerprints
 """
 
@@ -23,9 +25,9 @@ from .annotations import annotate
 from .session_replay import LOGS_DIR, _collect, anonymize, defang
 
 OUT_FILE = Path("data/processed/fingerprints.json")
-# a family needs enough members to be a pattern rather than a coincidence
+# una familia necesita suficientes miembros para ser un patrón y no una casualidad
 MIN_SESSIONS = 3
-# how many families to publish, and how many commands to keep as the family's signature
+# cuántas familias se publican, y cuántos comandos se guardan como firma de cada una
 TOP_N = 12
 MAX_COMMANDS = 12
 
@@ -75,7 +77,7 @@ def build(logs_dir: Path = LOGS_DIR) -> dict[str, Any]:
                 "tactics": tactics,
                 "first_seen": fam["first"],
                 "last_seen": fam["last"],
-                # a stable label so the family can be referred to in the report
+                # una etiqueta estable, para poder referirse a la familia en el informe
                 "label": anonymize("|".join(fam["commands"])).replace("attacker-", "family-"),
             }
         )

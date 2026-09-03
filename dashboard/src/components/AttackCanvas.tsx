@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
 
 interface Props {
-  /** Daily event counts, oldest first. Drives how many nodes appear and how fast they move. */
+  /** Conteos diarios de eventos, del más viejo al más nuevo. Define cuántos nodos aparecen y a qué
+   *  velocidad se mueven. */
   intensity: number[];
 }
 
@@ -16,14 +17,14 @@ interface Node {
 const LINK_DIST = 74;
 
 /**
- * Background texture for the section header, built from the capture itself.
+ * Textura de fondo del encabezado de sección, armada con la propia captura.
  *
- * Adapted from the public site's particle canvas, with one difference that matters: the node count
- * and drift speed come from the real daily volume, so a busy period looks busy. It is decoration
- * that cannot contradict the data, because it is made of it.
+ * Adaptada del canvas de partículas del sitio público, con una diferencia que importa: la cantidad
+ * de nodos y la velocidad de deriva salen del volumen diario real, así que un período movido se ve
+ * movido. Es decoración que no puede contradecir a los datos, porque está hecha de ellos.
  *
- * Renders at devicePixelRatio, pauses when off-screen, and does not run at all under
- * prefers-reduced-motion or in capture mode.
+ * Dibuja a devicePixelRatio, se pausa cuando queda fuera de pantalla, y directamente no corre con
+ * prefers-reduced-motion ni en modo captura.
  */
 export default function AttackCanvas({ intensity }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -40,7 +41,7 @@ export default function AttackCanvas({ intensity }: Props) {
     const peak = Math.max(...intensity, 1);
     const recent = intensity.slice(-14);
     const level = recent.reduce((a, b) => a + b, 0) / (recent.length || 1) / peak;
-    // between 18 and 46 nodes: enough to read as a network, never enough to be noise
+    // entre 18 y 46 nodos: suficiente para leerse como una red, nunca tanto como para ser ruido
     const count = Math.round(18 + level * 28);
 
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -106,7 +107,7 @@ export default function AttackCanvas({ intensity }: Props) {
     };
 
     if (reduced || frozen) {
-      // one static frame: the texture is still there, nothing moves
+      // un solo cuadro estático: la textura sigue estando, no se mueve nada
       draw(false);
       return () => window.removeEventListener('resize', resize);
     }

@@ -1,7 +1,7 @@
 http.host: "0.0.0.0"
 # X-Pack monitoring off (security off, private setup)
 xpack.monitoring.enabled: false
-# main pipeline lives in the files under /usr/share/logstash/pipeline
+# el pipeline principal vive en los archivos bajo /usr/share/logstash/pipeline
 pipeline.ordered: auto
 log.level: info
 
@@ -35,9 +35,9 @@ xpack.geoip.downloader.enabled: false
 # perdería en cada recreación, que es exactamente lo que se quiere evitar.
 queue.type: persisted
 
-# DIMENSIONADO, medido sobre el corpus real
+# Dimensionado, medido sobre el corpus real
 # El día de mayor actividad registró 258.348 eventos. Un evento en cola pesa más que en el índice
-# —no está comprimido y conserva el mensaje original—, del orden de 1,5 KB, así que un día pico
+# (no está comprimido y conserva el mensaje original), del orden de 1,5 KB, así que un día pico
 # ocupa unos 400 MB. Dos gigabytes cubren cerca de cinco días pico seguidos con el índice caído.
 #
 # El espacio se reserva de a páginas, a medida que hace falta: en operación normal la cola está
@@ -46,7 +46,7 @@ queue.type: persisted
 queue.max_bytes: 2gb
 
 # El punto de control se sincroniza a disco cada 128 escrituras en lugar de las 1024 por defecto.
-# Con el caudal de este sistema —21 eventos por minuto de media, 180 en el día pico— el valor por
+# Con el caudal de este sistema, 21 eventos por minuto de media y 180 en el día pico, el valor por
 # defecto dejaba ventanas de hasta 48 minutos sin sincronizar. A 128 la ventana baja a menos de un
 # minuto en pico, y el costo es de una sincronización cada minuto y medio: irrelevante.
 #

@@ -1,20 +1,20 @@
-# docker-compose.dev.yml: override for local dev (macOS/Linux)
+# docker-compose.dev.yml: override para desarrollo local (macOS/Linux)
 #
 # Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 #        or just: make dev-up
 #
-# Why the ports change:
-#   Port 22   -> macOS runs its own sshd on 22
+# Por qué cambian los puertos:
+#   Puerto 22   -> macOS corre su propio sshd en el 22
 #   Port 445  -> macOS has native SMB (File Sharing)
-#   Port 3306 -> a local MySQL may be running
-#   Port 80   -> there may be a local web server
+#   Puerto 3306 -> puede haber un MySQL local corriendo
+#   Puerto 80   -> puede haber un servidor web local
 
 services:
   cowrie:
     ports:
       - "127.0.0.1:2222:2222/tcp"   # SSH honeypot  (test with: ssh -p 2222 root@localhost)
       - "127.0.0.1:2323:2223/tcp"   # Telnet honeypot
-    # no CPU cap locally so it doesn't get in the way of dev
+    # sin tope de CPU en local, para que no moleste mientras se desarrolla
     cpus: "1.0"
     mem_limit: 256m
 

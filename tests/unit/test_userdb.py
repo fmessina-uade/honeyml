@@ -62,7 +62,7 @@ def test_userdb_has_minimum_entries(userdb_text):
 
 
 def test_userdb_root_entry_present(userdb_text):
-    """root:x:root debe estar presente — es la credencial más probada en ataques SSH."""
+    """root:x:root debe estar presente, es la credencial más probada en ataques SSH."""
     assert "root:x:root" in userdb_text, "Falta la entrada root:x:root"
 
 

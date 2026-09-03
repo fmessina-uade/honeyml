@@ -1,10 +1,10 @@
-"""Check the implementation claims made in the report against the running system.
+"""Contrasta contra el sistema andando las afirmaciones de implementación que hace el informe.
 
-Every table in the document that describes runtime behaviour is re-derived here from
-Elasticsearch instead of being trusted. Run it before submitting, and paste the output next to
-the chapter it backs.
+Cada tabla del documento que describe comportamiento en ejecución se vuelve a derivar acá desde
+Elasticsearch, en lugar de darla por buena. Se corre antes de entregar, y la salida se pega al lado
+del capítulo que respalda.
 
-Usage:
+Uso:
     python scripts/verify_claims.py
 """
 
@@ -35,7 +35,7 @@ def miles(v: int) -> str:
 
 
 def event_mapping() -> None:
-    """Claim 8: the nine Cowrie event rows (native event, category, action, outcome)."""
+    """Afirmación 8: las nueve filas de eventos de Cowrie, con categoría, acción y resultado."""
     body = {
         "size": 0,
         "query": NOT_LOCAL,
@@ -53,14 +53,14 @@ def event_mapping() -> None:
     print(f"{'event.action':<28}{'event.category':<16}{'event.outcome':<14}{'eventos':>12}")
     print("-" * 70)
     for b in buckets:
-        cat = ",".join(x["key"] for x in b["cat"]["buckets"]) or "—"
-        out = ",".join(x["key"] for x in b["out"]["buckets"]) or "—"
+        cat = ",".join(x["key"] for x in b["cat"]["buckets"]) or "-"
+        out = ",".join(x["key"] for x in b["out"]["buckets"]) or "-"
         print(f"{b['key']:<28}{cat:<16}{out:<14}{miles(b['doc_count']):>12}")
     print(f"\n  filas distintas: {len(buckets)}")
 
 
 def sensor_namespace() -> None:
-    """Claim 9: attributes with no ECS equivalent live under a per-sensor namespace."""
+    """Afirmación 9: los atributos sin equivalente ECS van bajo un espacio de nombres por sensor."""
     for sensor in ("cowrie", "dionaea"):
         body = {"size": 1, "query": {"bool": {"filter": [{"exists": {"field": sensor}}]}}}
         hits = search(f"honeypot-{sensor}-*", body)["hits"]["hits"]
@@ -72,7 +72,7 @@ def sensor_namespace() -> None:
 
 
 def unrouted() -> None:
-    """Claim 7: the dead-letter index is empty in normal operation."""
+    """Afirmación 7: el índice de descarte está vacío en operación normal."""
     req = urllib.request.Request(f"{ES}/_cat/indices/honeypot-unrouted-*?format=json")
     with urllib.request.urlopen(req, timeout=30) as r:
         rows = json.load(r)
@@ -84,7 +84,7 @@ def unrouted() -> None:
 
 
 def complementarity() -> None:
-    """Claim 11: the network-services sensor sees database protocols the SSH sensor cannot."""
+    """Afirmación 11: el sensor de servicios ve protocolos de base de datos que el de SSH no."""
     body = {
         "size": 0,
         "query": NOT_LOCAL,
@@ -101,7 +101,7 @@ def complementarity() -> None:
 
 
 def totals() -> None:
-    """The final numbers for the report's cut-off."""
+    """Los números finales al corte del informe."""
     body = {
         "size": 0,
         "track_total_hits": True,
@@ -140,11 +140,11 @@ def totals() -> None:
 
 def main() -> None:
     for title, fn in [
-        ("Afirmación 8 — mapeo de eventos del sensor de acceso remoto", event_mapping),
-        ("Afirmación 9 — espacio de nombres por sensor", sensor_namespace),
-        ("Afirmación 7 — índice de descarte", unrouted),
-        ("Afirmación 11 — complementariedad de sensores", complementarity),
-        ("Parte 3 — números finales del corte", totals),
+        ("Afirmación 8: mapeo de eventos del sensor de acceso remoto", event_mapping),
+        ("Afirmación 9: espacio de nombres por sensor", sensor_namespace),
+        ("Afirmación 7: índice de descarte", unrouted),
+        ("Afirmación 11: complementariedad de sensores", complementarity),
+        ("Parte 3: números finales del corte", totals),
     ]:
         print(f"\n{'=' * 72}\n{title}\n{'=' * 72}")
         fn()

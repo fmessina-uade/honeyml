@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-/** Returns a ref and a flag that flips to true (once) when the element scrolls into view. */
+/** Devuelve una ref y una bandera que pasa a true, una sola vez, cuando el elemento entra en vista. */
 export function useInView<T extends HTMLElement>(threshold = 0.2) {
   const ref = useRef<T | null>(null);
   const [inView, setInView] = useState(false);

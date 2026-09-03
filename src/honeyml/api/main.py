@@ -1,10 +1,10 @@
-"""FastAPI service behind the educational dashboard.
+"""Servicio FastAPI detrás del panel educativo.
 
-Sits between the browser and Elasticsearch so the search API is never exposed to the client, and
-serves the annotated replay sessions. Runs next to Elasticsearch on the private network; reached
-through the SSH tunnel, never published.
+Se pone entre el navegador y Elasticsearch para que la API de búsqueda nunca quede expuesta al
+cliente, y además sirve las sesiones anotadas del replay. Corre al lado de Elasticsearch en la red
+privada y se alcanza por el túnel SSH, nunca publicado.
 
-Usage:
+Uso:
     uvicorn honeyml.api.main:app --reload --port 8000
 """
 
@@ -27,10 +27,10 @@ REPLAY_FILE = Path("data/processed/replay_sessions.json")
 
 
 def _live_or_frozen[T](fetch: Callable[[], T], key: str) -> T:
-    """Run a live query, falling back to the frozen snapshot when Elasticsearch is unreachable.
+    """Corre la consulta en vivo y cae al respaldo congelado si no se alcanza a Elasticsearch.
 
-    Only connection errors fall back. A malformed query is a bug and must surface as one rather
-    than be masked by stale data that happens to be on disk.
+    Solo caen al respaldo los errores de conexión. Una consulta mal armada es un error nuestro y
+    tiene que aparecer como tal, no quedar tapada por datos viejos que justo estaban en disco.
     """
     try:
         return fetch()
@@ -55,7 +55,7 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# the dashboard runs on the Vite dev server during development
+# durante el desarrollo el panel corre en el servidor de Vite
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
@@ -66,7 +66,7 @@ app.add_middleware(
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    """Reports whether the data being served is live or comes from the frozen snapshot."""
+    """Informa si lo que se está sirviendo es en vivo o sale del respaldo congelado."""
     try:
         queries.overview()
         return {"status": "ok", "mode": "live"}
@@ -94,12 +94,12 @@ def get_timeline(
     desde: str | None = None,
     hasta: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Events over time, optionally narrowed by sensor and date range.
+    """Eventos en el tiempo, con filtro opcional por sensor y por rango de fechas.
 
-    With Elasticsearch down the snapshot answers what it can compute from its daily buckets —a date
-    range, a sensor, a weekly rollup— and refuses the hourly view, whose buckets it never stored.
-    The refusal is a 503 with the reason in it, not a stack trace: the panel shows the reason, and a
-    filter that cannot be honoured says so instead of leaving the unfiltered chart on screen.
+    Con Elasticsearch abajo, el respaldo contesta lo que puede calcular desde sus cubos diarios (un
+    rango, un sensor, un agrupado semanal) y rechaza la vista por hora, cuyos cubos nunca guardó.
+    El rechazo es un 503 con el motivo adentro y no una traza: el panel muestra ese motivo, así un
+    filtro que no se puede cumplir lo dice, en vez de dejar el gráfico sin filtrar en pantalla.
     """
     filtrado = bool(sensor or desde or hasta) or interval != "day"
     if not filtrado:
@@ -123,43 +123,43 @@ def get_timeline(
 
 @app.get("/api/credentials")
 def get_credentials(size: int = 10) -> dict[str, list[dict[str, Any]]]:
-    """Most attempted users and passwords."""
+    """Los usuarios y contraseñas más intentados."""
     return _live_or_frozen(lambda: queries.top_credentials(size=size), "credentials")
 
 
 @app.get("/api/commands")
 def get_commands(size: int = 12) -> list[dict[str, Any]]:
-    """Most executed commands."""
+    """Los comandos más ejecutados."""
     return _live_or_frozen(lambda: queries.top_commands(size=size), "commands")
 
 
 @app.get("/api/protocol-detail")
 def get_protocol_detail() -> list[dict[str, Any]]:
-    """Per-protocol traffic on the multiprotocol sensor, with distinct sources."""
+    """Tráfico por protocolo en el sensor multiprotocolo, con direcciones distintas."""
     return _live_or_frozen(queries.protocol_detail, "protocol_detail")
 
 
 @app.get("/api/protocols")
 def get_protocols() -> list[dict[str, Any]]:
-    """Attack surface by protocol."""
+    """Superficie de ataque por protocolo."""
     return _live_or_frozen(queries.protocols, "protocols")
 
 
 @app.get("/api/stages")
 def get_stages() -> list[dict[str, Any]]:
-    """Events per stage of the intrusion."""
+    """Eventos por etapa de la intrusión."""
     return _live_or_frozen(queries.attack_stages, "stages")
 
 
 @app.get("/api/hourly")
 def get_hourly() -> list[dict[str, Any]]:
-    """Attacks by hour of day: shows the absence of a human rhythm."""
+    """Ataques por hora del día: muestra que no hay ritmo humano detrás."""
     return _live_or_frozen(queries.hourly, "hourly")
 
 
 @app.get("/api/snapshot")
 def get_snapshot() -> dict[str, Any]:
-    """Everything at once: one round trip for the dashboard's initial load."""
+    """Todo junto: un solo viaje para la carga inicial del panel."""
     try:
         return queries.snapshot()
     except (URLError, ConnectionError, TimeoutError) as exc:
@@ -178,22 +178,23 @@ def get_snapshot() -> dict[str, Any]:
 
 @app.get("/api/weekly-rhythm")
 def get_weekly_rhythm() -> dict[str, Any]:
-    """Events by day of week and hour of day: whether there is any human rhythm at all."""
+    """Eventos por día de la semana y hora: si hay algún ritmo humano, acá se vería."""
     return _live_or_frozen(queries.weekly_rhythm, "weekly_rhythm")
 
 
 @app.get("/api/geography")
 def get_geography() -> dict[str, Any]:
-    """Origin of the attacks by country and by autonomous system."""
+    """Origen de los ataques por país y por sistema autónomo."""
     return _live_or_frozen(queries.geography, "geography")
 
 
 @app.get("/api/archetypes")
 def get_archetypes() -> dict[str, Any]:
-    """Behavioural groups of the observed sources.
+    """Grupos de conducta de las direcciones observadas.
 
-    Served from the precomputed file and not from a live query: the grouping runs over the whole
-    feature table and takes seconds, which is fine as a batch step and not on a page load.
+    Sale del archivo precalculado y no de una consulta en vivo: el agrupamiento corre sobre toda la
+    tabla de características y tarda segundos, que está bien como paso por lotes y no en una carga
+    de página.
     """
     data = arquetipos.load()
     if data is None:
@@ -206,7 +207,7 @@ def get_archetypes() -> dict[str, Any]:
 
 @app.get("/api/fingerprints")
 def get_fingerprints() -> dict[str, Any]:
-    """Families of sessions running a byte-identical command sequence."""
+    """Familias de sesiones que corren una secuencia de comandos idéntica byte a byte."""
     data = fingerprints.load()
     if data is None:
         raise HTTPException(
@@ -218,9 +219,9 @@ def get_fingerprints() -> dict[str, Any]:
 
 @app.get("/api/password-check")
 def check_password(prefix: str) -> dict[str, Any]:
-    """k-anonymity lookup: takes a hash prefix, never a password.
+    """Consulta con k-anonimato: recibe un prefijo de hash, nunca una contraseña.
 
-    See honeyml/education/password_index for why the comparison is split this way.
+    En honeyml/education/password_index está el porqué de partir así la comparación.
     """
     if not prefix or len(prefix) > 8 or not all(c in "0123456789abcdefABCDEF" for c in prefix):
         raise HTTPException(status_code=400, detail="Prefijo inválido.")
@@ -235,7 +236,7 @@ def check_password(prefix: str) -> dict[str, Any]:
 
 @app.get("/api/replays")
 def get_replays() -> list[dict[str, Any]]:
-    """Annotated attack sessions for the step by step replay."""
+    """Sesiones de ataque anotadas, para el replay paso a paso."""
     if not REPLAY_FILE.exists():
         raise HTTPException(
             status_code=503,

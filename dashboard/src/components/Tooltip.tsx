@@ -6,12 +6,12 @@ interface Anchor {
 }
 
 /**
- * Cursor-following tooltip for the charts.
+ * Tooltip que sigue al cursor, para los gráficos.
  *
- * The native `title` attribute was the obvious shortcut and the wrong one: it waits a second
- * before appearing, cannot be styled to match the surface, and cannot show more than a line.
- * Readings here need units, a share of the total and a per-sensor split, so it is worth the
- * component. Renders in a fixed layer and flips sides near the viewport edge.
+ * El atributo nativo `title` era el atajo obvio y el equivocado: espera un segundo antes de
+ * aparecer, no se puede estilar para que combine con la superficie, y no muestra más de una línea.
+ * Las lecturas de acá necesitan unidades, la proporción sobre el total y el desglose por sensor,
+ * así que el componente vale la pena. Se dibuja en una capa fija y se da vuelta cerca del borde.
  */
 export function useTooltip() {
   const [content, setContent] = useState<ReactNode>(null);
@@ -34,7 +34,7 @@ export default function Tooltip({ content, at }: { content: ReactNode; at: Ancho
     const el = ref.current;
     if (!el || !content) return;
     const r = el.getBoundingClientRect();
-    // flip to the other side of the cursor when the tooltip would leave the viewport
+    // pasa al otro lado del cursor cuando el tooltip se saldría de la pantalla
     const dx = at.x + 14 + r.width > window.innerWidth ? -r.width - 14 : 14;
     const dy = at.y - 8 + r.height > window.innerHeight ? -r.height + 8 : -8;
     setOffset({ dx, dy });

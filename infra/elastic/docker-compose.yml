@@ -1,6 +1,6 @@
 services:
 
-  # Elasticsearch: storage and indexing of the ECS-normalized telemetry
+  # Elasticsearch: almacenamiento e indexado de la telemetría normalizada a ECS
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION:-8.17.3}
     container_name: elasticsearch
@@ -10,8 +10,8 @@ services:
       - node.name=es01
       - discovery.type=single-node
       - bootstrap.memory_lock=true
-      # security off: access is via SSH tunnel to 127.0.0.1 only (private dashboard), never exposed
-      # to the internet. A public deployment would need xpack turned on.
+      # Seguridad apagada: el acceso es por túnel SSH a 127.0.0.1 y nada más (el panel es privado),
+      # nunca expuesto a internet. Un despliegue público necesitaría xpack prendido.
       - xpack.security.enabled=false
       - xpack.security.http.ssl.enabled=false
       - "ES_JAVA_OPTS=-Xms${ES_HEAP:-1g} -Xmx${ES_HEAP:-1g}"
@@ -28,7 +28,7 @@ services:
         hard: 65536
     volumes:
       - es_data:/usr/share/elasticsearch/data
-    # bound to loopback, never exposed on the VPS public interface
+    # atado a loopback, nunca expuesto en la interfaz pública del VPS
     ports:
       - "127.0.0.1:9200:9200"
     networks:
@@ -46,7 +46,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Logstash: semantic normalization of honeypot events to the Elastic Common Schema (ECS)
+  # Logstash: normalización semántica de los eventos de los honeypots al Elastic Common Schema
   logstash:
     image: docker.elastic.co/logstash/logstash:${ELASTIC_VERSION:-8.17.3}
     container_name: logstash
@@ -56,9 +56,10 @@ services:
       elasticsearch:
         condition: service_healthy
     environment:
-      # don't pass env vars named after a Logstash setting (e.g. PIPELINE_WORKERS): the entrypoint
-      # would rewrite logstash.yml, which is mounted read-only. pipeline.workers stays at its default
-      # (CPU count); LS_JAVA_OPTS isn't a setting, it's applied directly.
+      # No pasar variables de entorno con el nombre de un ajuste de Logstash (por ejemplo
+      # PIPELINE_WORKERS): el entrypoint reescribiría logstash.yml, que está montado de solo
+      # lectura. pipeline.workers queda en su valor por defecto (la cantidad de CPU); LS_JAVA_OPTS
+      # no es un ajuste, se aplica directo.
       - "LS_JAVA_OPTS=-Xmx${LS_HEAP:-512m} -Xms${LS_HEAP:-512m}"
     volumes:
       - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
@@ -84,7 +85,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Kibana: analytics dashboard for teaching. Private access over SSH tunnel.
+  # Kibana: tablero analítico para enseñar. Acceso privado por túnel SSH.
   kibana:
     image: docker.elastic.co/kibana/kibana:${ELASTIC_VERSION:-8.17.3}
     container_name: kibana
@@ -116,7 +117,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Filebeat shipper: tails the honeypots' JSON logs into Logstash
+  # Transportador Filebeat: sigue los registros JSON de los honeypots y los manda a Logstash
   filebeat:
     image: docker.elastic.co/beats/filebeat:${ELASTIC_VERSION:-8.17.3}
     container_name: filebeat
@@ -130,7 +131,7 @@ services:
     volumes:
       - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
       - filebeat_data:/usr/share/filebeat/data
-      # honeypot log volumes (defined externally by infra/honeypots)
+      # volúmenes de registros de los honeypots (los define infra/honeypots)
       - honeypots_cowrie_logs:/logs/cowrie:ro
       - honeypots_dionaea_var:/logs/dionaea:ro
     networks:
@@ -154,7 +155,7 @@ volumes:
     name: elastic_ls_data
   filebeat_data:
     name: elastic_filebeat_data
-  # volumes created by infra/honeypots/docker-compose.yml, mounted read-only here
+  # volúmenes creados por infra/honeypots/docker-compose.yml, acá montados de solo lectura
   honeypots_cowrie_logs:
     external: true
     name: honeypots_cowrie_logs

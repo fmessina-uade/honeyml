@@ -30,7 +30,7 @@ def test_cowrie_cfg_parseable(cfg):
 
 
 def test_contents_path_is_honeyfs(cfg):
-    """share/cowrie/txtcmds no existe en la imagen — pwd.py llama sys.exit(2)
+    """share/cowrie/txtcmds no existe en la imagen, así que pwd.py llama sys.exit(2)
     si no puede abrir contents_path/etc/passwd."""
     val = cfg.get("honeypot", "contents_path", fallback="")
     assert val == "honeyfs", (
@@ -49,7 +49,7 @@ def test_txtcmds_path(cfg):
 
 def test_auth_class_is_userdb(cfg):
     val = cfg.get("honeypot", "auth_class", fallback="")
-    assert val == "UserDB", f"auth_class='{val}' — debe ser 'UserDB' para usar userdb.txt"
+    assert val == "UserDB", f"auth_class='{val}', debe ser 'UserDB' para usar userdb.txt"
 
 
 def test_ssh_enabled(cfg):
@@ -62,5 +62,5 @@ def test_telnet_enabled(cfg):
 
 def test_json_output_enabled(cfg):
     assert cfg.get("output_jsonlog", "enabled", fallback="false") == "true", (
-        "output_jsonlog debe estar habilitado — es la fuente de datos para el pipeline ECS (Fase 2)"
+        "output_jsonlog debe estar habilitado, es la fuente de datos para el pipeline ECS (Fase 2)"
     )

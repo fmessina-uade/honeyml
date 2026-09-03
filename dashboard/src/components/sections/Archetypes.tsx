@@ -6,15 +6,15 @@ import { n } from '../../lib/format';
 import { useI18n } from '../../lib/i18n';
 
 /**
- * Attackers grouped by how they behave, not by what they typed.
+ * Atacantes agrupados por cómo se comportan, no por lo que tipearon.
  *
- * The fingerprints section groups by byte-identical commands, which is strict and therefore blind
- * to everyone who never reached a shell. This covers every observed address and lets the data draw
- * the boundaries — which is how the section arrives at its point: almost none of them are a threat,
- * and the ones that are, are very few.
+ * La sección de huellas agrupa por comandos idénticos byte a byte, que es estricto y por eso ciego
+ * a todos los que nunca llegaron a una consola. Esto cubre todas las direcciones observadas y deja
+ * que los datos dibujen los límites, que es como la sección llega a su punto: casi ninguna es una
+ * amenaza, y las que sí lo son, son muy pocas.
  */
 
-/** Visual identity per archetype, keyed by the name the backend derives from the profile. */
+/** Identidad visual por arquetipo, indexada por el nombre que el backend deriva del perfil. */
 const LOOK: Record<string, { icon: typeof Radar; color: string }> = {
   'Intrusión efectiva': { icon: Crosshair, color: 'var(--agent-coral)' },
   'Fuerza bruta': { icon: KeyRound, color: 'var(--honey-amber)' },
@@ -27,7 +27,7 @@ export default function Archetypes({ data }: { data: ArchetypeData }) {
   const { t } = useI18n();
   const max = Math.max(...data.perfiles.map((p) => p.direcciones), 1);
 
-  /** Names and copy live in the translations; the backend name is the key. */
+  /** Los nombres y los textos viven en las traducciones; el nombre del backend es la clave. */
   const copy = (nombre: string) =>
     t.archetypes.groups[nombre as keyof typeof t.archetypes.groups] ?? {
       name: nombre,
@@ -35,11 +35,13 @@ export default function Archetypes({ data }: { data: ArchetypeData }) {
     };
 
   /**
-   * Traits are labelled from the raw column name, not from the text the API sends.
+   * Los rasgos se etiquetan desde el nombre crudo de la columna y no desde el texto que manda la
+   * API.
    *
-   * The API's label is Spanish, so using it left the chips untranslated with the panel in English.
-   * The column name is language-neutral and already travels in the payload, which makes it the
-   * right key — and avoids shipping two copies of every label from the backend.
+   * La etiqueta de la API está en español, así que usarla dejaba los chips sin traducir cuando el
+   * panel estaba en inglés. El nombre de la columna es neutro respecto del idioma y ya viaja en la
+   * respuesta, lo que lo vuelve la clave correcta y evita mandar dos copias de cada etiqueta desde
+   * el backend.
    */
   const traitLabel = (columna: string, fallback: string) => {
     if (columna.startsWith('cmd_')) return t.archetypes.usedCmd(columna.slice(4));

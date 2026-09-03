@@ -6,16 +6,17 @@ import type { CountryOrigin } from '../lib/api';
 import { WORLD } from '../lib/world';
 
 /**
- * Rotating globe with country borders and a marker per country of origin.
+ * Globo que rota, con las fronteras de los países y un marcador por país de origen.
  *
- * Drawn as an SVG orthographic projection rather than with a 3D library. The borders come from
- * Natural Earth, decoded and simplified ahead of time by scripts/build_world_map.py: 28 KB of
- * plain coordinate pairs, against the megabyte a globe library would add to a bundle that ships
- * at 250 KB.
+ * Está dibujado como una proyección ortográfica en SVG y no con una biblioteca 3D. Las fronteras
+ * salen de Natural Earth, decodificadas y simplificadas de antemano por scripts/build_world_map.py:
+ * 28 KB de pares de coordenadas pelados, contra el megabyte que una biblioteca de globos le sumaría
+ * a un bundle que hoy pesa 250 KB.
  *
- * The marker coordinates are the centroid of the addresses actually observed in each country,
- * computed by Elasticsearch over the captured events. They are not the country's geographic
- * centre: if every attack from a country came from one city, the marker sits on that city.
+ * Las coordenadas de cada marcador son el centroide de las direcciones efectivamente observadas en
+ * ese país, calculado por Elasticsearch sobre los eventos capturados. No son el centro geográfico
+ * del país: si todos los ataques de un país vinieron de una ciudad, el marcador queda en esa
+ * ciudad.
  */
 
 const R = 78; // radio de la esfera, en unidades del viewBox
@@ -23,8 +24,8 @@ const CX = 100;
 const CY = 100;
 const RAD = Math.PI / 180;
 
-// Inclinación inicial del eje. Con el globo derecho, el hemisferio norte —de donde viene casi todo
-// el tráfico— queda comprimido contra el borde superior. Arrastrando en vertical se cambia.
+// Inclinación inicial del eje. Con el globo derecho, el hemisferio norte (de donde viene casi todo
+// el tráfico) queda comprimido contra el borde superior. Arrastrando en vertical se cambia.
 const TILT = 18;
 
 // Tope de la inclinación manual. Más allá del polo la proyección sigue siendo válida pero el mundo
@@ -47,7 +48,7 @@ interface Punto {
   z: number;
 }
 
-/** Orthographic projection of a lat/lon onto the sphere, for a given rotation and tilt. */
+/** Proyección ortográfica de una lat/lon sobre la esfera, para una rotación e inclinación dadas. */
 function proyectar(lat: number, lon: number, rotLon: number, tilt: number): Punto {
   const l = (lon + rotLon) * RAD;
   const f = lat * RAD;
@@ -63,10 +64,10 @@ function proyectar(lat: number, lon: number, rotLon: number, tilt: number): Punt
 }
 
 /**
- * Meridians and parallels as path strings, broken wherever they cross behind the sphere.
+ * Meridianos y paralelos como cadenas de path, cortados donde pasan por detrás de la esfera.
  *
- * Without the break, a line leaving the visible side would be drawn straight across the disc to
- * wherever it reappears, which reads as a crack rather than as a curve.
+ * Sin ese corte, una línea que se va del lado visible se dibujaría derecho cruzando el disco hasta
+ * donde reaparece, y eso se lee como una grieta y no como una curva.
  */
 function graticula(rotLon: number, tilt: number): string[] {
   const paths: string[] = [];
@@ -98,13 +99,9 @@ function graticula(rotLon: number, tilt: number): string[] {
   return paths;
 }
 
-/**
- * Every border point with its trigonometry precomputed.
- *
- * Only the rotation changes between frames, so the sine and cosine of each point's own latitude
- * and longitude are constant and can be worked out once. With the angle-sum identities, projecting
- * two thousand points per frame becomes multiplications instead of eight thousand trig calls.
- */
+// Entre cuadro y cuadro lo único que cambia es la rotación, así que el seno y el coseno propios de
+// cada punto se sacan una sola vez. Con las identidades de suma de ángulos, proyectar dos mil
+// puntos por cuadro pasa a ser multiplicaciones y no ocho mil llamadas trigonométricas.
 interface PuntoFijo {
   sinF: number;
   cosF: number;
@@ -124,10 +121,10 @@ function precomputar(anillos: [number, number][][]): PuntoFijo[][] {
 }
 
 /**
- * Border rings as path strings, cut wherever they pass behind the sphere.
+ * Los anillos de las fronteras como cadenas de path, cortados donde pasan por detrás de la esfera.
  *
- * Same cut as the graticule and for the same reason: a ring that leaves the visible side would
- * otherwise be drawn straight across the disc to wherever it comes back.
+ * Es el mismo corte que en la graticula y por el mismo motivo: un anillo que se va del lado visible
+ * se dibujaría derecho cruzando el disco hasta donde vuelve.
  */
 function contornos(anillos: PuntoFijo[][], rotLon: number, tilt: number): string {
   const sinR = Math.sin(rotLon * RAD);
@@ -157,16 +154,16 @@ function contornos(anillos: PuntoFijo[][], rotLon: number, tilt: number): string
 }
 
 /**
- * Whether the globe should skip animating and jump straight to its target.
+ * Si el globo tiene que saltearse la animación e ir directo a su destino.
  *
- * Two cases, both real: the reader asked for reduced motion, or the tab is in the background,
- * where browsers do not run requestAnimationFrame at all.
+ * Pasa en dos casos, los dos reales: el lector pidió movimiento reducido, o la pestaña está en
+ * segundo plano, donde los navegadores directamente no ejecutan requestAnimationFrame.
  */
 function sinAnimacion(): boolean {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches || document.hidden;
 }
 
-/** Shortest angular distance, so rotating from 170° to −170° goes 20° and not 340°. */
+/** La distancia angular más corta, así ir de 170° a −170° son 20° y no 340°. */
 function deltaAngular(desde: number, hasta: number): number {
   return ((((hasta - desde) % 360) + 540) % 360) - 180;
 }
@@ -174,7 +171,7 @@ function deltaAngular(desde: number, hasta: number): number {
 /**
  * Qué gobierna la rotación en este momento.
  *
- * Sin esto había una sola pregunta —¿hay país elegido?— y no alcanzaba: en cuanto el arrastre puede
+ * Sin esto había una sola pregunta (¿hay país elegido?) y no alcanzaba: en cuanto el arrastre puede
  * mover el globo, hace falta distinguir "nadie lo tocó" de "el usuario lo dejó así". Si no, soltar
  * el mouse con un país elegido devolvía el globo a su posición y el gesto parecía no haber pasado.
  */
@@ -227,18 +224,13 @@ export default function Globe({ countries, selected, onSelect }: Props) {
     const destino = -pais.lon;
     destinoRef.current = destino;
     // Elegir un país recupera el control aunque el usuario hubiera movido el globo a mano: es una
-    // orden explícita —"mostrame este"— y tiene que ganarle al encuadre anterior.
+    // orden explícita ("mostrame este") y tiene que ganarle al encuadre anterior.
     modoRef.current = 'destino';
 
-    // Si la animación no puede correr, se salta directo al destino en lugar de no moverse.
-    //
-    // Pasa en dos situaciones reales: con "reducir movimiento" activado, y con la pestaña en
-    // segundo plano, donde el navegador no ejecuta requestAnimationFrame. Sin este salto, elegir
-    // un país dejaba el marcador donde estaba y la selección parecía no hacer nada — que es
-    // exactamente cómo se detectó.
-    //
-    // Centrar el país es la función; el giro es la decoración. Cuando hay que elegir entre las
-    // dos, se conserva la función.
+    // Si la animación no puede correr, se salta directo al destino en lugar de no moverse. Sin
+    // esto, con "reducir movimiento" o con la pestaña de fondo, elegir un país dejaba el marcador
+    // donde estaba y la selección parecía no hacer nada. Centrar el país es la función y el giro es
+    // la decoración: entre las dos se conserva la función.
     if (sinAnimacion()) {
       rotRef.current = destino;
       setRotLon(destino);
@@ -277,14 +269,9 @@ export default function Globe({ countries, selected, onSelect }: Props) {
       rafRef.current = undefined;
     };
 
-    /**
-     * Volver de segundo plano tiene que revivir el giro.
-     *
-     * La condición solo se miraba al montar, y en una pestaña oculta el navegador no ejecuta
-     * requestAnimationFrame: abrir el panel en una pestaña de fondo —con ctrl+clic, o restaurando
-     * una sesión— dejaba el bucle sin arrancar, y traerla al frente después no lo revivía. El globo
-     * quedaba muerto para toda la visita, sin nada que lo explicara.
-     */
+    // Volver de segundo plano tiene que revivir el giro. La condición solo se miraba al montar, así
+    // que abrir el panel en una pestaña de fondo dejaba el bucle sin arrancar y traerla al frente
+    // después no lo revivía: el globo quedaba muerto para toda la visita.
     const alCambiarVisibilidad = () => (document.hidden ? parar() : arrancar());
     document.addEventListener('visibilitychange', alCambiarVisibilidad);
     arrancar();
@@ -431,7 +418,7 @@ export default function Globe({ countries, selected, onSelect }: Props) {
             key={c.country}
             /* Soltar el arrastre encima de un marcador no lo selecciona: el clic del navegador
                llega igual, y sin esta guardia girar el globo terminaba eligiendo un país al
-               azar —el que quedara bajo el cursor. */
+               azar, el que quedara bajo el cursor. */
             onClick={() => {
               if (movidoRef.current) return;
               onSelect(esSel ? null : c.country);

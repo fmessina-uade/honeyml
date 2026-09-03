@@ -1,10 +1,10 @@
-"""Exploratory analysis of the ECS-normalized honeypot telemetry.
+"""Análisis exploratorio de la telemetría de los honeypots ya normalizada a ECS.
 
-Cleaning (dups, nulls, outliers), attack class distribution and a correlation matrix. Reads the
-parquet extracted from Elasticsearch (data/processed/honeypot_events.parquet) and writes figures
-to reports/figures/. Report text and figure labels stay in Spanish since they feed the thesis.
+Hace la limpieza (duplicados, nulos, valores atípicos), el reparto por clase de ataque y la matriz
+de correlación. Lee el parquet extraído de Elasticsearch (data/processed/honeypot_events.parquet) y
+escribe las figuras en reports/figures/.
 
-Usage:
+Uso:
     python -m src.honeyml.eda.honeypot_eda
 """
 
@@ -22,8 +22,8 @@ import seaborn as sns
 PARQUET = Path("data/processed/honeypot_events.parquet")
 FIG_DIR = Path("reports/figures")
 
-# Cowrie actions grouped into attack stages. Rough taxonomy, before the real MITRE ATT&CK labels
-# that come from UWF-ZeekData24 for the supervised model. Spanish labels on purpose (thesis).
+# Acciones de Cowrie agrupadas por etapa del ataque. Es una taxonomía gruesa, anterior a las
+# etiquetas MITRE ATT&CK de verdad, que salen de UWF-ZeekData24 para el modelo supervisado.
 STAGE_BY_ACTION = {
     "session-connect": "Reconocimiento",
     "session-closed": "Reconocimiento",
@@ -50,18 +50,18 @@ def load() -> pd.DataFrame:
 
 
 def clean(df: pd.DataFrame) -> pd.DataFrame:
-    """Run and report the cleaning; return the cleaned DataFrame."""
+    """Hace la limpieza, la informa por pantalla y devuelve el DataFrame limpio."""
     print("\n" + "=" * 70)
     print("LIMPIEZA DE DATOS")
     print("=" * 70)
     print(f"Eventos crudos:             {len(df):,}")
 
-    # 1. local healthchecks: container talking to itself, not attacks
+    # 1. healthchecks locales: el contenedor hablándose a sí mismo, no son ataques
     hc = (df["source.ip"] == LOCAL_IP).sum()
     df = df[df["source.ip"] != LOCAL_IP].copy()
     print(f"Healthchecks 127.0.0.1:     -{hc:,} eliminados")
 
-    # 2. leftover exact dups (the pipeline already dedups by fingerprint/document_id)
+    # 2. duplicados exactos que hayan quedado; el pipeline ya deduplica por document_id
     dup = df.duplicated().sum()
     df = df.drop_duplicates().reset_index(drop=True)
     print(f"Duplicados exactos:         -{dup:,} eliminados")
@@ -69,13 +69,13 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
     print(f"Eventos de ataque limpios:  {len(df):,}")
     print(f"Rango temporal:             {df['@timestamp'].min()}  ->  {df['@timestamp'].max()}")
 
-    # nulls are expected and semantic: each event type fills different fields
+    # los nulos son esperables y significan algo: cada tipo de evento llena campos distintos
     print("\nNulos por campo (%):")
     nulls = (df.isna().mean() * 100).round(1).sort_values(ascending=False)
     for col, pct in nulls.items():
         print(f"  {col:<24} {pct:5.1f}%")
 
-    # session-duration outliers (only session-closed events carry a duration)
+    # atípicos de duración de sesión; solo los eventos de cierre traen duración
     dur = df.loc[df["event.duration"].notna(), "event.duration"] / 1e9  # ns -> s
     if len(dur):
         q1, q3 = dur.quantile(0.25), dur.quantile(0.75)
@@ -107,7 +107,7 @@ def class_distribution(df: pd.DataFrame) -> None:
     for stage, n in stages.items():
         print(f"  {n:>7,}  ({n / len(df) * 100:4.1f}%)  {stage}")
 
-    # figure: events per attack stage
+    # figura: eventos por etapa del ataque
     FIG_DIR.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(figsize=(8, 4.5))
     stages.sort_values().plot.barh(ax=ax, color="#D4860A")
@@ -137,7 +137,7 @@ def attacker_summary(df: pd.DataFrame) -> None:
 
 
 def correlation_matrix(df: pd.DataFrame) -> None:
-    """Correlation matrix over per-IP features (the base for feature engineering)."""
+    """Matriz de correlación sobre las características por IP, la base del feature engineering."""
     print("\n" + "=" * 70)
     print("MATRIZ DE CORRELACIÓN (features agregadas por IP)")
     print("=" * 70)

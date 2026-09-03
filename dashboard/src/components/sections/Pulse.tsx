@@ -28,11 +28,11 @@ const SENSOR_COLOR: Record<string, string> = {
 };
 
 /**
- * Long date for the tooltip: "lunes, 3 de junio". Reads better than an ISO string.
+ * Fecha larga para el tooltip: "lunes, 3 de junio". Se lee mejor que una cadena ISO.
  *
- * The hourly view labels its points "2026-08-19 14", so the hour has to be split off before the
- * date is parsed. Splitting the whole label on dashes turned the day into "19 14", which parses
- * as NaN and rendered every hourly tooltip as "Invalid Date".
+ * La vista horaria etiqueta sus puntos como "2026-08-19 14", así que hay que separar la hora antes
+ * de parsear la fecha. Partir la etiqueta entera por guiones dejaba el día como "19 14", que parsea
+ * como NaN y hacía que todos los tooltips horarios dijeran "Invalid Date".
  */
 function longDate(etiqueta: string, lang: 'es' | 'en'): string {
   const [fecha, hora] = etiqueta.split(' ');
@@ -47,10 +47,10 @@ function longDate(etiqueta: string, lang: 'es' | 'en'): string {
 }
 
 /**
- * The opening: raw scale. A machine nobody advertised, under constant attack.
+ * La apertura: la escala cruda. Una máquina que nadie anunció, bajo ataque constante.
  *
- * The daily bars are split by sensor rather than totalled. That is what makes the Dionaea
- * outage legible instead of looking like a drop in attacks.
+ * Las barras diarias van separadas por sensor en vez de sumadas. Eso es lo que hace legible la
+ * caída de Dionaea, en lugar de que parezca una baja en los ataques.
  */
 export default function Pulse({
   overview,
@@ -83,20 +83,15 @@ export default function Pulse({
 
   const completo = desde === minimo && hasta === maximo;
 
-  // Un filtro que no se pudo aplicar no cuenta como filtro. Se distingue de `completo` —que es un
-  // hecho sobre las fechas y gobierna qué se pide— porque este gobierna qué se dice: sin la
+  // Un filtro que no se pudo aplicar no cuenta como filtro. Se distingue de `completo` (que es un
+  // hecho sobre las fechas y gobierna qué se pide) porque este gobierna qué se dice: sin la
   // distinción, el encabezado anunciaba el rango elegido sobre un gráfico que seguía mostrando el
   // período entero.
   const filtroAplicado = !completo && problema === null;
 
-  /**
-   * Cambiar el intervalo ajusta el rango cuando hace falta.
-   *
-   * Por hora sobre los tres meses completos son más de dos mil barras en novecientos píxeles: los
-   * huecos entre ellas solos ocupan más que el ancho disponible y el gráfico sale vacío. Es
-   * exactamente lo que pasaba. Al pasar a "por hora" se acota a los últimos siete días, que es un
-   * rango donde una barra por hora se puede ver; volver a día o semana recupera todo.
-   */
+  // Cambiar el intervalo ajusta el rango cuando hace falta: por hora sobre los tres meses completos
+  // son más de dos mil barras en novecientos píxeles, y solo los huecos entre ellas ya ocupan más
+  // que el ancho disponible, así que el gráfico salía vacío. Volver a día o semana recupera todo.
   const cambiarIntervalo = (i: Interval) => {
     setInterval(i);
     if (i === 'hour' && completo) {
@@ -173,15 +168,10 @@ export default function Pulse({
 
   const timeline = serie ?? timelineBase;
 
-  /**
-   * Las tarjetas describen la captura completa; el gráfico, lo seleccionado.
-   *
-   * Los números grandes —eventos, direcciones, accesos, comandos— vienen del resumen y no se
-   * filtran: la API de la línea de tiempo devuelve conteos por período, no el resumen recortado.
-   * Mientras lo derivado salía de la serie filtrada, elegir una semana dejaba "2,7 millones de
-   * eventos" arriba y "390.000 por día" debajo, que es la división de un total entre los días de
-   * otro rango. Derivándolo de la serie completa las cuatro tarjetas vuelven a hablar de lo mismo.
-   */
+  // Las tarjetas describen la captura completa; el gráfico, lo seleccionado. Los números grandes
+  // vienen del resumen y no se filtran, así que mientras lo derivado salía de la serie filtrada,
+  // elegir una semana dejaba "2,7 millones de eventos" arriba y "390.000 por día" abajo, que es un
+  // total dividido por los días de otro rango.
   const days = timelineBase.filter((d) => d.count > 0).length;
   const perDay = days ? Math.round(overview.events / days) : 0;
   const peak = timelineBase.reduce((a, b) => (b.count > a.count ? b : a), timelineBase[0]);
@@ -224,7 +214,7 @@ export default function Pulse({
   const max = Math.max(...timeline.map((d) => d.count), 1);
   const maxHour = Math.max(...hourly.map((h) => h.count), 1);
   const minHour = hourly.length ? Math.min(...hourly.map((h) => h.count)) : 0;
-  // peak-to-trough: a human rhythm sits well above 3x, automation stays near 1
+  // pico contra valle: un ritmo humano queda bastante por encima de 3x, la automatización cerca de 1
   const ratio = minHour > 0 ? maxHour / minHour : 0;
 
   const sensors = Object.keys(overview.by_sensor);
@@ -240,17 +230,10 @@ export default function Pulse({
       ? d.count
       : ((d as unknown as Record<string, number>)[sensorVisto] ?? 0);
 
-  /**
-   * Interrupciones de captura, siempre contadas en días.
-   *
-   * Siguen la selección —rango y sensor— pero se leen de la serie diaria y no de la del gráfico.
-   * Con el intervalo por hora, dos horas seguidas en cero no distinguen un sensor caído de una
-   * madrugada tranquila, y el bloque pasaba a declarar interrupciones que nunca ocurrieron. Un día
-   * entero sin un solo evento sí es un corte: llegan unos treinta mil por día.
-   *
-   * Filtrar por sensor además revela lo que el total esconde: la caída de Dionaea queda tapada
-   * mientras Cowrie sigue registrando.
-   */
+  // Interrupciones de captura, siempre contadas en días. Siguen la selección pero se leen de la
+  // serie diaria: con el intervalo por hora, dos horas seguidas en cero no distinguen un sensor
+  // caído de una madrugada tranquila, y el bloque declaraba cortes que nunca ocurrieron. Un día
+  // entero sin un solo evento sí es un corte, porque llegan unos treinta mil por día.
   const outages: { from: string; to: string; days: number }[] = [];
   let run: string[] = [];
   for (const d of timelineBase) {
@@ -543,7 +526,7 @@ export default function Pulse({
       </Reveal>
 
       {/* Va al final porque es la conclusión: las secciones anteriores describen el volumen, esta
-          responde quién lo produce. Solo aparece si el respaldo trae la matriz — un snapshot
+          responde quién lo produce. Solo aparece si el respaldo trae la matriz: un snapshot
           congelado antes de que existiera no la tiene. */}
       {weekly && (
         <Reveal delay={320}>

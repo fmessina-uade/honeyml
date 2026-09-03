@@ -1,16 +1,16 @@
-"""Block until the ingestion pipeline has caught up with the logs on disk.
+"""Bloquea hasta que el pipeline de ingesta alcanzó a los registros que hay en disco.
 
-Why this exists: `make refresh` pulls fresh logs and then regenerates every derived artifact. The
-collector picks up the new lines on its own, but it takes a while. Without this wait, the
-artifacts would be rebuilt from a half-ingested index and would disagree with each other — the
-consolidated table would hold one figure and the frozen snapshot another.
+Por qué existe: `make refresh` baja registros nuevos y después regenera todos los artefactos
+derivados. El colector levanta las líneas nuevas por su cuenta, pero tarda. Sin esta espera, los
+artefactos se rearmarían desde un índice ingerido a medias y no coincidirían entre sí: la tabla
+consolidada tendría un número y el respaldo congelado, otro.
 
-The signal is the document count going quiet: once it stops growing for a few consecutive checks,
-the collector has drained what it had. That is more reliable than comparing against the line count
-of the logs, because the pipeline legitimately drops events (the sensors' own health checks) and
-the two numbers are not meant to match.
+La señal es que el conteo de documentos se aquiete: cuando deja de crecer durante unas cuantas
+lecturas seguidas, el colector ya drenó lo que tenía. Eso es más confiable que compararlo contra la
+cantidad de líneas de los registros, porque el pipeline descarta eventos por diseño (los
+healthchecks de los propios sensores) y los dos números no tienen por qué coincidir.
 
-Usage:
+Uso:
     python scripts/wait_for_ingest.py
     python scripts/wait_for_ingest.py --timeout 900
 """
@@ -26,7 +26,7 @@ import urllib.request
 
 ES_URL = "http://localhost:9200"
 INDEX = "honeypot-*"
-# how many identical readings mean "drained" — one alone can land between two batches
+# cuántas lecturas iguales significan "drenado"; una sola puede caer entre dos lotes
 STABLE_CHECKS = 3
 POLL_SECONDS = 10
 
@@ -80,7 +80,7 @@ def main() -> int:
                     print("  no había nada nuevo que ingerir.")
                 return 0
         else:
-            if stable:  # it moved again after looking quiet
+            if stable:  # se volvió a mover después de parecer quieto
                 stable = 0
             print(f"  ingiriendo… {miles(current)} (+{miles(current - previous)})")
         previous = current

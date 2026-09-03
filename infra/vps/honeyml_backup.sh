@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# honeyml_backup.sh — Respaldo diario de la telemetría de los honeypots.
+# honeyml_backup.sh: respaldo diario de la telemetría de los honeypots.
 # Ejecutado por cron todos los días a las 03:00 UTC.
 #
 # Por qué existe: los sensores rotan sus registros y eliminan los antiguos, así que el volumen

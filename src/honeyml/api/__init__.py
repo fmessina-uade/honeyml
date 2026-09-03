@@ -1,1 +1,1 @@
-"""HTTP API that feeds the educational dashboard from the ECS indices."""
+"""API HTTP que alimenta el panel educativo desde los índices ECS."""

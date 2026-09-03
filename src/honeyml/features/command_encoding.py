@@ -1,10 +1,10 @@
-"""TF-IDF encoding of the commands attackers run in Cowrie.
+"""Codificación TF-IDF de los comandos que los atacantes ejecutan en Cowrie.
 
-Each source IP becomes a "document" with all the commands it ran concatenated; TF-IDF turns that
-into a numeric vector that captures which tools and patterns each attacker uses. Complements the
-binary flags from build_features with a dense representation for the model.
+Cada dirección de origen se vuelve un "documento" con todos sus comandos concatenados, y TF-IDF lo
+convierte en un vector numérico que captura qué herramientas y qué patrones usa cada atacante.
+Complementa las banderas binarias de build_features con una representación densa para el modelo.
 
-Usage:
+Uso:
     python -m src.honeyml.features.command_encoding
 """
 
@@ -22,7 +22,7 @@ LOCAL_IP = "127.0.0.1"
 
 
 def _tokenizer(text: str) -> list[str]:
-    """Tokenize shell commands: split on spaces/symbols, keep flags and short paths."""
+    """Tokeniza comandos: parte por espacios y símbolos, y conserva flags y rutas cortas."""
     tokens = []
     for raw in text.replace("|", " ").replace(";", " ").replace("&", " ").split():
         tok = raw.strip("\"'`()").lower()
@@ -32,10 +32,10 @@ def _tokenizer(text: str) -> list[str]:
 
 
 def commands_by_ip(df: pd.DataFrame) -> pd.Series:
-    """One document of concatenated commands per source IP.
+    """Un documento de comandos concatenados por dirección de origen.
 
-    Only command-input (commands actually typed); command-failed carries the
-    "Command not found: ..." text that would pollute the vocabulary.
+    Solo command-input, que son los comandos efectivamente tipeados. command-failed trae el texto
+    "Command not found: ..." que ensuciaría el vocabulario.
     """
     mask = df["event.action"].eq("command-input")
     cmds = df.loc[mask & (df["source.ip"] != LOCAL_IP), ["source.ip", "process.command_line"]]
@@ -67,7 +67,7 @@ def main() -> None:
     print(f"IPs con comandos:    {len(docs):,}")
     print(f"Vocabulario TF-IDF:  {len(terms)} términos")
 
-    # most informative terms (highest mean TF-IDF weight across the corpus)
+    # los términos más informativos: mayor peso TF-IDF promedio sobre todo el corpus
     weights = pd.Series(matrix.mean(axis=0).A1, index=terms).sort_values(ascending=False)
     print("\nTop 20 términos por peso TF-IDF medio:")
     for term, w in weights.head(20).items():

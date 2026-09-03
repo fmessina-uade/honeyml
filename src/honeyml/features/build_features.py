@@ -1,17 +1,17 @@
-"""Per-source-IP time and frequency features from Cowrie telemetry.
+"""Características de tiempo y frecuencia por dirección de origen, desde la telemetría de Cowrie.
 
-The source IP is the unit of analysis: each attacker boils down to a vector of volume, auth,
-timing and behaviour features, to train the supervised model later. Works off the ECS parquet
-(data/processed/honeypot_events.parquet). Feature names and output stay in Spanish (thesis).
+La unidad de análisis es la dirección: cada atacante se reduce a un vector de volumen, intentos de
+acceso, tiempos y conducta, para después entrenar el modelo supervisado. Trabaja sobre el parquet
+ECS (data/processed/honeypot_events.parquet).
 
-Feature-engineering choices:
-- count/rate features are heavy-tailed, so log1p to tame the skew.
-- the event rate uses a span floor (1 min) so bursts (span ~ 0) don't blow it up.
-- prune redundant features (high correlation / multicollinearity).
-- scaling is NOT done here: it belongs in the modeling Pipeline, fit on train only, so we don't
-  leak test stats into training (data leakage).
+Cuatro decisiones que conviene tener presentes al leer el resto del módulo. Las cuentas y las tasas
+tienen cola pesada, así que van con log1p para domar la asimetría. La tasa de eventos usa un piso de
+un minuto en el lapso, porque con ráfagas el lapso se va a cero y el número explota. Se podan las
+características redundantes, las que tienen correlación alta entre sí. Y el escalado no se hace acá:
+va dentro del Pipeline de modelado, ajustado solo con entrenamiento, así no se filtran estadísticas
+de la partición de prueba.
 
-Usage:
+Uso:
     python -m src.honeyml.features.build_features
 """
 
@@ -26,7 +26,7 @@ PARQUET_IN = Path("data/processed/honeypot_events.parquet")
 PARQUET_OUT = Path("data/processed/features_por_ip.parquet")
 LOCAL_IP = "127.0.0.1"
 
-# typical post-exploitation tools; seeing them is a signal of intent
+# herramientas típicas de post explotación; verlas es una señal de intención
 COMMAND_KEYWORDS = [
     "wget",
     "curl",
@@ -47,7 +47,7 @@ COMMAND_KEYWORDS = [
     "history",
 ]
 
-# heavy-tailed count/rate features, get a log1p
+# las características de cuenta y tasa tienen cola pesada, van con log1p
 SKEWED = [
     "n_eventos",
     "n_sesiones",
@@ -81,14 +81,14 @@ def _prepare(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _interarrival(df: pd.DataFrame) -> pd.Series:
-    """Mean time between consecutive events (seconds) per IP."""
+    """Tiempo medio entre eventos consecutivos, en segundos, por dirección."""
     d = df.sort_values(["source.ip", "@timestamp"])
     delta = d.groupby("source.ip")["@timestamp"].diff().dt.total_seconds()
     return delta.groupby(d["source.ip"]).mean()
 
 
 def _command_flags(df: pd.DataFrame, index: pd.Index) -> pd.DataFrame:
-    """Binary per-IP flags: whether each COMMAND_KEYWORDS tool shows up."""
+    """Banderas binarias por dirección: si aparece cada herramienta de COMMAND_KEYWORDS."""
     cmds = df.loc[df["is_command"], ["source.ip", "process.command_line"]].dropna()
     cmds["cmd"] = cmds["process.command_line"].str.lower()
     out = {}
@@ -102,7 +102,7 @@ def _command_flags(df: pd.DataFrame, index: pd.Index) -> pd.DataFrame:
 def prune_correlated(
     feats: pd.DataFrame, threshold: float = 0.95
 ) -> tuple[pd.DataFrame, list[str]]:
-    """Drop one feature from each pair with abs correlation > threshold (multicollinearity)."""
+    """Descarta una de cada par de características con correlación absoluta sobre el umbral."""
     corr = feats.corr().abs()
     upper = corr.where(np.triu(np.ones(corr.shape), k=1).astype(bool))
     to_drop = [c for c in upper.columns if (upper[c] > threshold).any()]
@@ -115,51 +115,51 @@ def build_features(df: pd.DataFrame, prune: bool = True) -> pd.DataFrame:
 
     feats = pd.DataFrame(
         {
-            # volume / frequency
+            # volumen y frecuencia
             "n_eventos": g.size(),
             "n_sesiones": g["cowrie.session"].nunique(),
             # El denominador lleva piso 1. Una dirección puede tener eventos y ninguna sesión
-            # identificada —los de Dionaea no traen identificador de sesión, y algunos de Cowrie
-            # tampoco—, y ahí la división daba infinito: 3.077 de 14.173 direcciones, el 21,7 %.
+            # identificada (los de Dionaea no traen identificador de sesión, y algunos de Cowrie
+            # tampoco), y ahí la división daba infinito: 3.077 de 14.173 direcciones, el 21,7 %.
             # Un infinito no se nota en un promedio (lo vuelve infinito, que se lee como error de
             # otra cosa) pero rompe cualquier escalado o modelo que consuma la tabla.
             # Con piso 1, una ráfaga sin sesión cuenta como una sola sesión, que es la lectura
             # razonable: hubo actividad, no se pudo segmentar.
             "eventos_por_sesion": g.size() / g["cowrie.session"].nunique().clip(lower=1),
-            # auth
+            # intentos de acceso
             "login_intentos": g["is_login"].sum(),
             "login_fallidos": g["is_fail"].sum(),
             "login_exitosos": g["is_success"].sum(),
             "usuarios_distintos": g["user.name"].nunique(),
             "pass_distintas": g["cowrie.password"].nunique(),
-            # behaviour
+            # conducta
             "n_comandos": g["is_command"].sum(),
             "ejecuto_comandos": (g["is_command"].sum() > 0).astype(int),
             "descargo_archivo": (g["is_download"].sum() > 0).astype(int),
             "ratio_ssh": g["is_ssh"].mean(),
-            # timing
+            # tiempos
             "span_horas": (g["@timestamp"].max() - g["@timestamp"].min()).dt.total_seconds() / 3600,
             "horas_activas": g["hour"].nunique(),
             "ratio_nocturno": g["hour"].apply(lambda h: (h < 6).mean()),
             "dur_sesion_media_s": g["event.duration"].mean() / 1e9,
         }
     )
-    # derived features + disambiguate the zero-filled ratios
+    # características derivadas, y desambiguar los cocientes que se rellenaron con cero
     feats["tuvo_logins"] = (feats["login_intentos"] > 0).astype(int)
     feats["ratio_fallo_login"] = (feats["login_fallidos"] / feats["login_intentos"]).fillna(0)
     feats["interarribo_medio_s"] = _interarrival(df).reindex(feats.index).fillna(0)
-    # rate with a span floor so a burst of events in seconds doesn't explode it
+    # tasa con piso en el lapso, así una ráfaga de eventos en segundos no la hace explotar
     span_floor = feats["span_horas"].clip(lower=MIN_SPAN_H)
     feats["eventos_por_hora"] = feats["n_eventos"] / span_floor
 
     feats = feats.fillna(0)
 
-    # log1p the heavy-tailed features (cuts skew, keeps the ordering)
+    # log1p sobre las de cola pesada: baja la asimetría y conserva el orden
     for col in SKEWED:
         feats[col] = np.log1p(feats[col])
     feats = feats.rename(columns={col: f"log1p_{col}" for col in SKEWED})
 
-    # command flags (binary, not transformed or pruned)
+    # banderas de comandos: binarias, no se transforman ni se podan
     feats = feats.join(_command_flags(df, feats.index))
 
     if prune:

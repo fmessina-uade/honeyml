@@ -1,21 +1,13 @@
-"""What travels between the nodes of the triage graph, and what a decision is allowed to be.
+"""Qué viaja entre los nodos del grafo, y qué se le permite ser a una decisión.
 
-This is the contract the rest of the engine is written against. Every node reads some of these
-keys and writes others; nothing else crosses between them. Pinning it down before the nodes exist
-is the point of the exercise — with the shape settled, the five nodes can be built in any order and
-still fit together.
+Es el contrato contra el que está escrito el resto del motor: cada nodo lee algunas de estas claves
+y escribe otras, y no cruza nada más.
 
-WHY A TypedDict AND NOT A DATACLASS
-LangGraph merges what each node returns into the running state, key by key. A dataclass would force
-every node to rebuild the whole object to change one field, and `total=False` lets a node return
-only what it actually touched — which is also the clearest possible statement of what it does.
+Un `TypedDict` y no una dataclass porque LangGraph funde en el estado lo que devuelve cada nodo,
+clave por clave. Con una dataclass, cambiar un campo obligaría a rearmar el objeto entero.
 
-WHERE THE SEVERITY SCALE LIVES
-In `severidad.py`, not here. This module says a decision carries a level; that one says which levels
-exist, what evidence establishes each, and how far above the proven floor the engine may go. They
-are separate because the second is a statement about the domain that the panel, the validation node
-and the adversarial validation campaign all read — and only this one is about what travels between
-nodes.
+La escala de severidad no vive acá sino en `severidad.py`. Este módulo dice que una decisión lleva
+un nivel; el otro dice qué niveles hay y qué evidencia establece cada uno.
 """
 
 from __future__ import annotations
@@ -35,23 +27,19 @@ MAX_INTENTOS = 3
 
 
 class Decision(BaseModel):
-    """The engine's answer about one event. This is the envelope, not yet the vocabulary.
+    """La respuesta del motor sobre un evento. Es el envoltorio, todavía no el vocabulario.
 
-    Every field exists so that a reader can reconstruct *why* the engine said what it said. The
-    justification and the evidence are not decoration: a triage decision that cannot be audited is
-    an opinion, and the whole point of the project is that this one can be checked against the
-    telemetry it came from.
+    Cada campo está para que quien lea pueda reconstruir por qué el motor dijo lo que dijo: una
+    decisión de triaje que no se puede auditar es una opinión.
     """
 
-    # `extra="forbid"` cierra el objeto, y eso es un requisito del modo estricto del proveedor:
-    # `additionalProperties: false` en todo objeto del esquema. Además vale por sí mismo — un campo
-    # que el modelo inventa y que nadie lee es una alucinación que pasa silenciosamente.
+    # `extra="forbid"` lo pide el modo estricto del proveedor, y además vale por sí mismo: un campo
+    # que el modelo inventa y que nadie lee es una alucinación que pasa en silencio.
     model_config = ConfigDict(extra="forbid")
 
     doc_id: str = Field(description="identidad del evento en el índice")
-    # Enum y no `str`: el nodo de validación rechaza un nivel inventado sin escribir una sola
-    # comprobación, y el esquema que se le publica al proveedor lista los valores admitidos. Que un
-    # nivel además sea *defendible para este evento* es otra cosa, y la resuelve
+    # Enum y no `str`: así el nodo de validación rechaza un nivel inventado sin escribir una sola
+    # comprobación. Que el nivel además sea defendible para este evento es otra cosa, y la resuelve
     # `severidad.dentro_de_limites`, que necesita el evento y por eso no puede vivir acá.
     severidad: Severidad = Field(description="nivel asignado; la escala vive en severidad.py")
     confianza: float = Field(ge=0.0, le=1.0)
@@ -67,11 +55,10 @@ class Decision(BaseModel):
 
 
 class Contexto(BaseModel):
-    """Everything the model gets to reason over. Assembled by the context node, never by the model.
+    """Todo sobre lo que el modelo puede razonar. Lo arma el nodo de contexto, nunca el modelo.
 
-    Kept as a declared structure rather than a free-form string so that what was shown to the
-    provider is reproducible after the fact. A prompt built by concatenation cannot be reconstructed
-    from the decision it produced.
+    Estructura declarada y no texto libre, así lo que se le mostró al proveedor se puede
+    reconstruir después. Un prompt armado por concatenación no.
     """
 
     doc_id: str
@@ -94,10 +81,10 @@ MotivoDeCorte = Literal[
 
 
 class EstadoTriaje(TypedDict, total=False):
-    """One event's trip through the graph.
+    """El paso de un evento por el grafo.
 
-    `total=False` a propósito: cada nodo devuelve solo las claves que tocó, y la lista de claves de
-    su `return` es la declaración más corta y más honesta de qué hace ese nodo.
+    `total=False` a propósito: cada nodo devuelve solo las claves que tocó, y esa lista es la forma
+    más corta de decir qué hace.
     """
 
     evento: EventoDelBus
@@ -107,17 +94,13 @@ class EstadoTriaje(TypedDict, total=False):
     borrador: dict[str, Any]
     decision: Decision
     intentos: int
-    # Los errores de validación, redactados para devolvérselos al proveedor.
-    #
-    # El `operator.add` no es decoración: LangGraph **reemplaza** el valor de una clave con lo que
-    # devuelve el nodo, salvo que se declare un reductor. Sin él, cada vuelta pisa los reproches de
-    # la anterior, y un modelo que arregla el campo que le señalaron y rompe otro se queda
-    # alternando entre dos errores hasta agotar los intentos, sin ver nunca los dos juntos. Con el
-    # reductor, cada nodo devuelve solo los reproches nuevos y el estado conserva la historia.
+    # Los errores de validación, redactados para devolvérselos al proveedor. El `operator.add` es
+    # necesario: sin reductor, LangGraph pisa la clave en cada vuelta, y un modelo que arregla el
+    # campo que le señalaron y rompe otro queda alternando entre dos errores sin verlos nunca
+    # juntos.
     reproches: Annotated[list[str], operator.add]
     motivo_de_corte: MotivoDeCorte
 
 
 def estado_inicial(evento: EventoDelBus) -> EstadoTriaje:
-    """The only entry point: a bus event and nothing else decided yet."""
     return {"evento": evento, "intentos": 0, "reproches": []}

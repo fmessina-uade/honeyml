@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Validate the ECS indexing in Elasticsearch.
+"""Valida el indexado ECS en Elasticsearch.
 
-Checks the honeypot telemetry was indexed and normalized correctly: per-index counts, coverage of
-the key ECS fields, no unrouted events or date-parse failures, and a quick event distribution.
-No external deps (stdlib only).
+Comprueba que la telemetría de los honeypots haya quedado indexada y normalizada como corresponde:
+conteos por índice, cobertura de los campos ECS clave, que no haya eventos sin rutear ni fallas al
+parsear fechas, y un reparto rápido de eventos. Sin dependencias externas, solo biblioteca estándar.
 
-Usage:
+Uso:
     python3 validate_indexing.py [--es-url http://localhost:9200]
 """
 
@@ -100,7 +100,7 @@ def main() -> int:
 
     checks_ok = True
 
-    # unrouted events
+    # eventos sin rutear
     print("\n=== Integridad de enrutamiento ===")
     try:
         unrouted = count(url, "honeypot-unrouted-*")
@@ -112,7 +112,7 @@ def main() -> int:
         print(f"  {FAIL} {unrouted} eventos en honeypot-unrouted-* (revisar filebeat/logstash)")
         checks_ok = False
 
-    # ECS field coverage
+    # cobertura de los campos ECS
     print(f"\n=== Cobertura de campos ECS (sobre {total} docs) ===")
     ecs_fields = [
         "@timestamp",
@@ -126,13 +126,13 @@ def main() -> int:
         n = count(url, args.index, {"exists": {"field": field}})
         pct = (n / total * 100) if total else 0
         mark = OK if pct >= 99 else (WARN if pct >= 50 else FAIL)
-        # source.ip isn't in every event: report it without penalizing
+        # source.ip no está en todos los eventos: se informa sin penalizar
         note = "  (esperable <100%)" if field == "source.ip" else ""
         print(f"  {mark} {field:<18} {n:>8} ({pct:5.1f}%){note}")
         if field in ("@timestamp", "event.category", "observer.type") and pct < 99:
             checks_ok = False
 
-    # date parse failures
+    # fallas al parsear fechas
     datefail = count(
         url,
         args.index,
@@ -143,7 +143,7 @@ def main() -> int:
     if datefail:
         checks_ok = False
 
-    # event distribution (seeds the EDA)
+    # reparto de eventos, que después alimenta el EDA
     print("\n=== Distribución por event.action ===")
     for key, n in terms(url, args.index, "event.action", 15):
         print(f"  {n:>8}  {key}")

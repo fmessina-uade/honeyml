@@ -1,6 +1,6 @@
-"""The inference boundary and its model-selection policy.
+"""La frontera de inferencia y su política de selección de modelo.
 
-Lo que se fija acá es la política —barato primero, capaz al reintentar— y las dos formas en que
+Lo que se fija acá es la política (barato primero, capaz al reintentar) y las dos formas en que
 podría dejar de aplicarse sin que nadie se entere: que el modelo quede fijado por configuración sin
 que se note, o que el desglose por modelo se pierda y ya no se pueda evaluar si conviene.
 """

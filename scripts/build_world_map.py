@@ -1,18 +1,17 @@
-"""Turn a TopoJSON world atlas into the compact outline the globe draws.
+"""Convierte un atlas mundial en TopoJSON en el contorno compacto que dibuja el globo.
 
-WHY A GENERATOR AND NOT A DEPENDENCY
-Decoding TopoJSON at runtime needs a client library, and the raw file is 105 KB of quantised
-deltas that the browser would decode on every load to draw a 320-pixel sphere. Doing it once,
-here, ships plain coordinate arrays and keeps the panel free of another dependency.
+Un generador y no una dependencia: decodificar TopoJSON en tiempo de ejecución pide una biblioteca
+del lado del cliente, y el archivo crudo son 105 KB de deltas cuantizados que el navegador tendría
+que decodificar en cada carga para dibujar una esfera de 320 píxeles. Haciéndolo una sola vez, acá,
+lo que viaja son arreglos de coordenadas y el panel se queda sin otra dependencia.
 
-WHY IT IS SIMPLIFIED
-The source outline has far more detail than a globe that size can show: at 320 pixels across, a
-degree of longitude is under a pixel. Simplification is not a compromise here, it removes points
-that could never be distinguished.
+Va simplificado porque el contorno original tiene mucho más detalle del que un globo de ese tamaño
+puede mostrar: a 320 píxeles de ancho, un grado de longitud no llega a un píxel. Simplificar no es
+una concesión, saca puntos que igual no se podrían distinguir.
 
-The result is committed to the repository. This script exists so the file can be regenerated and
-audited, not because it runs as part of the build — it needs a download, and a build that reaches
-the network is a build that breaks when the network does.
+El resultado queda versionado en el repositorio. Este script existe para poder regenerarlo y
+auditarlo, no para correr como parte del build: necesita una descarga, y un build que sale a la red
+es un build que se rompe cuando la red se cae.
 
 Fuente: world-atlas (Natural Earth 110m), dominio público.
     curl -o countries-110m.json https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json
@@ -35,10 +34,10 @@ Punto = tuple[float, float]
 
 
 def decodificar_arcos(topo: dict[str, Any]) -> list[list[Punto]]:
-    """Undo TopoJSON's delta encoding and quantisation into absolute lon/lat pairs.
+    """Deshace la codificación por deltas y la cuantización de TopoJSON, a pares lon/lat absolutos.
 
-    Every arc stores its first point as a quantised absolute and the rest as deltas from the
-    previous one; the transform maps that integer grid back onto degrees.
+    Cada arco guarda su primer punto como absoluto cuantizado y el resto como deltas respecto del
+    anterior; la transformación devuelve esa grilla de enteros a grados.
     """
     t = topo["transform"]
     sx, sy = t["scale"]
@@ -57,7 +56,7 @@ def decodificar_arcos(topo: dict[str, Any]) -> list[list[Punto]]:
 
 
 def _perpendicular(p: Punto, a: Punto, b: Punto) -> float:
-    """Distance from p to the segment a-b, in degrees. Good enough at this scale."""
+    """Distancia de p al segmento a-b, en grados. A esta escala alcanza y sobra."""
     (px, py), (ax, ay), (bx, by) = p, a, b
     dx, dy = bx - ax, by - ay
     if dx == 0 and dy == 0:
@@ -68,7 +67,7 @@ def _perpendicular(p: Punto, a: Punto, b: Punto) -> float:
 
 
 def simplificar(puntos: list[Punto], tolerancia: float) -> list[Punto]:
-    """Douglas-Peucker, iterative so a long coastline cannot blow the recursion limit."""
+    """Douglas-Peucker, iterativo para que una costa larga no reviente el límite de recursión."""
     if len(puntos) < 3:
         return puntos
 
@@ -94,10 +93,10 @@ def simplificar(puntos: list[Punto], tolerancia: float) -> list[Punto]:
 
 
 def anillos(geom: dict[str, Any], arcos: list[list[Punto]]) -> list[list[Punto]]:
-    """Resolve a geometry's arc references into closed rings.
+    """Resuelve las referencias a arcos de una geometría en anillos cerrados.
 
-    A negative index means the arc runs backwards, encoded as ~i, which is how TopoJSON lets two
-    countries share the border between them instead of storing it twice.
+    Un índice negativo significa que el arco va al revés, codificado como ~i, que es la forma en que
+    TopoJSON deja que dos países compartan la frontera entre ellos en vez de guardarla dos veces.
     """
     if geom["type"] == "Polygon":
         listas = geom["arcs"]
@@ -150,7 +149,7 @@ def main() -> None:
 
     SALIDA.parent.mkdir(parents=True, exist_ok=True)
     SALIDA.write_text(
-        "// Generado por scripts/build_world_map.py — no editar a mano.\n"
+        "// Generado por scripts/build_world_map.py, no editar a mano.\n"
         "//\n"
         "// Contornos de países del atlas world-atlas (Natural Earth 110m, dominio público),\n"
         f"// simplificados con Douglas-Peucker a {args.tolerancia}° de tolerancia.\n"

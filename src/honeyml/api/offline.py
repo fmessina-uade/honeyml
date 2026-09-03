@@ -1,22 +1,20 @@
-"""Freeze the dashboard's telemetry to a file so the panel works without Elasticsearch.
+"""Congela la telemetría del panel en un archivo, para que funcione sin Elasticsearch.
 
-The stack is heavy and only runs on demand. Two situations need the data without it: taking the
-screenshots for the report, and showing the panel on a machine that is not the development one.
-Both are worse moments than usual to discover that the dashboard needs a running cluster.
+El stack es pesado y solo se levanta cuando hace falta. Hay dos momentos en los que necesitamos los
+datos sin él: sacar las capturas para el informe, y mostrar el panel en una máquina que no es la de
+desarrollo. Los dos son malos momentos para descubrir que el tablero necesita un clúster arriba.
 
-The API reads this file automatically when Elasticsearch is unreachable, and reports which mode it
-is serving so the panel can say so instead of passing stale numbers off as live.
+La API lee este archivo sola cuando no alcanza a Elasticsearch, y avisa en qué modo está sirviendo,
+así el panel lo dice en pantalla en lugar de pasar números viejos por datos en vivo.
 
-POR QUÉ LA SERIE HORARIA VIVE APARTE
-El respaldo guarda un punto por día, que alcanza para acotar un rango, elegir sensor o agrupar en
-semanas. La vista por hora no se puede reconstruir de ahí, y es la que usan dos de los cinco atajos
-del panel: sin ella, "último día" y "día anterior" no funcionan sin el índice.
+La serie horaria va en su propio archivo. El respaldo guarda un punto por día, que alcanza para
+acotar un rango, elegir sensor o agrupar por semana, pero la vista por hora no se puede reconstruir
+desde ahí, y la usan dos de los cinco atajos del panel.
 
-Se precalcula en su propio archivo desde la tabla consolidada, no desde Elasticsearch. Eso tiene una
-consecuencia que hay que respetar: la tabla incluye el tráfico de healthcheck del propio contenedor
-y las consultas del panel lo excluyen. Sin ese filtro las dos series difieren —32.732 eventos
-repartidos en once días—, y pasar de "por día" a "por hora" mostraría totales distintos para el
-mismo período. Con el filtro coinciden exactamente.
+Se precalcula desde la tabla consolidada y no desde Elasticsearch. Ojo con una consecuencia: la
+tabla incluye el tráfico de healthcheck del propio contenedor y las consultas del panel lo excluyen,
+así que sin ese filtro las dos series difieren (32.732 eventos repartidos en once días) y pasar de
+"por día" a "por hora" mostraría totales distintos para el mismo período. Con el filtro coinciden.
 
 Usage:
     python -m honeyml.api.offline               # respaldo completo, necesita Elasticsearch
@@ -39,14 +37,14 @@ TABLA_CONSOLIDADA = Path("data/processed/honeypot_events.parquet")
 
 
 def build(es_url: str = queries.ES_URL) -> dict[str, Any]:
-    """Query everything the dashboard needs and stamp it with the time it was taken."""
+    """Consulta todo lo que necesita el panel y le pone la marca de cuándo se tomó."""
     data = queries.snapshot(es_url)
     data["generated_at"] = datetime.now(UTC).isoformat(timespec="seconds")
     return data
 
 
 def load() -> dict[str, Any] | None:
-    """Read the frozen snapshot, or None when it was never generated."""
+    """Lee el respaldo congelado, o None si nunca se generó."""
     if not OUT_FILE.exists():
         return None
     parsed: dict[str, Any] = json.loads(OUT_FILE.read_text(encoding="utf-8"))
@@ -54,7 +52,7 @@ def load() -> dict[str, Any] | None:
 
 
 def construir_serie_horaria() -> list[dict[str, Any]]:
-    """One bucket per hour with its per-sensor split, computed from the consolidated table.
+    """Un cubo por hora con su desglose por sensor, calculado desde la tabla consolidada.
 
     Se calcula acá y no con una consulta más al índice porque la tabla ya tiene lo necesario y el
     respaldo tiene que poder regenerarse sin levantar el stack.
@@ -85,7 +83,7 @@ def construir_serie_horaria() -> list[dict[str, Any]]:
 
 
 def cargar_serie_horaria() -> list[dict[str, Any]] | None:
-    """Read the precomputed hourly series, or None when it was never generated."""
+    """Lee la serie horaria precalculada, o None si nunca se generó."""
     if not HORARIO_FILE.exists():
         return None
     datos: list[dict[str, Any]] = json.loads(HORARIO_FILE.read_text(encoding="utf-8"))
@@ -93,7 +91,7 @@ def cargar_serie_horaria() -> list[dict[str, Any]] | None:
 
 
 def guardar_serie_horaria() -> int:
-    """Rebuild the hourly series and write it next to the snapshot. Returns how many buckets."""
+    """Regenera la serie horaria y la escribe al lado del respaldo. Devuelve cuántos cubos hay."""
     serie = construir_serie_horaria()
     HORARIO_FILE.parent.mkdir(parents=True, exist_ok=True)
     HORARIO_FILE.write_text(json.dumps(serie, ensure_ascii=False), encoding="utf-8")
@@ -106,16 +104,16 @@ def timeline(
     desde: str | None = None,
     hasta: str | None = None,
 ) -> list[dict[str, Any]] | None:
-    """Answer a filtered timeline from the frozen data, or None when it honestly cannot.
+    """Responde la serie filtrada desde el respaldo, o None cuando honestamente no puede.
 
-    Los cuatro filtros del panel se resuelven acá: rango de fechas, sensor, y los tres intervalos.
-    Día y semana salen de los cubos diarios del respaldo; la vista por hora, del archivo horario
-    precalculado, que se genera aparte porque el respaldo no la puede reconstruir.
+    Acá se resuelven los cuatro filtros del panel: rango de fechas, sensor y los tres intervalos.
+    Día y semana salen de los cubos diarios del respaldo; la vista por hora, del archivo horario,
+    que se genera aparte porque el respaldo no la puede reconstruir.
 
-    Devolver None cuando el archivo horario no está —en vez de una aproximación— es deliberado. Sin
-    esa distinción el pedido fallaba, el panel se comía el error, y el gráfico seguía mostrando la
-    serie *sin filtrar* debajo de unos controles que decían "último día": una respuesta equivocada
-    disfrazada de correcta.
+    Que devuelva None cuando falta el archivo horario, en lugar de una aproximación, es a propósito.
+    Sin esa distinción el pedido fallaba, el panel se comía el error y el gráfico seguía mostrando
+    la serie sin filtrar debajo de unos controles que decían "último día", que es una respuesta
+    equivocada disfrazada de correcta.
     """
     datos = load()
     if datos is None:
@@ -138,9 +136,9 @@ def _acotar(
     hasta: str | None,
     corte: int,
 ) -> list[dict[str, Any]]:
-    """Narrow a series by date range and sensor. `corte` is how much of the label to keep.
+    """Acota una serie por rango de fechas y sensor. `corte` es cuánto de la etiqueta se conserva.
 
-    Diez para la vista diaria y trece para la horaria —"2026-08-25 14"—, que es el mismo largo con
+    Diez para la vista diaria y trece para la horaria ("2026-08-25 14"), que es el mismo largo con
     que Elasticsearch etiqueta cada intervalo. El panel parte esa etiqueta por el espacio para
     separar el día de la hora, así que el largo es parte del contrato y no una preferencia.
 
@@ -169,10 +167,10 @@ def _acotar(
 
 
 def _por_semana(dias: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Roll daily buckets up into weeks starting on Monday, as Elasticsearch labels them.
+    """Agrupa los cubos diarios en semanas que arrancan el lunes, como las etiqueta Elasticsearch.
 
-    Same key as `calendar_interval: week` so that switching between live and frozen does not move
-    the bars sideways by a few days.
+    Misma clave que `calendar_interval: week`, así pasar de vivo a congelado no corre las barras
+    unos días para el costado.
     """
     semanas: dict[str, dict[str, Any]] = {}
     for d in dias:
@@ -223,7 +221,7 @@ def main() -> None:
 
     # La serie horaria sale de la tabla consolidada, no del índice, así que se regenera junto con el
     # respaldo: si quedara desfasada, el gráfico mostraría un período distinto al cambiar de
-    # intervalo. Si la tabla no está, el respaldo igual sirve —solo pierde la vista por hora.
+    # intervalo. Si la tabla no está, el respaldo igual sirve, solo que pierde la vista por hora.
     try:
         _informar_horaria()
     except FileNotFoundError as exc:

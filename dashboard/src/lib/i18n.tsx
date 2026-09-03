@@ -8,7 +8,7 @@ import {
 import { TRANSLATIONS, type Dict, type Lang } from './translations';
 import { setNumberLocale } from './format';
 
-// separate key from the public site: they are different apps and can differ
+// clave separada de la del sitio público: son apps distintas y pueden diferir
 const STORAGE_KEY = 'honeyml-panel-lang';
 
 interface I18nValue {
@@ -35,11 +35,11 @@ export function LangProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.setItem(STORAGE_KEY, next);
     } catch {
-      // private mode / storage disabled: the choice just won't persist
+      // modo privado o almacenamiento deshabilitado: la elección simplemente no persiste
     }
   };
 
-  // set before the first paint so numbers never render with the wrong separators
+  // se fija antes del primer pintado, así los números nunca salen con el separador equivocado
   setNumberLocale(lang);
 
   useEffect(() => {

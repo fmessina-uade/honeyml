@@ -7,8 +7,8 @@ import { n, pct, dec } from '../../lib/format';
 
 
 
-// Why attackers reach for these specific credentials. This is the layer that turns a ranking
-// into a lesson: the reader leaves knowing what to change on their own machine.
+// Por qué los atacantes van a buscar justamente estas credenciales. Es la capa que convierte un
+// ranking en una lección: el lector se va sabiendo qué cambiar en su propia máquina.
 const USER_NOTES: Record<string, string> = {
   root: 'Existe en prácticamente toda instalación de Linux, y es el único con control total. Por eso concentra la mayoría de los intentos: no hay que adivinar el nombre de usuario.',
   admin: 'Nombre por defecto en routers, cámaras y paneles web. Se prueba apenas falla root.',
@@ -75,7 +75,7 @@ function Panel({
   const { t } = useI18n();
   const tip = useTooltip();
   const max = Math.max(...buckets.map((b) => b.count), 1);
-  // share is computed over the whole ranking, so the reader sees concentration, not just order
+  // la proporción se calcula sobre el ranking entero, así se ve la concentración y no solo el orden
   const total = buckets.reduce((a, b) => a + b.count, 0);
 
   return (
@@ -133,7 +133,7 @@ function Panel({
   );
 }
 
-/** Credentials and commands, each with the reason behind it. */
+/** Credenciales y comandos, cada uno con el motivo detrás. */
 export default function Dictionary({
   users,
   passwords,

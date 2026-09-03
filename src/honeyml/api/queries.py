@@ -1,7 +1,7 @@
-"""Aggregations over the ECS indices that power the dashboard.
+"""Las agregaciones sobre los índices ECS que alimentan el panel.
 
-Plain urllib so the module has no dependency beyond the standard library: the same functions
-serve the live API and the static snapshot used for offline screenshots.
+urllib pelado, así el módulo no depende de nada fuera de la biblioteca estándar: las mismas
+funciones sirven la API en vivo y el respaldo estático que se usa para las capturas.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ ES_URL = "http://localhost:9200"
 INDEX = "honeypot-*"
 LOCAL_IP = "127.0.0.1"
 
-# every query excludes the container's own healthchecks
+# todas las consultas dejan afuera los healthchecks del propio contenedor
 NOT_LOCAL: dict[str, Any] = {"bool": {"must_not": [{"term": {"source.ip": LOCAL_IP}}]}}
 
 
@@ -41,10 +41,10 @@ def _terms(
 
 
 def overview(es_url: str = ES_URL) -> dict[str, Any]:
-    """Headline counters: the numbers that open the dashboard."""
+    """Los contadores de portada, los números con los que abre el panel."""
     body = {
         "size": 0,
-        # without this ES caps the reported total at 10.000
+        # sin esto, Elasticsearch informa como mucho 10.000 y corta ahí
         "track_total_hits": True,
         "query": NOT_LOCAL,
         "aggs": {
@@ -82,11 +82,11 @@ def overview(es_url: str = ES_URL) -> dict[str, Any]:
 def _filtrado(
     sensor: str | None = None, desde: str | None = None, hasta: str | None = None
 ) -> dict[str, Any]:
-    """The base query plus whatever filters the caller passed.
+    """La consulta base más los filtros que haya pasado quien llama.
 
-    Built here rather than in each query so every filtered view excludes the container's own
-    healthchecks the same way. Passing nothing gives exactly the unfiltered query, so adding
-    filter support to a view cannot change what it returns by default.
+    Se arma acá y no en cada consulta para que todas las vistas filtradas dejen afuera los
+    healthchecks del contenedor de la misma forma. Sin filtros devuelve exactamente la consulta sin
+    filtrar, así que sumarle filtros a una vista no puede cambiar lo que devuelve por defecto.
     """
     must: list[dict[str, Any]] = []
     if sensor:
@@ -116,7 +116,7 @@ def timeline(
     desde: str | None = None,
     hasta: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Events over time: shows the relentlessness of the traffic, and the capture gaps."""
+    """Eventos en el tiempo: muestra que el tráfico no afloja, y también los cortes de captura."""
     if interval not in INTERVALOS:
         interval = "day"
     body = {
@@ -141,7 +141,7 @@ def timeline(
 
 
 def top_credentials(es_url: str = ES_URL, size: int = 10) -> dict[str, list[dict[str, Any]]]:
-    """What attackers actually try: the concrete evidence behind 'use strong passwords'."""
+    """Lo que los atacantes prueban de verdad: la evidencia detrás de "usá contraseñas fuertes"."""
     return {
         "users": _terms("user.name", size, es_url),
         "passwords": _terms("cowrie.password", size, es_url),
@@ -153,20 +153,21 @@ def top_commands(es_url: str = ES_URL, size: int = 12) -> list[dict[str, Any]]:
 
 
 def protocols(es_url: str = ES_URL) -> list[dict[str, Any]]:
-    """Attack surface by protocol: what the multiprotocol sensor adds over SSH alone."""
+    """Superficie de ataque por protocolo: qué suma el sensor multiprotocolo sobre SSH solo."""
     return _terms("network.protocol", 15, es_url)
 
 
 def attack_stages(es_url: str = ES_URL) -> list[dict[str, Any]]:
-    """Events grouped by stage of the intrusion."""
+    """Eventos agrupados por etapa de la intrusión."""
     return _terms("event.category", 10, es_url)
 
 
 def protocol_detail(es_url: str = ES_URL) -> list[dict[str, Any]]:
-    """Per-protocol traffic on the multiprotocol sensor, with how many distinct sources hit each.
+    """Tráfico por protocolo en el sensor multiprotocolo, con las direcciones distintas de cada uno.
 
-    Event counts alone are misleading here: SMB dominates because a single worm retries endlessly,
-    while HTTP is touched by far more distinct scanners. The two numbers together tell that apart.
+    Contar solo eventos acá engaña: SMB domina porque un solo gusano reintenta sin parar, mientras
+    que HTTP lo tocan muchos más escáneres distintos. Los dos números juntos distinguen una cosa de
+    la otra.
     """
     body = {
         "size": 0,
@@ -201,19 +202,19 @@ def protocol_detail(es_url: str = ES_URL) -> list[dict[str, Any]]:
 
 
 def geography(es_url: str = ES_URL) -> dict[str, Any]:
-    """Where the attacks come from, by country and by autonomous system.
+    """De dónde vienen los ataques, por país y por sistema autónomo.
 
-    Both are reported, and the pair is the point. The country says little on its own: an attack
-    launched from a cloud rental and one from a home connection can share a flag and be entirely
-    different things. The autonomous system is what tells them apart, because it names the network
-    that actually operates the address.
+    Se informan los dos, y ahí está la gracia. El país solo dice poco: un ataque lanzado desde una
+    nube alquilada y uno desde una conexión hogareña pueden compartir bandera y ser cosas
+    completamente distintas. El sistema autónomo los separa, porque nombra la red que efectivamente
+    opera la dirección.
 
-    Distinct sources travel next to event counts for the same reason as in protocol_detail: one
-    persistent host inflates a country's event total without meaning that many attackers are there.
+    Las direcciones distintas van al lado del conteo de eventos por lo mismo que en protocol_detail:
+    un solo equipo insistente infla el total de un país sin que haya tantos atacantes ahí.
 
-    Coverage is reported rather than assumed. The bundled databases are the free MaxMind ones, and
-    they do not know every address — hiding that would make the percentages look complete when they
-    are computed over a subset.
+    La cobertura se informa en vez de darse por sentada. Las bases que vienen con el plugin son las
+    gratuitas de MaxMind y no conocen todas las direcciones; taparlo haría que los porcentajes
+    parezcan completos cuando en realidad se calculan sobre un subconjunto.
     """
     body = {
         "size": 0,
@@ -276,10 +277,11 @@ def geography(es_url: str = ES_URL) -> dict[str, Any]:
 
 
 def hourly(es_url: str = ES_URL) -> list[dict[str, Any]]:
-    """Attacks by hour of day, in UTC.
+    """Ataques por hora del día, en UTC.
 
-    The interesting part is that this distribution is flat. Human activity has office hours;
-    a flat curve is the signature of automation, and it is easier to show than to assert.
+    Lo interesante es que esta distribución es plana. La actividad humana tiene horario de
+    oficina; una curva chata es la firma de la automatización, y se muestra más fácil de lo que se
+    argumenta.
     """
     body = {
         "size": 0,
@@ -301,17 +303,18 @@ def hourly(es_url: str = ES_URL) -> list[dict[str, Any]]:
 
 
 def weekly_rhythm(es_url: str = ES_URL) -> dict[str, Any]:
-    """Events laid out as day of week by hour of day: 168 cells, in UTC.
+    """Eventos dispuestos como día de la semana por hora del día: 168 celdas, en UTC.
 
-    The flat hourly curve already says the traffic is automated, but as twenty-four bars it reads
-    as a chart that happens to be even. Spread over a full week it stops being a claim and becomes
-    something the reader checks themselves: a system with people behind it lights up on weekdays
-    between nine and six and goes dark at night and on weekends. Whatever pattern this grid does
-    or does not have is visible at a glance, with no statistic in between.
+    La curva horaria plana ya dice que el tráfico es automático, pero en veinticuatro barras se lee
+    como un gráfico que casualmente quedó parejo. Desplegado sobre una semana entera deja de ser una
+    afirmación y pasa a ser algo que el lector comprueba solo: un sistema con gente detrás se
+    enciende de lunes a viernes entre las nueve y las seis, y se apaga de noche y los fines de
+    semana. El patrón que tenga o no tenga esta grilla se ve de un vistazo, sin una estadística en
+    el medio.
 
-    Bucketing happens here and not in Elasticsearch because the hourly histogram is already being
-    read: adding a scripted aggregation would ask the cluster to redo work for two thousand
-    buckets that fit in memory.
+    El agrupado se hace acá y no en Elasticsearch porque el histograma horario ya se está leyendo:
+    sumar una agregación con script sería pedirle al clúster que rehaga trabajo para dos mil cubos
+    que entran en memoria.
     """
     body = {
         "size": 0,
@@ -352,7 +355,7 @@ def weekly_rhythm(es_url: str = ES_URL) -> dict[str, Any]:
 
 
 def snapshot(es_url: str = ES_URL) -> dict[str, Any]:
-    """Everything the dashboard needs, in one object (also used for the offline snapshot)."""
+    """Todo lo que necesita el panel, en un solo objeto. También lo usa el respaldo congelado."""
     return {
         "overview": overview(es_url),
         "timeline": timeline(es_url),

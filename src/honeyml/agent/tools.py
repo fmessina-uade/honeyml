@@ -1,28 +1,27 @@
-"""What the triage engine is allowed to look up while reasoning about an event.
+"""Qué puede consultar el motor de triaje mientras razona sobre un evento.
 
-The bus message carries the trigger and nothing else: one line saying an address ran a command.
-Deciding whether that matters needs the surroundings — has this address been here before, what else
-did it do in the same session, is the sequence one the corpus has already seen a thousand times.
-These are the lookups that answer those questions.
+El mensaje del bus trae el disparador y nada más: una línea que dice que una dirección ejecutó un
+comando. Para saber si eso importa hacen falta las circunstancias, y estas son las consultas que las
+responden: si esa dirección ya estuvo antes, qué más hizo en la misma sesión, si la secuencia es una
+que el corpus ya vio mil veces.
 
-THREE PROPERTIES, EACH LOAD-BEARING
+Hay tres propiedades y las tres sostienen algo.
 
-*Read-only.* Nothing here writes, deletes, or reaches outside the project's own data. That is not
-tidiness: the input is attacker-controlled text. A command captured by the honeypot can say anything
-at all, including instructions addressed to whatever reads it, and it lands in the model's context
-by design. An engine whose entire toolbox is queries cannot be talked into doing damage, because
-there is no damage available to do. Anything that acts on the world belongs outside this module and
-behind a human.
+Son de solo lectura. Nada de acá escribe, borra ni sale de los datos del propio proyecto. No es
+prolijidad: la entrada es texto controlado por el atacante. Un comando capturado por el señuelo
+puede decir cualquier cosa, incluidas instrucciones dirigidas a lo que sea que lo lea, y entra al
+contexto del modelo por diseño. Un motor cuya caja de herramientas son puras consultas no puede ser
+convencido de hacer daño, porque no hay daño disponible. Lo que actúe sobre el mundo va afuera de
+este módulo y detrás de una persona.
 
-*Bounded.* Every lookup caps what it returns. One session in the corpus ran 1.400 commands; handed
-over whole it would crowd out the rest of the context and be paid for by the token. The caps are
-constants below, and each one is a declared limit rather than a surprise.
+Son acotadas. Cada consulta tiene tope. Una sesión del corpus corrió 1.400 comandos, y entregada
+entera desplazaría al resto del contexto y se paga por token. Los topes son las constantes de abajo.
 
-*Cut off at the event's own timestamp.* History means what was known *before* this event, not
-everything in the index today. Without the cut, the engine judges an early event using evidence
-from a later one, scores better than it could ever score live, and the adversarial validation
-campaign ends up measuring a system that cannot exist. The horizon is a parameter of every
-historical lookup, and it is not optional.
+Y están cortadas en la marca temporal del propio evento. Historial significa lo que se sabía antes
+de este evento, no todo lo que hay en el índice hoy. Sin el corte, el motor juzga un evento temprano
+con evidencia posterior, puntúa mejor de lo que jamás podría en vivo, y la campaña de validación
+adversaria termina midiendo un sistema que no puede existir. El horizonte es parámetro obligatorio
+de toda consulta histórica.
 """
 
 from __future__ import annotations
@@ -46,8 +45,8 @@ MAX_ACCIONES = 8
 # Ventana hacia atrás para detectar una ráfaga coordinada.
 #
 # Seis horas. Una campaña de botnet reparte su objetivo entre nodos en minutos u horas, no en días;
-# con una ventana de un día el conteo se llena del tráfico de fondo —unos treinta mil eventos
-# diarios— y deja de distinguir nada. Con una hora, una campaña lenta pasa desapercibida.
+# con una ventana de un día el conteo se llena del tráfico de fondo (unos treinta mil eventos
+# diarios) y deja de distinguir nada. Con una hora, una campaña lenta pasa desapercibida.
 VENTANA_RAFAGA_HORAS = 6
 
 
@@ -69,11 +68,11 @@ def _buscar(body: dict[str, Any], es_url: str = queries.ES_URL) -> dict[str, Any
 
 
 def historial_de_direccion(ip: str, hasta: str, es_url: str = queries.ES_URL) -> dict[str, Any]:
-    """What this address had already done before `hasta`.
+    """Qué había hecho ya esta dirección antes de `hasta`.
 
-    `hasta` is the horizon and is required for the reason in the module header: an address whose
-    first appearance is the event being judged looks very different from one that has been trying
-    for three weeks, and only the second is a fact the engine could have known at the time.
+    `hasta` es el horizonte y es obligatorio por lo que dice el encabezado del módulo: una dirección
+    cuya primera aparición es el evento que se está juzgando no se parece en nada a una que viene
+    intentando hace tres semanas, y solo la segunda es un hecho que el motor podía saber entonces.
     """
     if not ip or not hasta:
         return {"conocida": False}
@@ -123,10 +122,10 @@ def historial_de_direccion(ip: str, hasta: str, es_url: str = queries.ES_URL) ->
 def comandos_de_la_sesion(
     session: str, hasta: str = "", es_url: str = queries.ES_URL
 ) -> dict[str, Any]:
-    """The commands run in this session, in order, up to the horizon.
+    """Los comandos de esta sesión, en orden, hasta el horizonte.
 
-    Cut at `hasta` as well when given: the point of the sequence is what led up to the event, and
-    including what came after would let the engine reason from the ending backwards.
+    Si viene `hasta`, también corta ahí: lo que interesa de la secuencia es lo que llevó al evento,
+    e incluir lo que pasó después dejaría al motor razonando desde el final hacia atrás.
     """
     if not session:
         return {"comandos": [], "total": 0}
@@ -161,11 +160,12 @@ def comandos_de_la_sesion(
 
 
 def familia_de_la_sesion(comandos: list[str]) -> dict[str, Any] | None:
-    """Which published fingerprint family this exact command sequence belongs to, if any.
+    """A qué familia de huellas publicada pertenece esta secuencia exacta de comandos, si a alguna.
 
-    Matching is byte-identical, which is the same strict criterion the families were built with. A
-    near miss is deliberately not a match: the value of this lookup is that a hit means "5.514 other
-    sessions did precisely this", and a fuzzy hit would not mean that.
+    La coincidencia es byte a byte, el mismo criterio estricto con el que se armaron las familias.
+    Que algo se parezca mucho no cuenta como coincidencia, y es a propósito: el valor de esta
+    consulta es que un acierto significa "otras 5.514 sesiones hicieron exactamente esto", y una
+    coincidencia difusa no significaría eso.
     """
     if not comandos:
         return None
@@ -187,11 +187,11 @@ def familia_de_la_sesion(comandos: list[str]) -> dict[str, Any] | None:
 
 
 def origen_de_direccion(ip: str, es_url: str = queries.ES_URL) -> dict[str, Any]:
-    """Country and operating network of an address, as the pipeline enriched them.
+    """País y red que opera una dirección, tal como los dejó el enriquecimiento del pipeline.
 
-    The network matters more than the country and the section of the panel says why: a rented
-    datacentre address and a home connection are different things that share a flag. Both are
-    reported so the engine can weigh them, and neither is attribution.
+    La red dice más que el país, y la sección del panel explica por qué: una dirección alquilada en
+    un centro de datos y una conexión hogareña son cosas distintas que comparten bandera. Se
+    informan las dos para que el motor las pese, y ninguna de las dos es atribución.
     """
     if not ip:
         return {}
@@ -212,16 +212,16 @@ def origen_de_direccion(ip: str, es_url: str = queries.ES_URL) -> dict[str, Any]
 
 
 def trayectoria_de_direccion(ip: str, hasta: str, es_url: str = queries.ES_URL) -> dict[str, Any]:
-    """How far up the scale this address had already got, before this event.
+    """Hasta dónde había llegado esta dirección en la escala, antes de este evento.
 
-    `historial_de_direccion` counts what it did; this says how far it *reached*. The difference is
-    the one the severity scale is built on: an address with nine thousand prior events that never
-    got past a credential prompt is a different thing from one that ran commands last Tuesday, and
-    the raw count cannot tell them apart.
+    `historial_de_direccion` cuenta qué hizo; esto dice hasta dónde llegó. Es la diferencia sobre la
+    que está construida la escala de severidad: una dirección con nueve mil eventos previos que
+    nunca pasó de una pantalla de credenciales es otra cosa que una que ejecutó comandos el martes
+    pasado, y el conteo crudo no las distingue.
 
-    Returns the pairs of (category, outcome) it produced before the horizon, each mapped through the
-    same floor rule the engine is judged by — so "already reached ALTO" means exactly what it means
-    everywhere else, and not something this function invented.
+    Devuelve los pares (categoría, resultado) que produjo antes del horizonte, cada uno pasado por
+    la misma regla de piso con la que se juzga al motor, así que "ya alcanzó ALTO" significa lo
+    mismo que en el resto del motor y no algo que esta función se inventó.
     """
     if not ip or not hasta:
         return {"conocida": False}
@@ -266,18 +266,18 @@ def trayectoria_de_direccion(ip: str, hasta: str, es_url: str = queries.ES_URL) 
 def rafaga_en_la_ventana(
     evento: EventoDelBus, ventana_horas: int = VENTANA_RAFAGA_HORAS, es_url: str = queries.ES_URL
 ) -> dict[str, Any]:
-    """How many *other* addresses were doing the same thing in the hours before this event.
+    """Cuántas otras direcciones estaban haciendo lo mismo en las horas previas a este evento.
 
-    This is the one signal nothing else in the engine carries. The fingerprint families already say
-    how many addresses ever ran a sequence, but over the whole corpus: forty addresses spread across
-    three months is the background noise of the internet, and the same forty inside one hour is a
-    coordinated push. Only the second is a reason to look harder, and only a time-boxed count can
-    tell them apart.
+    Es la única señal que no aporta ninguna otra parte del motor. Las familias de huellas ya dicen
+    cuántas direcciones corrieron alguna vez una secuencia, pero sobre todo el corpus: cuarenta
+    direcciones repartidas en tres meses son el ruido de fondo de internet, y esas mismas cuarenta
+    dentro de una hora son un empuje coordinado. Solo lo segundo amerita mirar más de cerca, y solo
+    un conteo acotado en el tiempo las distingue.
 
-    Two counts, because they answer different questions. The action-and-protocol count is always
-    available and says whether this *kind* of traffic is spiking. The command count only exists for
-    events that carry one, and is far more specific: the same byte-identical command from thirty
-    addresses in an hour is not a coincidence.
+    Van dos conteos porque contestan preguntas distintas. El de acción y protocolo está siempre
+    disponible y dice si ese tipo de tráfico está en pico. El de comando existe solo para los
+    eventos que traen uno, y es mucho más específico: el mismo comando byte a byte desde treinta
+    direcciones en una hora no es casualidad.
     """
     desde = _restar_horas(evento.timestamp, ventana_horas)
     if not desde:
@@ -329,11 +329,11 @@ def rafaga_en_la_ventana(
 
 
 def arquetipos_del_corpus() -> dict[str, Any] | None:
-    """The population baseline: how the observed addresses divide by behaviour.
+    """La línea base de la población: cómo se reparten por conducta las direcciones observadas.
 
-    Not about this event — about everything, which is exactly what makes it useful. "Ran commands
-    and got in" reads as ordinary until you know that only 1,5 % of addresses ever get there. It is
-    the denominator that turns an observation into a severity.
+    No habla de este evento sino de todos, que es justamente lo que lo hace útil. "Ejecutó comandos
+    y entró" se lee como algo común hasta que uno sabe que solo el 1,5 % de las direcciones llega
+    ahí. Es el denominador el que convierte una observación en una severidad.
     """
     datos = arquetipos.load()
     if datos is None:

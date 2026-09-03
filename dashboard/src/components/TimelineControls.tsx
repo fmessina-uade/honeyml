@@ -1,14 +1,15 @@
 import { useI18n } from '../lib/i18n';
 
 /**
- * Interval and sensor selectors for the timeline.
+ * Los selectores de intervalo y de sensor de la línea de tiempo.
  *
- * They sit next to the chart rather than in a global bar on purpose: only the timeline reacts to
- * them, and a control that looks global but changes one chart is worse than no control at all.
+ * Van al lado del gráfico y no en una barra global a propósito: la línea de tiempo es lo único que
+ * reacciona a ellos, y un control que parece global pero cambia un solo gráfico es peor que no
+ * tener control.
  *
- * Both are plain segmented buttons instead of dropdowns. There are three and four options; a
- * dropdown would hide them behind a click and make the current selection harder to read at a
- * glance, which for a panel meant to be looked at rather than operated is the wrong trade.
+ * Los dos son botones segmentados y no desplegables. Son tres y cuatro opciones; un desplegable las
+ * escondería detrás de un clic y haría más difícil leer de un vistazo qué está elegido, que para un
+ * panel pensado para mirarse y no para operarse es el intercambio equivocado.
  */
 
 export type Interval = 'hour' | 'day' | 'week';
@@ -16,14 +17,14 @@ export type Sensor = 'todos' | 'cowrie' | 'dionaea';
 export type Atajo = 'hoy' | 'ayer' | 'semana' | 'mes' | 'todo';
 
 /**
- * Ranges relative to the last day with data, not to today's clock.
+ * Los rangos son relativos al último día con datos, no al reloj de hoy.
  *
- * "Today" has to mean the last captured day: the panel is often read from a frozen snapshot, or
- * hours after the last pull, and anchoring to the real clock would hand back an empty chart and no
- * explanation for it.
+ * "Hoy" tiene que significar el último día capturado: el panel muchas veces se lee desde un
+ * respaldo congelado, o unas horas después de la última descarga, y anclarlo al reloj real
+ * devolvería un gráfico vacío sin ninguna explicación.
  *
- * Each shortcut also carries the interval that makes it readable — a single day as daily bars is
- * one bar, and three months by the hour is two thousand.
+ * Cada atajo lleva además el intervalo que lo hace legible: un solo día en barras diarias es una
+ * barra, y tres meses por hora son dos mil.
  */
 export const ATAJOS: Record<Atajo, { dias: number | null; interval: Interval }> = {
   hoy: { dias: 0, interval: 'hour' },

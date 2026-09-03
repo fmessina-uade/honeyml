@@ -1,14 +1,14 @@
-"""Load ECS-normalized events from Elasticsearch into a pandas DataFrame.
+"""Carga eventos normalizados a ECS desde Elasticsearch a un DataFrame de pandas.
 
-Uses the scroll API over urllib (no elasticsearch client, so we don't pin to its version) and
-flattens the nested ECS fields into flat columns ready for the EDA.
+Usa la API de scroll sobre urllib, sin el cliente de elasticsearch, para no quedar atados a su
+versión, y aplana los campos anidados de ECS en columnas sueltas listas para el análisis.
 
-Running it as a module writes the consolidated table to disk. That file is the first link of the
-derived-artifact chain: the exploratory analysis, the per-address features and the command
-encoding all read it, so it has to be reproducible from a command rather than from an ad-hoc
-session.
+Corrido como módulo, escribe la tabla consolidada en disco. Ese archivo es el primer eslabón de la
+cadena de artefactos derivados: lo leen el análisis exploratorio, las características por dirección
+y la codificación de comandos, así que tiene que poder reproducirse con un comando y no desde una
+sesión improvisada.
 
-Usage:
+Uso:
     python -m honeyml.eda.es_loader
 """
 
@@ -23,7 +23,7 @@ import pandas as pd
 
 OUT_FILE = Path("data/processed/honeypot_events.parquet")
 
-# ECS fields pulled per event. Asked for explicitly so we don't drag heavy payloads along.
+# Los campos ECS que se traen por evento. Se piden explícitos para no arrastrar cargas pesadas.
 DEFAULT_FIELDS = [
     "@timestamp",
     "honeypot",
@@ -58,7 +58,7 @@ def _post(url: str, path: str, body: dict[str, Any]) -> dict[str, Any]:
 
 
 def _first(value: Any) -> Any:
-    """ECS allows arrays (e.g. event.category=[network,authentication]); take the first value."""
+    """ECS admite arreglos (event.category=[network,authentication]); se toma el primer valor."""
     if isinstance(value, list):
         return value[0] if value else None
     return value
@@ -71,15 +71,15 @@ def load_events(
     page_size: int = 5000,
     max_docs: int | None = None,
 ) -> pd.DataFrame:
-    """Pull every event of the index into a DataFrame with flat ECS columns.
+    """Trae todos los eventos del índice a un DataFrame con las columnas ECS aplanadas.
 
-    Parameters
+    Parámetros
     ----------
-    es_url : Elasticsearch base URL.
-    index : index pattern (honeypot-*, honeypot-cowrie-*, ...).
-    fields : ECS fields to fetch; defaults to DEFAULT_FIELDS.
-    page_size : scroll page size.
-    max_docs : optional doc cap (handy for quick tests).
+    es_url : URL base de Elasticsearch.
+    index : patrón de índice (honeypot-*, honeypot-cowrie-*, ...).
+    fields : campos ECS a traer; si no se pasan, DEFAULT_FIELDS.
+    page_size : tamaño de página del scroll.
+    max_docs : tope opcional de documentos, cómodo para pruebas rápidas.
     """
     url = es_url.rstrip("/")
     fields = fields or DEFAULT_FIELDS
@@ -97,7 +97,7 @@ def load_events(
             src = h["_source"]
             row = {}
             for f in fields:
-                # walk the dotted path (event.category -> src["event"]["category"])
+                # recorre la ruta con puntos (event.category -> src["event"]["category"])
                 node = src
                 for part in f.split("."):
                     if isinstance(node, dict):
@@ -113,7 +113,7 @@ def load_events(
         res = _post(url, "/_search/scroll", {"scroll": "2m", "scroll_id": scroll_id})
         scroll_id = res.get("_scroll_id")
 
-    # free the scroll context
+    # libera el contexto del scroll
     if scroll_id:
         try:
             req = urllib.request.Request(

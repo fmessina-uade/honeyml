@@ -1,1 +1,1 @@
-"""Feature engineering over the honeypot telemetry."""
+"""Ingeniería de características sobre la telemetría de los honeypots."""

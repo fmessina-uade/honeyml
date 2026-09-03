@@ -1,29 +1,24 @@
-"""Attacker archetypes: unsupervised grouping of the observed sources by their behaviour.
+"""Arquetipos de atacante: agrupamiento no supervisado de las direcciones observadas por conducta.
 
-WHY THIS EXISTS
-The session fingerprints already group attacks by byte-identical command sequences. That is a
-strict criterion — it cannot group anything by accident, which makes every family it finds real,
-but it also means one changed character splits a family in two, and it says nothing at all about
-the sources that never ran a command.
+Las huellas de sesión ya agrupan ataques por secuencias de comandos byte a byte idénticas. Es un
+criterio estricto, así que no agrupa nada por casualidad y cada familia que encuentra es real, pero
+también significa que un carácter distinto parte una familia en dos, y no dice absolutamente nada de
+las direcciones que nunca ejecutaron un comando.
 
-This works the other way round: it takes the 35 behavioural features computed per source IP and
-lets the data decide where the boundaries fall. It generalises past literal matching and covers
-every observed address, not only those that reached a shell.
+Esto trabaja al revés: toma las 35 características de comportamiento calculadas por dirección y deja
+que los datos decidan dónde caen los límites. Generaliza más allá de la coincidencia literal y cubre
+todas las direcciones observadas, no solo las que llegaron a una consola.
 
-It also fills a gap the reference dataset cannot. UWF-ZeekData24 supplies MITRE labels but is
-network-flow telemetry: bytes, packets, connection state. Our features are behavioural — how many
-passwords were tried, whether a file was downloaded, at what hour, at what pace. Nothing in the
-benchmark describes that, so nothing in the benchmark can label it. Clustering needs no labels,
-which is exactly why it fits here.
+Además llena un hueco que el conjunto de referencia no puede. UWF-ZeekData24 aporta etiquetas MITRE
+pero es telemetría de flujos de red: bytes, paquetes, estado de conexión. Las nuestras son de
+comportamiento: cuántas contraseñas se probaron, si se descargó un archivo, a qué hora, a qué ritmo.
+Nada en el benchmark describe eso, así que nada en el benchmark puede etiquetarlo. El agrupamiento
+no necesita etiquetas, y por eso encaja acá.
 
-WHAT IT IS NOT
-The groups are descriptive, not ground truth. There is no external key saying how many kinds of
-attacker exist, so the number of groups is a choice made on a measurable criterion and stated as
-such. The names are an interpretation layer written after reading the profiles, and they are
-labelled as interpretation wherever they are shown.
-
-Usage:
-    python -m honeyml.features.arquetipos
+Qué no es esto. Los grupos son descriptivos, no verdad de campo. No hay una clave externa que diga
+cuántos tipos de atacante existen, así que la cantidad de grupos es una elección hecha sobre un
+criterio medible y declarada como tal. Los nombres son una capa de interpretación escrita después de
+leer los perfiles, y se los rotula como interpretación en todos lados donde se muestran.
 """
 
 from __future__ import annotations
@@ -42,7 +37,7 @@ ENTRADA = Path("data/processed/features_por_ip.parquet")
 SALIDA = Path("data/processed/arquetipos.json")
 RANDOM_STATE = 42
 
-# Rango de k a evaluar. Por debajo de 3 el resultado no informa —siempre da "mucho" y "poco"— y por
+# Rango de k a evaluar. Por debajo de 3 el resultado no informa (siempre da "mucho" y "poco") y por
 # encima de 8 los grupos se vuelven demasiado chicos para describirlos con honestidad.
 KS = range(3, 9)
 
@@ -79,13 +74,13 @@ LEGIBLE = {
 
 
 def nombrar(p: dict[str, Any]) -> tuple[str, str]:
-    """Name an archetype from its profile, never from its cluster number.
+    """Nombra un arquetipo por su perfil, nunca por el número de grupo.
 
-    KMeans does not guarantee stable numbering between runs, so a name attached to "group 2" would
-    move to a different set of attackers on the next run without anyone noticing. Deriving it from
-    the profile keeps the name attached to the behaviour.
+    KMeans no garantiza que la numeración se mantenga entre corridas, así que un nombre pegado al
+    "grupo 2" se mudaría a otro conjunto de atacantes en la corrida siguiente sin que nadie se dé
+    cuenta. Derivarlo del perfil mantiene el nombre atado a la conducta.
 
-    This is the interpretation layer, and it is the only part of this module that is not measured.
+    Esta es la capa de interpretación, y es la única parte del módulo que no está medida.
     """
     if p["pct_ejecuto_comandos"] > 50 and p["pct_descargo_archivo"] > 25:
         return (
@@ -115,11 +110,11 @@ def _legible(col: str) -> str:
 
 
 def elegir_k(x: np.ndarray) -> tuple[int, list[dict[str, Any]]]:
-    """Pick the number of groups by silhouette, preferring fewer when the gain is marginal.
+    """Elige la cantidad de grupos por silueta, y prefiere menos cuando la ganancia es marginal.
 
-    Silhouette measures how much better each point fits its own group than the nearest other one.
-    It is not a truth, it is a criterion — but it is a stated one, which is what matters: the
-    alternative is choosing a number because the result looked nice.
+    La silueta mide cuánto mejor encaja cada punto en su propio grupo que en el más cercano. No es
+    una verdad sino un criterio, pero es uno declarado, que es lo que importa: la alternativa es
+    elegir un número porque el resultado quedaba lindo.
     """
     rng = np.random.default_rng(RANDOM_STATE)
     idx = rng.choice(len(x), size=min(MUESTRA_SILUETA, len(x)), replace=False)
@@ -142,10 +137,10 @@ def elegir_k(x: np.ndarray) -> tuple[int, list[dict[str, Any]]]:
 def perfilar(
     df: pd.DataFrame, x: np.ndarray, etiquetas: np.ndarray, columnas: list[str]
 ) -> list[dict[str, Any]]:
-    """Describe each group by the features that separate it from the rest of the population.
+    """Describe cada grupo por las características que lo separan del resto de la población.
 
-    The comparison is in standardised space, so a deviation is read in standard deviations and
-    features on different scales can be ranked against each other.
+    La comparación es en el espacio estandarizado, así que un desvío se lee en desvíos estándar y
+    características de escalas distintas se pueden ordenar entre sí.
     """
     perfiles = []
     for g in sorted(set(etiquetas)):
@@ -188,7 +183,7 @@ def perfilar(
 
 
 def load() -> dict[str, Any] | None:
-    """Read the computed archetypes, or None when they have not been generated yet."""
+    """Lee los arquetipos ya calculados, o None si todavía no se generaron."""
     if not SALIDA.exists():
         return None
     parsed: dict[str, Any] = json.loads(SALIDA.read_text(encoding="utf-8"))
@@ -224,7 +219,7 @@ def main() -> None:
 
     for p in perfiles:
         n = f"{p['direcciones']:,}".replace(",", ".")
-        print(f"  {p['nombre'].upper()} — {n} direcciones ({p['porcentaje']} %)")
+        print(f"  {p['nombre'].upper()}: {n} direcciones ({p['porcentaje']} %)")
         for r in p["rasgos"]:
             print(f"      {r['direccion']:>5}  {r['caracteristica']}  ({r['desvios']:+.2f} σ)")
         print(

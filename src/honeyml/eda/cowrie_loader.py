@@ -1,7 +1,7 @@
-"""Load Cowrie's raw JSON logs into a pandas DataFrame.
+"""Carga los registros JSON crudos de Cowrie en un DataFrame de pandas.
 
-Reads the cowrie.json* files the honeypot writes (one JSON event per line) without needing the
-Elastic Stack up. This is the ground-truth source for offline EDA.
+Lee los archivos cowrie.json* que escribe el honeypot (un evento JSON por línea) sin necesidad de
+tener el Elastic Stack arriba. Es la fuente de verdad para el análisis exploratorio sin conexión.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from typing import Any
 
 import pandas as pd
 
-# Cowrie fields we care about (the rest is dropped to keep memory down).
+# Los campos de Cowrie que nos interesan; el resto se descarta para no cargar memoria de más.
 FIELDS = [
     "eventid",
     "timestamp",
@@ -37,13 +37,14 @@ def load_cowrie(
     pattern: str = "cowrie.json*",
     drop_local: bool = True,
 ) -> pd.DataFrame:
-    """Read all cowrie.json* files in a directory into a DataFrame.
+    """Lee todos los cowrie.json* de un directorio y los junta en un DataFrame.
 
-    Parameters
+    Parámetros
     ----------
-    logs_dir : directory holding the cowrie.json* files.
-    pattern : glob of files to read.
-    drop_local : if True, drop 127.0.0.1 events (the container's own healthchecks).
+    logs_dir : el directorio donde están los cowrie.json*.
+    pattern : qué archivos leer.
+    drop_local : si es True, descarta los eventos de 127.0.0.1, que son los healthchecks del
+        propio contenedor y no ataques.
     """
     logs_dir = Path(logs_dir)
     rows: list[dict[str, Any]] = []

@@ -1,18 +1,18 @@
-"""Build the lookup that lets a visitor check their own password against the captured ones.
+"""Arma la consulta que le permite a un visitante comparar su contraseña con las capturadas.
 
-The privacy design is the point, and it is the same one Have I Been Pwned uses (k-anonymity):
+El diseño de privacidad es el punto, y es el mismo que usa Have I Been Pwned (k-anonimato):
 
-  1. The browser hashes the typed password with SHA-256 and sends only the first five hex
-     characters of the digest.
-  2. The service answers with every captured hash sharing that prefix, and its count.
-  3. The browser finishes the comparison locally.
+  1. El navegador hashea con SHA-256 la contraseña tipeada y manda solo los primeros cinco
+     caracteres hexadecimales del resumen.
+  2. El servicio contesta con todos los hashes capturados que comparten ese prefijo, y su conteo.
+  3. El navegador termina la comparación localmente.
 
-The password never leaves the browser, and the service cannot tell which of the returned hashes
-the visitor was asking about. Asking someone to type a real password into a form that transmits
-it would teach exactly the wrong lesson — in a panel whose whole subject is credential attacks,
-that would be indefensible.
+La contraseña nunca sale del navegador, y el servicio no puede saber por cuál de los hashes
+devueltos estaba preguntando el visitante. Pedirle a alguien que tipee una contraseña real en un
+formulario que la transmite enseñaría exactamente la lección equivocada, y en un panel cuyo tema
+entero son los ataques a credenciales eso sería indefendible.
 
-Usage:
+Uso:
     python -m honeyml.education.password_index
 """
 
@@ -29,12 +29,12 @@ ES_URL = "http://localhost:9200"
 INDEX = "honeypot-*"
 OUT_FILE = Path("data/processed/password_index.json")
 PREFIX_LEN = 5
-# how many distinct passwords to pull; the captures hold ~54.000
+# cuántas contraseñas distintas se traen; en las capturas hay unas 54.000
 MAX_TERMS = 100_000
 
 
 def fetch_passwords(es_url: str = ES_URL) -> list[tuple[str, int]]:
-    """Every distinct captured password with how many times it was attempted."""
+    """Cada contraseña distinta capturada, con cuántas veces se intentó."""
     body = {
         "size": 0,
         "query": {"bool": {"must_not": [{"term": {"source.ip": "127.0.0.1"}}]}},
@@ -52,7 +52,7 @@ def fetch_passwords(es_url: str = ES_URL) -> list[tuple[str, int]]:
 
 
 def build(es_url: str = ES_URL) -> dict[str, Any]:
-    """Group the hashed passwords by digest prefix."""
+    """Agrupa las contraseñas hasheadas por prefijo del resumen."""
     passwords = fetch_passwords(es_url)
     buckets: dict[str, list[list[Any]]] = defaultdict(list)
     for raw, count in passwords:
@@ -76,7 +76,7 @@ def load() -> dict[str, Any] | None:
 
 
 def lookup(prefix: str, index: dict[str, Any]) -> dict[str, Any]:
-    """Everything the client needs to finish the comparison on its own."""
+    """Todo lo que el cliente necesita para terminar la comparación por su cuenta."""
     matches = index.get("buckets", {}).get(prefix.lower(), [])
     return {
         "prefix": prefix.lower(),

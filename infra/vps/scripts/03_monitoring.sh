@@ -1,8 +1,8 @@
 #!/bin/bash
 # 03_monitoring.sh
-# Basic VPS health monitoring for HoneyML's phase 1.
-# Installs a health-check script with webhook alerts (Slack/Discord/custom).
-# In phase 2 this gets absorbed by the Elastic Stack (Metricbeat).
+# Monitoreo básico de salud del VPS, para la fase 1 de HoneyML.
+# Instala un script de chequeo con alertas por webhook (Slack, Discord o el que sea).
+# En la fase 2 esto lo absorbe el Elastic Stack (Metricbeat).
 #
 # Usage: sudo bash 03_monitoring.sh <webhook_url>
 # Example: sudo bash 03_monitoring.sh "https://hooks.slack.com/services/..."
@@ -29,7 +29,7 @@ log "=== HoneyML - Configuración de Monitoreo de Salud ==="
 log "[1/3] Creando script de health check en $HEALTHCHECK_SCRIPT..."
 cat > "$HEALTHCHECK_SCRIPT" << HEALTH_SCRIPT
 #!/usr/bin/env bash
-# honeyml_health.sh - periodic VPS metric check, run by cron every 5 minutes.
+# honeyml_health.sh: chequeo periódico de métricas del VPS, lo corre cron cada 5 minutos.
 
 set -euo pipefail
 
@@ -162,13 +162,13 @@ cat > "$CRON_FILE" << CRONEOF
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 
-# health check every 5 minutes
+# chequeo de salud cada 5 minutos
 */5 * * * * root $HEALTHCHECK_SCRIPT >> $HEALTHCHECK_LOG 2>&1
 
 # daily report at 07:00 ART (UTC-3 = 10:00 UTC)
 0 10 * * * root $DAILY_REPORT_SCRIPT >> $HEALTHCHECK_LOG 2>&1
 
-# weekly rotation of the honeypot activity log (until Logstash is in place)
+# rotación semanal del registro de actividad de los honeypots, hasta que esté Logstash
 0 3 * * 0 root find /var/log -name "honeyml_*.log" -mtime +30 -delete 2>/dev/null || true
 CRONEOF
 

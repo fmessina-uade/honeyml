@@ -1,7 +1,7 @@
 import { useI18n } from '../lib/i18n';
 import type { Lang } from '../lib/translations';
 
-// Same flags as the public site, so the control reads as the same product.
+// Las mismas banderas que el sitio público, así el control se lee como el mismo producto.
 function FlagAR() {
   return (
     <svg viewBox="0 0 20 14" className="w-5 h-3.5 rounded-[2px]" aria-hidden="true">

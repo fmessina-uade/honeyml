@@ -1,14 +1,14 @@
-"""Bus consumer behaviour against a real Redis.
+"""Comportamiento del consumidor del bus contra un Redis de verdad.
 
-These check the properties that make the engine survivable, which are exactly the ones that cannot
-be verified by reading the code: that an acknowledgement only happens after the handler succeeded,
-that a failure leaves the event recoverable, that another consumer can take over what a dead one
-left behind, and that an event which always fails stops blocking the group instead of looping.
+Acá se comprueban las propiedades que hacen que el motor sobreviva, que son justo las que no se
+pueden verificar leyendo el código: que la confirmación llegue recién después de que el manejador
+salió bien, que una falla deje el evento recuperable, que otro consumidor pueda levantar lo que dejó
+uno muerto, y que un evento que falla siempre deje de trabar al grupo en vez de dar vueltas.
 
-They run against a throwaway stream and group, never the production ones, and clean up after
-themselves.
+Corren contra un stream y un grupo descartables, nunca los de producción, y limpian lo suyo al
+terminar.
 
-    make test-integration        (needs the bus up: make bus-up)
+    make test-integration        (necesita el bus arriba: make bus-up)
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ pytestmark = pytest.mark.integration
 
 @pytest.fixture
 def bus():
-    """A live connection, or a skip if the bus is not up. Never a false green."""
+    """Una conexión viva, o se saltea si el bus no está arriba. Nunca un verde falso."""
     r = redis.Redis(host="127.0.0.1", port=6379, decode_responses=True, socket_timeout=3)
     try:
         r.ping()
@@ -37,7 +37,7 @@ def bus():
 
 @pytest.fixture
 def stream(bus):
-    """A stream of its own per test, so nothing touches 'honeyml:events'."""
+    """Un stream propio por prueba, así nada toca 'honeyml:events'."""
     nombre = f"prueba:bus:{uuid.uuid4().hex[:8]}"
     yield nombre
     bus.delete(nombre, f"{nombre}:muertos")
@@ -74,13 +74,14 @@ def _consumidor(stream: str, manejador, **kw) -> ConsumidorDelBus:
 
 
 def _limpiar_marcas(bus, *doc_ids: str) -> None:
-    """Dedup marks outlive the stream, so a rerun would see the previous run's events."""
+    """Las marcas de deduplicación sobreviven al stream: sin esto, una recorrida vería los eventos
+    de la anterior."""
     for d in doc_ids:
         bus.delete(PREFIJO_VISTO + d)
 
 
 def test_procesa_y_confirma(bus, stream):
-    """The happy path: the handler receives the event and nothing stays pending."""
+    """El camino feliz: el manejador recibe el evento y no queda nada pendiente."""
     doc_id = uuid.uuid4().hex
     _limpiar_marcas(bus, doc_id)
     _publicar(bus, stream, doc_id)
@@ -93,14 +94,14 @@ def test_procesa_y_confirma(bus, stream):
     assert vistos[0].doc_id == doc_id
     assert vistos[0].command == "uname -a"
     assert c.contadores.procesados == 1
-    # Zero pending is the whole point: the event is settled, not merely delivered.
+    # Cero pendientes es toda la gracia: el evento quedó resuelto, no solamente entregado.
     assert bus.xpending(stream, "triaje-prueba")["pending"] == 0
 
     _limpiar_marcas(bus, doc_id)
 
 
 def test_el_grupo_se_crea_una_sola_vez(bus, stream):
-    """Creating the group twice must not raise: every start calls it."""
+    """Crear el grupo dos veces no puede levantar: cada arranque lo llama."""
     c = _consumidor(stream, lambda e: None)
     c.asegurar_grupo()
     c.asegurar_grupo()  # BUSYGROUP se absorbe
@@ -108,10 +109,10 @@ def test_el_grupo_se_crea_una_sola_vez(bus, stream):
 
 
 def test_repetido_se_saltea_sin_volver_a_procesar(bus, stream):
-    """The same doc_id delivered twice must run the handler once.
+    """El mismo doc_id entregado dos veces tiene que correr el manejador una sola.
 
-    This is not hypothetical: the real stream carried 52.165 messages with 52.156 distinct
-    document ids, because a normalizer restart replays what was between checkpoints.
+    No es hipotético: el stream real llevó 52.165 mensajes con 52.156 identificadores de documento
+    distintos, porque un reinicio del normalizador reproduce lo que había entre puntos de control.
     """
     doc_id = uuid.uuid4().hex
     _limpiar_marcas(bus, doc_id)
@@ -128,14 +129,14 @@ def test_repetido_se_saltea_sin_volver_a_procesar(bus, stream):
 
     assert len(vistos) == 1, "el manejador no debe correr dos veces sobre el mismo documento"
     assert c2.contadores.repetidos == 1
-    # Settled anyway: leaving it pending would bring it back forever.
+    # Igual queda resuelto: dejarlo pendiente lo traería de vuelta para siempre.
     assert bus.xpending(stream, "triaje-prueba")["pending"] == 0
 
     _limpiar_marcas(bus, doc_id)
 
 
 def test_fallo_del_manejador_deja_el_evento_pendiente(bus, stream):
-    """A failed decision must stay recoverable, not be swallowed by the acknowledgement."""
+    """Una decisión fallada tiene que seguir siendo recuperable, no comida por la confirmación."""
     doc_id = uuid.uuid4().hex
     _limpiar_marcas(bus, doc_id)
     _publicar(bus, stream, doc_id)
@@ -149,16 +150,16 @@ def test_fallo_del_manejador_deja_el_evento_pendiente(bus, stream):
     assert c.contadores.fallados == 1
     assert c.contadores.procesados == 0
     assert bus.xpending(stream, "triaje-prueba")["pending"] == 1
-    # Not marked as done, so a later attempt will actually redo the work.
+    # No queda marcado como hecho, así un intento posterior rehace el trabajo de verdad.
     assert not bus.exists(PREFIJO_VISTO + doc_id)
 
     _limpiar_marcas(bus, doc_id)
 
 
 def test_huerfano_lo_reclama_otro_consumidor(bus, stream):
-    """What a dead consumer left pending must be taken over by a live one.
+    """Lo que dejó pendiente un consumidor muerto lo tiene que levantar uno vivo.
 
-    This is the property that separates 'the engine restarts' from 'the engine loses nothing'.
+    Esta es la propiedad que separa "el motor reinicia" de "el motor no pierde nada".
     """
     doc_id = uuid.uuid4().hex
     _limpiar_marcas(bus, doc_id)
@@ -190,10 +191,10 @@ def test_huerfano_lo_reclama_otro_consumidor(bus, stream):
 
 
 def test_evento_venenoso_termina_en_muertos(bus, stream):
-    """An event that always fails must stop blocking the group.
+    """Un evento que falla siempre tiene que dejar de trabar al grupo.
 
-    Without a ceiling it would be reclaimed forever: the group never advances and every round
-    spends an inference call on the same event.
+    Sin un techo se reclamaría para siempre: el grupo no avanza nunca y cada vuelta gasta una
+    llamada de inferencia sobre el mismo evento.
     """
     doc_id = uuid.uuid4().hex
     _limpiar_marcas(bus, doc_id)

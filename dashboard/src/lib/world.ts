@@ -1,4 +1,4 @@
-// Generado por scripts/build_world_map.py — no editar a mano.
+// Generado por scripts/build_world_map.py, no editar a mano.
 //
 // Contornos de países del atlas world-atlas (Natural Earth 110m, dominio público),
 // simplificados con Douglas-Peucker a 0.8° de tolerancia.

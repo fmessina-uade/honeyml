@@ -1,13 +1,13 @@
-"""Print a normalized document, and the raw record it came from, for the report's figures.
+"""Imprime un documento normalizado y el registro crudo del que salió, para las figuras del informe.
 
-Shows what the ECS pipeline contributes: the same event before and after normalization, side by
-side. Credentials and source addresses are masked — the point of the figure is the shape of the
-document, not who was attacking.
+Muestra qué aporta el pipeline ECS: el mismo evento antes y después de normalizar, uno al lado del
+otro. Las credenciales y las direcciones de origen van enmascaradas, porque lo que importa de la
+figura es la forma del documento y no quién estaba atacando.
 
-Usage:
-    python infra/elastic/scripts/show_normalized_doc.py                 # a login event
-    python infra/elastic/scripts/show_normalized_doc.py --tipo comando  # a command execution
-    python infra/elastic/scripts/show_normalized_doc.py --sin-mascara   # unmasked, local review
+Uso:
+    python infra/elastic/scripts/show_normalized_doc.py                 # un evento de acceso
+    python infra/elastic/scripts/show_normalized_doc.py --tipo comando  # una ejecución de comando
+    python infra/elastic/scripts/show_normalized_doc.py --sin-mascara   # sin máscara, uso local
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 ES = "http://localhost:9200"
-# the indexed document keeps only Cowrie's `message`; the true native record lives in the log
+# el documento indexado guarda solo el `message` de Cowrie; el registro nativo real está en el log
 RAW_LOG = Path("data/logs/cowrie/cowrie.json")
 
 QUERIES = {
@@ -28,7 +28,7 @@ QUERIES = {
     "comando": {"term": {"event.action": "command-input"}},
 }
 
-# fields whose value identifies a third party or reveals a credential
+# campos cuyo valor identifica a un tercero o revela una credencial
 MASK_FIELDS = {
     "source.ip",
     "source.address",
@@ -38,12 +38,12 @@ MASK_FIELDS = {
     "event.original",
 }
 
-# Cowrie writes the attempted credential into the raw line: "login attempt [user/pass] failed"
+# Cowrie escribe la credencial intentada en la línea cruda: "login attempt [user/pass] failed"
 _CRED_IN_TEXT = re.compile(r"\[([^\]/]+)/([^\]]*)\]")
 
 
 def mask_ip(ip: str) -> str:
-    """Keep the shape of an address without identifying the host."""
+    """Conserva la forma de una dirección sin identificar al equipo."""
     parts = ip.split(".")
     if len(parts) == 4:
         return f"{parts[0]}.{parts[1]}.xxx.xxx"
@@ -60,7 +60,7 @@ def mask_value(path: str, value: Any) -> Any:
     if path == "cowrie.password":
         return "•" * min(len(value), 8)
     if path == "event.original":
-        # the username stays (it is the finding); the password does not
+        # el usuario queda, porque es el hallazgo; la contraseña no
         return _CRED_IN_TEXT.sub(lambda m: f"[{m.group(1)}/{'•' * min(len(m.group(2)), 8)}]", value)
     return value
 
@@ -101,7 +101,7 @@ def fetch(tipo: str, es_url: str) -> dict[str, Any] | None:
 
 
 def find_native(session: str, eventid: str) -> dict[str, Any] | None:
-    """Recover the sensor's original line from the local log copy, matched by session and event."""
+    """Recupera la línea original del sensor desde la copia local del log, por sesión y evento."""
     if not RAW_LOG.exists():
         return None
     with open(RAW_LOG, encoding="utf-8", errors="replace") as fh:
@@ -146,12 +146,12 @@ def main() -> None:
                 native["password"] = "•" * min(len(str(native["password"])), 8)
             if "message" in native:
                 native["message"] = mask_value("event.original", str(native["message"]))
-        show("ANTES — registro nativo del sensor (Cowrie jsonlog)", native)
+        show("ANTES: registro nativo del sensor (Cowrie jsonlog)", native)
     elif raw_msg:
-        print("\nANTES — registro nativo (solo el mensaje; falta la copia local del log):")
+        print("\nANTES: registro nativo (solo el mensaje; falta la copia local del log):")
         print(f"  {raw_msg[:300]}")
 
-    show("DESPUÉS — documento normalizado a Elastic Common Schema", shown)
+    show("DESPUÉS: documento normalizado a Elastic Common Schema", shown)
 
     ecs = sum(1 for k in shown if k not in ("cowrie", "dionaea", "honeypot"))
     own = len(shown.get("cowrie", {})) + len(shown.get("dionaea", {}))

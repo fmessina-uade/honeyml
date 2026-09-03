@@ -7,11 +7,12 @@ import { n, pct } from '../../lib/format';
 import { useI18n } from '../../lib/i18n';
 
 /**
- * Sessions grouped by byte-identical command sequence.
+ * Sesiones agrupadas por secuencia de comandos idéntica byte a byte.
  *
- * This is the section that turns "we captured a lot of attacks" into "we captured a few programs,
- * many times". A family is a set of sessions whose commands match exactly — a strict definition
- * that cannot group things by accident, so every family shown is real.
+ * Es la sección que convierte "capturamos un montón de ataques" en "capturamos unos pocos
+ * programas, muchas veces". Una familia es un conjunto de sesiones cuyos comandos coinciden exacto,
+ * una definición estricta que no puede agrupar cosas por casualidad, así que toda familia que se
+ * muestra es real.
  */
 export default function Fingerprints({ data }: { data: FingerprintData }) {
   const { t, lang } = useI18n();

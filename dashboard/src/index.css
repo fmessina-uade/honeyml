@@ -47,7 +47,7 @@ body {
   }
 }
 
-/* ---- reveal on scroll (same curve as the public site) ---- */
+/* ---- aparición al hacer scroll, la misma curva que el sitio público ---- */
 .reveal {
   opacity: 0;
   transform: translateY(28px);
@@ -60,7 +60,7 @@ body {
   transform: none;
 }
 
-/* ---- glow behind the stat tiles, brand gradient ---- */
+/* ---- resplandor detrás de las tarjetas de números, con el degradado de marca ---- */
 .tile {
   position: relative;
 }
@@ -108,7 +108,7 @@ body {
   }
 }
 
-/* ---- terminal line entering, amber flash then settle (from the public site) ---- */
+/* ---- entrada de una línea de terminal: destello ámbar y después se asienta ---- */
 @keyframes rowEnter {
   from {
     opacity: 0;
@@ -125,7 +125,7 @@ body {
   animation: rowEnter 0.6s ease-out;
 }
 
-/* ---- blinking terminal cursor ---- */
+/* ---- cursor de terminal titilando ---- */
 @keyframes cursorBlink {
   0%,
   49% {
@@ -145,7 +145,7 @@ body {
   animation: cursorBlink 1s step-end infinite;
 }
 
-/* ---- section entrance when switching tabs: same curve as the site's hero ---- */
+/* ---- entrada de sección al cambiar de pestaña: la misma curva que el hero del sitio ---- */
 @keyframes sectionIn {
   0% {
     opacity: 0;
@@ -162,7 +162,7 @@ body {
   animation: sectionIn 0.55s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* ---- country label over the globe: enters while the globe is still turning toward it ---- */
+/* ---- etiqueta de país sobre el globo: entra mientras el globo todavía gira hacia él ---- */
 @keyframes paisRotulo {
   0% {
     opacity: 0;
@@ -179,7 +179,7 @@ body {
   animation: paisRotulo 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.35s backwards;
 }
 
-/* ---- sheen sweep, used once on the active nav item ---- */
+/* ---- barrido de brillo, se usa una vez sobre el ítem de navegación activo ---- */
 @keyframes navSheen {
   from {
     transform: translateX(-160%) skewX(-12deg);
@@ -197,7 +197,7 @@ body {
   pointer-events: none;
 }
 
-/* ---- scrollbars: the browser default breaks the dark surface ---- */
+/* ---- barras de desplazamiento: la del navegador rompe la superficie oscura ---- */
 .thin-scroll {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
@@ -216,7 +216,7 @@ body {
   background: rgba(255, 255, 255, 0.22);
 }
 
-/* ---- bar hover: lift the hovered bar, dim its neighbours ---- */
+/* ---- hover sobre una barra: se levanta la barra y se atenúan las vecinas ---- */
 .bar-group:hover .bar-item {
   opacity: 0.32;
 }
@@ -233,7 +233,7 @@ body {
   }
 }
 
-/* ---- capture mode: freeze everything so report screenshots are reproducible ---- */
+/* ---- modo captura: se congela todo para que las capturas del informe se repitan igual ---- */
 :root[data-capture='on'] .reveal {
   opacity: 1 !important;
   transform: none !important;
@@ -251,8 +251,8 @@ body {
 
 /* El cursor dejaba su rastro en la captura: congelar las animaciones no apaga los estados de
    hover, así que el elemento que estuviera debajo del puntero salía resaltado y distinto del
-   resto. Apagar los eventos de puntero es la forma robusta de evitarlo — no hay que enumerar cada
-   estilo de hover, que además son decenas de utilidades distintas.
+   resto. Apagar los eventos de puntero es la forma robusta de evitarlo, porque no hay que enumerar
+   cada estilo de hover, que además son decenas de utilidades distintas.
 
    El desplazamiento con la rueda sigue funcionando: el evento no encuentra destino acá y sube
    hasta el documento, que es quien desplaza. Lo que se pierde es poder hacer clic mientras el modo

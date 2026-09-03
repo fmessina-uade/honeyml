@@ -1,11 +1,11 @@
-"""The severity scale: its floors, its bounds, and the distribution it produces on real traffic.
+"""La escala de severidad: sus pisos, sus límites y el reparto que produce sobre tráfico real.
 
-The scale exists to be checkable by someone who does not trust the engine, so these are the tests
-that make that claim true. Two of them are worth naming:
+La escala existe para que la pueda comprobar alguien que no le cree al motor, así que estas pruebas
+son las que hacen cierta esa afirmación. Dos merecen mención aparte.
 
-`test_nunca_por_debajo_de_lo_que_prueba_el_registro` is the guardrail the validation node leans on.
-`test_el_reparto_sobre_el_bus_real_no_es_degenerado` is the one that would catch a redefinition that
-looks reasonable in isolation and collapses the corpus into a single level.
+`test_nunca_por_debajo_de_lo_que_prueba_el_registro` es la baranda sobre la que se apoya el nodo
+de validación. `test_el_reparto_sobre_el_bus_real_no_es_degenerado` es la que agarraría una
+redefinición que suena razonable aislada y termina aplastando el corpus en un solo nivel.
 """
 
 from __future__ import annotations

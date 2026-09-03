@@ -7,14 +7,14 @@ import { n, pct } from '../../lib/format';
 import { useI18n } from '../../lib/i18n';
 
 /**
- * Where the attacks come from — by country, and by the network that actually operates the address.
+ * De dónde vienen los ataques: por país, y por la red que efectivamente opera la dirección.
  *
- * The country alone is the weaker half. What separates a rented server from a home connection is
- * the autonomous system, so both are shown side by side and the section is written around the
- * comparison rather than around a ranking of flags.
+ * El país solo es la mitad más débil. Lo que separa un servidor alquilado de una conexión hogareña
+ * es el sistema autónomo, así que se muestran los dos lado a lado y la sección está escrita
+ * alrededor de esa comparación y no de un ranking de banderas.
  */
 
-/** Regional indicator symbols from the ISO code: no flag assets, no external requests. */
+/** Símbolos indicadores regionales desde el código ISO: sin imágenes de banderas ni pedidos externos. */
 function flag(iso: string): string {
   if (iso.length !== 2) return '🏳️';
   return String.fromCodePoint(...[...iso.toUpperCase()].map((c) => 0x1f1a5 + c.charCodeAt(0)));
@@ -31,11 +31,11 @@ export default function Geography({ data }: { data: GeoData }) {
   const maxPais = Math.max(...data.countries.map((c) => c.count), 1);
   const maxAs = Math.max(...data.autonomous_systems.map((a) => a.count), 1);
 
-  // Events per address is the tell: a country can lead on volume and still be a handful of hosts.
+  // Los eventos por dirección son la pista: un país puede liderar en volumen y ser cuatro equipos.
   //
-  // Formatted with the project's helper and not with toLocaleString directly: that one falls back
-  // to the browser's locale, which produced "1,537" right next to "252.137" in the same line. The
-  // helper follows the language toggle, so both numbers agree.
+  // Formateado con el helper del proyecto y no con toLocaleString directo: ese cae en el locale del
+  // navegador, y así apareció "1,537" al lado de "252.137" en la misma línea. El helper sigue el
+  // selector de idioma, así que los dos números quedan consistentes.
   const porDireccion = (count: number, sources: number) => n(Math.round(count / (sources || 1)));
 
   return (

@@ -1,4 +1,4 @@
-// Client for the HoneyML API. Vite proxies /api to the FastAPI service in dev.
+// Cliente de la API de HoneyML. En desarrollo, Vite hace proxy de /api al servicio FastAPI.
 
 export interface Overview {
   events: number;
@@ -27,7 +27,7 @@ export interface ReplayStep {
   command: string;
   what: string;
   why: string;
-  /** English copy, served by the API so the language toggle also covers the replay. */
+  /** El texto en inglés, servido por la API para que el selector de idioma cubra también el replay. */
   what_en: string;
   why_en: string;
   tactic: string;
@@ -115,8 +115,9 @@ export interface AsOrigin {
 
 export interface Geography {
   events: number;
-  /** Events whose source resolved to a country / to an autonomous system. The free MaxMind
-   *  databases do not know every address, so these bound every percentage in the section. */
+  /** Eventos cuyo origen se pudo resolver a un país o a un sistema autónomo. Las bases gratuitas
+   *  de MaxMind no conocen todas las direcciones, así que estos acotan cada porcentaje de la
+   *  sección. */
   with_geo: number;
   with_asn: number;
   countries: CountryOrigin[];
@@ -126,14 +127,14 @@ export interface Geography {
 export interface ArchetypeTrait {
   caracteristica: string;
   columna: string;
-  /** Distance from the population mean, in standard deviations. */
+  /** Distancia respecto de la media de la población, en desvíos estándar. */
   desvios: number;
   direccion: 'alto' | 'bajo';
 }
 
 export interface Archetype {
   grupo: number;
-  /** Derived from the profile, never from the cluster number, which KMeans does not keep stable. */
+  /** Sale del perfil y nunca del número de grupo, que KMeans no mantiene estable entre corridas. */
   nombre: string;
   descripcion: string;
   direcciones: number;
@@ -162,7 +163,7 @@ export interface Snapshot {
   stages: Bucket[];
   protocol_detail: ProtocolDetail[];
   hourly: HourPoint[];
-  /** Optional: a snapshot frozen before geographic enrichment existed will not carry it. */
+  /** Opcional: un respaldo congelado antes de que existiera el enriquecimiento geográfico no lo trae. */
   geography?: Geography;
   weekly_rhythm?: WeeklyRhythm;
   generated_at?: string;
@@ -171,7 +172,7 @@ export interface Snapshot {
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`/api${path}`);
   if (!res.ok) {
-    // La API explica en `detail` por qué no puede responder —típicamente qué falta levantar—, y
+    // La API explica en `detail` por qué no puede responder (típicamente qué falta levantar), y
     // ese texto es lo único accionable que tiene el lector. Quedarse con el número de estado
     // convierte una instrucción en un código.
     const detalle = await res

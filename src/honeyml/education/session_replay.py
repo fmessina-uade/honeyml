@@ -1,13 +1,13 @@
-"""Extract real attack sessions, annotated, so the dashboard can replay them step by step.
+"""Extrae sesiones de ataque reales, anotadas, para que el panel las pueda repasar paso a paso.
 
-This is the material for the "anatomy of an attack" section: a genuine intrusion captured by the
-honeypot, replayed command by command with an explanation of what the attacker was after. It is
-what a chart cannot show.
+Es el material de la sección "anatomía de un ataque": una intrusión de verdad capturada por el
+honeypot, repasada comando por comando con una explicación de qué buscaba el atacante. Es lo que un
+gráfico no puede mostrar.
 
-Source IPs are anonymized: the captures involve third parties and the educational value does not
-depend on the real address.
+Las direcciones de origen van anonimizadas: en las capturas hay terceros involucrados y el valor
+educativo no depende de la dirección real.
 
-Usage:
+Uso:
     python -m honeyml.education.session_replay
 """
 
@@ -26,30 +26,30 @@ LOGS_DIR = Path("data/logs/cowrie")
 OUT_FILE = Path("data/processed/replay_sessions.json")
 LOCAL_IP = "127.0.0.1"
 
-# Commands that add nothing for a reader (empty lines the client sends on connect).
+# Comandos que no le aportan nada a quien lee (líneas vacías que manda el cliente al conectar).
 MIN_COMMAND_LEN = 2
-# How many sessions to publish, and how long a session may be before we trim it.
-# One session per attacker (see build_replays), so this is really a cap on distinct attackers.
-# The captures yield ~260; the cap only guards against an unbounded file if that grows a lot.
+# Cuántas sesiones se publican, y hasta dónde se recorta una sesión larga. Va una sesión por
+# atacante (ver build_replays), así que en realidad es un tope de atacantes distintos. Las capturas
+# dan unos 260; el tope solo evita un archivo sin límite si ese número creciera mucho.
 TOP_N = 400
 MAX_COMMANDS = 20
 
 
 def anonymize(ip: str) -> str:
-    """Stable pseudonym for a source IP: same address always yields the same label."""
+    """Seudónimo estable para una dirección: la misma siempre da la misma etiqueta."""
     digest = hashlib.sha256(ip.encode()).hexdigest()[:6]
     return f"attacker-{digest}"
 
 
-# addresses and URLs of the malware infrastructure the attacker pulls from
+# direcciones y URLs de la infraestructura de malware desde donde baja cosas el atacante
 _IP_IN_TEXT = re.compile(r"\b(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\b")
 
 
 def defang(command: str) -> str:
-    """Neutralize URLs and addresses so the published material is not directly actionable.
+    """Neutraliza URLs y direcciones para que el material publicado no sea directamente accionable.
 
-    Standard practice when publishing threat intelligence: the reader still sees the evidence,
-    but the payload address cannot be clicked or copied by accident.
+    Es la práctica habitual al publicar inteligencia de amenazas: el lector sigue viendo la
+    evidencia, pero la dirección del payload no se puede clickear ni copiar sin querer.
     """
     text = _IP_IN_TEXT.sub(
         lambda m: f"{m.group(1)}.{m.group(2)}.{m.group(3)}[.]{m.group(4)}", command
@@ -58,7 +58,7 @@ def defang(command: str) -> str:
 
 
 def _collect(logs_dir: Path) -> dict[str, dict[str, Any]]:
-    """Group every Cowrie event by session id."""
+    """Agrupa todos los eventos de Cowrie por identificador de sesión."""
     sessions: dict[str, dict[str, Any]] = {}
     for path in sorted(glob.glob(str(logs_dir / "cowrie.json*"))):
         with open(path, encoding="utf-8", errors="replace") as fh:
@@ -100,20 +100,20 @@ def _collect(logs_dir: Path) -> dict[str, dict[str, Any]]:
 
 
 def _score(session: dict[str, Any]) -> tuple[int, int]:
-    """Rank by educational value: variety of tactics first, then number of commands.
+    """Ordena por valor educativo: primero la variedad de tácticas, después la cantidad de comandos.
 
-    A session touching persistence, download and discovery teaches more than one repeating the
-    same command twenty times.
+    Una sesión que toca persistencia, descarga y reconocimiento enseña más que una que repite el
+    mismo comando veinte veces.
     """
     tactics = {annotate(c).tactic for c in session["commands"]}
     return len(tactics), len(set(session["commands"]))
 
 
 def build_replays(logs_dir: Path = LOGS_DIR, top_n: int = TOP_N) -> list[dict[str, Any]]:
-    """Pick the most instructive sessions and annotate every command.
+    """Elige las sesiones más instructivas y anota cada comando.
 
-    One session per source address: several sessions from the same bot are nearly identical and
-    would fill the list with repetitions instead of showing different attack styles.
+    Una sesión por dirección de origen: varias sesiones del mismo bot son casi idénticas y llenarían
+    la lista de repeticiones en lugar de mostrar estilos de ataque distintos.
     """
     sessions = _collect(logs_dir)
     usable = [s for s in sessions.values() if s["credentials"] and len(s["commands"]) >= 4]

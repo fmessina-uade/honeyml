@@ -3,7 +3,7 @@ import { Play, Pause, RotateCcw, Terminal, Gauge, Search } from 'lucide-react';
 import type { Replay } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 
-// One tactic, one colour, reused across the whole dashboard.
+// Una táctica, un color, reutilizado en todo el panel.
 const TACTIC_COLOR: Record<string, string> = {
   Descubrimiento: 'var(--honey-amber)',
   Ejecución: 'var(--agent-coral)',
@@ -22,11 +22,11 @@ const SPEEDS = [
 ];
 
 /**
- * The piece a chart cannot do: a real captured intrusion, replayed command by command,
- * explaining what the attacker was after at each step.
+ * Lo que un gráfico no puede hacer: una intrusión real capturada, repasada comando por comando,
+ * explicando qué buscaba el atacante en cada paso.
  *
- * Playback is scrubbable and keyboard-driven. Someone reading this wants to stop on a command
- * and re-read it, and autoplay alone makes that a race against the timer.
+ * La reproducción se puede arrastrar y manejar con el teclado. Quien lee esto quiere frenar en un
+ * comando y releerlo, y con reproducción automática sola eso es una carrera contra el reloj.
  */
 export default function SessionReplay({ replays }: { replays: Replay[] }) {
   const { t, lang } = useI18n();
@@ -58,7 +58,7 @@ export default function SessionReplay({ replays }: { replays: Replay[] }) {
     [total],
   );
 
-  // Space toggles, arrows step. Scoped to the section so it never hijacks the whole page.
+  // Espacio alterna, las flechas avanzan. Acotado a la sección para no secuestrar la página entera.
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === ' ') {
       e.preventDefault();
@@ -89,7 +89,7 @@ export default function SessionReplay({ replays }: { replays: Replay[] }) {
     );
   }
 
-  // index is kept alongside so picking still selects the right session after filtering
+  // el índice viaja al lado, así elegir sigue seleccionando la sesión correcta después de filtrar
   const q = filter.trim().toLowerCase();
   const visible = replays
     .map((r, i) => ({ r, i }))

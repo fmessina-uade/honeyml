@@ -168,10 +168,10 @@ endif
 	@echo "Archivos de infraestructura copiados al VPS $(VPS_IP)"
 	@echo "Siguiente paso: ssh -p $(SSH_PORT) $(SSH_USER)@$(VPS_IP)"
 
-# data pipeline: Elastic Stack + ECS
+# pipeline de datos: Elastic Stack + ECS
 
-# Pull Cowrie's raw logs from the VPS Docker volume to data/logs/cowrie/.
-# Needs the admin SSH key. Uses remote sudo to read the volume (owned by root).
+# Baja los registros crudos de Cowrie desde el volumen de Docker del VPS a data/logs/cowrie/.
+# Necesita la clave SSH de administración. Usa sudo remoto para leer el volumen, que es de root.
 pull-logs:
 ifndef VPS_IP
 	$(error VPS_IP no definido. Crear archivo .vps_ip o exportar: export VPS_IP=<ip>)
@@ -182,9 +182,10 @@ endif
 		$(SSH_USER)@$(VPS_IP):/var/lib/docker/volumes/honeypots_cowrie_logs/_data/ \
 		data/logs/cowrie/
 	@echo "Logs de Cowrie descargados en data/logs/cowrie/"
-	# Dionaea's log_json writes under var/lib/dionaea/; the dev Filebeat expects it flat
-	# include/exclude instead of a glob: with --rsync-path="sudo rsync" the remote shell
-	# never expands it, and the sibling files (sqlite db, captured binaries) must stay out
+	# El log_json de Dionaea escribe bajo var/lib/dionaea/, y el Filebeat de desarrollo lo espera
+	# plano. Van include/exclude en lugar de un glob: con --rsync-path="sudo rsync" el shell remoto
+	# nunca lo expande, y los archivos vecinos (la base sqlite, binarios capturados) tienen que
+	# quedar afuera.
 	rsync -avz --progress --rsync-path="sudo rsync" \
 		--include='dionaea.json' --include='dionaea.json.[0-9]*' --exclude='*' \
 		-e "ssh -p $(SSH_PORT) -i $(SSH_KEY) -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
@@ -194,8 +195,8 @@ endif
 
 elastic-dev-up:
 	@if [ ! -f infra/elastic/.env ]; then cp infra/elastic/.env.example infra/elastic/.env; echo "Creado infra/elastic/.env desde el ejemplo."; fi
-	# bring up storage/processing and apply the ECS template BEFORE Filebeat,
-	# so indices get the right ECS types (avoids the mapping race).
+	# Se levantan almacenamiento y procesamiento, y se aplica la plantilla ECS ANTES que Filebeat,
+	# así los índices salen con los tipos ECS correctos y no hay carrera con el mapeo.
 	docker compose --env-file infra/elastic/.env -f $(ELASTIC_FILE) -f $(ELASTIC_DEV) up -d elasticsearch logstash kibana
 	@ES_URL=http://localhost:9200 bash infra/elastic/scripts/es_bootstrap.sh
 	docker compose --env-file infra/elastic/.env -f $(ELASTIC_FILE) -f $(ELASTIC_DEV) up -d filebeat
@@ -232,16 +233,16 @@ es-bootstrap:
 validate-indexing:
 	@python3 infra/elastic/scripts/validate_indexing.py --es-url $${ES_URL:-http://localhost:9200}
 
-# compact output for the report's screenshots: no per-day index list, no source addresses
+# salida compacta para las capturas del informe: sin lista de índices por día ni direcciones
 validate-indexing-resumen:
 	@python3 infra/elastic/scripts/validate_indexing.py --es-url $${ES_URL:-http://localhost:9200} --resumen
 
-# educational dashboard: API + SPA. Run `make api` and `make dash` in two terminals.
+# panel educativo: API + SPA. Se corren `make api` y `make dash` en dos terminales.
 
 REDIS_FILE   = infra/redis/docker-compose.yml
 
-# Event bus (Redis Streams). Lives in the analysis zone and joins elastic_net, so the stack
-# must be up first: the network is created there.
+# Bus de eventos (Redis Streams). Vive en la zona de análisis y se une a elastic_net, así que el
+# stack tiene que estar arriba antes: la red se crea ahí.
 bus-up:
 	@if [ ! -f infra/redis/.env ]; then cp infra/redis/.env.example infra/redis/.env; echo "Creado infra/redis/.env desde el ejemplo."; fi
 	docker compose --env-file infra/redis/.env -f $(REDIS_FILE) up -d
@@ -273,11 +274,12 @@ severidad:
 modelo:
 	@./.venv/bin/python -m honeyml.features.uwf_export
 
-# One command for the whole data cycle: pull fresh logs from the sensors, wait for the pipeline
-# to ingest them, and regenerate every derived artifact. Replaces running five targets by hand.
+# Un solo comando para todo el ciclo de datos: bajar registros frescos de los sensores, esperar a
+# que el pipeline los ingiera, y regenerar todos los artefactos derivados. Reemplaza correr cinco
+# objetivos a mano.
 #
-# It does NOT start the stack: run `make elastic-dev-up` first. Keeping them separate means a
-# refresh cannot silently bring up containers you did not expect.
+# NO levanta el stack: primero hay que correr `make elastic-dev-up`. Mantenerlos separados hace que
+# un refresh no pueda levantar contenedores que uno no esperaba, y en silencio.
 refresh:
 	@echo "==> 1/3  Descargando registros de los sensores"
 	@$(MAKE) --no-print-directory pull-logs
@@ -288,16 +290,16 @@ refresh:
 	@echo "==> 3/3  Regenerando artefactos derivados"
 	@$(MAKE) --no-print-directory artifacts
 
-# Consolidated telemetry: the first link of the derived-artifact chain.
+# Telemetría consolidada: el primer eslabón de la cadena de artefactos derivados.
 consolidate:
 	@./.venv/bin/python -m honeyml.eda.es_loader
 
-# Feature engineering: reads the consolidated table, so it runs after `consolidate`.
+# Ingeniería de características: lee la tabla consolidada, así que va después de `consolidate`.
 features:
 	@./.venv/bin/python -m honeyml.features.build_features
 	@./.venv/bin/python -m honeyml.features.command_encoding
 
-# Everything that reads from the index or from the consolidated table. El orden importa:
+# Todo lo que lee del índice o de la tabla consolidada. El orden importa:
 # `consolidate` produce la tabla de la que dependen tanto la ingeniería de características como la
 # serie horaria, y `arquetipos` necesita las características ya calculadas.
 #

@@ -1,10 +1,11 @@
-"""Supervised feature selection on UWF-ZeekData24 for the MITRE tactic classifier.
+"""Selección supervisada de características sobre UWF-ZeekData24, para el clasificador MITRE.
 
-Anti-leakage by design: split first (stratified), then everything (imputation, encoding, the model)
-is fit on the train split only, inside an sklearn Pipeline. Ranks the Zeek connection features by
-random-forest importance and prints a quick classification report on the held-out test set.
+Anti fuga por diseño: primero se parte (estratificado) y recién después todo lo demás (imputación,
+codificación, el modelo) se ajusta solo con la partición de entrenamiento, dentro de un Pipeline de
+sklearn. Ordena las características de conexión de Zeek por importancia del bosque aleatorio e
+imprime un informe rápido de clasificación sobre la partición de prueba.
 
-Usage:
+Uso:
     python -m src.honeyml.features.uwf_selection
 """
 
@@ -42,7 +43,7 @@ CATEGORICAL = ["proto", "conn_state", "service"]
 
 
 def build_pipeline() -> Pipeline:
-    """ColumnTransformer + RandomForest. All state is fit on train only when .fit() runs."""
+    """ColumnTransformer + RandomForest. Todo el estado se ajusta solo con entrenamiento."""
     prep = ColumnTransformer(
         [
             ("num", SimpleImputer(strategy="constant", fill_value=0), NUMERIC),
@@ -63,19 +64,19 @@ def build_pipeline() -> Pipeline:
 def main() -> None:
     df = load_uwf()
     x, y = features_target(df)
-    # keep only the columns we model; bools become ints for the imputer
+    # se dejan solo las columnas que se modelan; los booleanos pasan a enteros para el imputador
     x = x[NUMERIC + CATEGORICAL].copy()
     for c in ("local_orig", "local_resp"):
         x[c] = x[c].astype(int)
 
-    # split BEFORE fitting anything (no leakage)
+    # se parte ANTES de ajustar cualquier cosa, para que no haya fuga
     x_tr, x_te, y_tr, y_te = train_test_split(x, y, test_size=0.25, stratify=y, random_state=42)
     print(f"Train: {len(x_tr):,}  |  Test: {len(x_te):,}  |  clases: {y.nunique()}")
 
     pipe = build_pipeline()
     pipe.fit(x_tr, y_tr)  # fit on train only
 
-    # feature importances mapped back to names
+    # las importancias, devueltas a los nombres de las características
     prep = pipe.named_steps["prep"]
     names = prep.get_feature_names_out()
     importances = pipe.named_steps["clf"].feature_importances_
@@ -98,7 +99,7 @@ def main() -> None:
     for name, fila in zip(labels, cm):
         print(f"{str(name):<{ancho}}" + "".join(f"{v:>12,}".replace(",", ".") for v in fila))
 
-    # persisted so the report can cite the numbers without re-running the whole selection
+    # se persiste para que el informe cite los números sin rehacer toda la selección
     metrics = {
         "accuracy": float(accuracy_score(y_te, y_pred)),
         "report": classification_report(y_te, y_pred, zero_division=0, output_dict=True),

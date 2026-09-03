@@ -1,4 +1,4 @@
-"""Credentials and the inference client, without ever touching the network or a real key.
+"""Las credenciales y el cliente de inferencia, sin tocar la red ni una clave de verdad.
 
 Lo que se fija acá son las tres propiedades que, si se rompen, se rompen en silencio:
 
@@ -51,7 +51,7 @@ def test_sin_variable_de_entorno_no_arranca_y_dice_como_arreglarlo(
 def test_el_entorno_le_gana_al_archivo(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
     """Poner la variable a mano para probar otra clave tiene que funcionar.
 
-    Con la precedencia invertida —que es como estaba mientras esto vivía en el Makefile— una
+    Con la precedencia invertida, que es como estaba mientras esto vivía en el Makefile, una
     corrida con `GROQ_API_KEY=… make …` usaba en silencio la clave del archivo. Lo destapó una
     prueba con una clave inválida a propósito que devolvió éxito.
     """
@@ -154,7 +154,7 @@ def test_un_modelo_sin_precio_conocido_no_inventa_uno() -> None:
 
 
 def _cliente_con(respuestas: list[Any]) -> tuple[inferencia.ClienteDeInferencia, list[dict]]:
-    """Cliente cuyo transporte devuelve —o levanta— lo que se le indique, en orden."""
+    """Cliente cuyo transporte devuelve, o levanta, lo que se le indique, en orden."""
     cliente = inferencia.ClienteDeInferencia(_config())
     enviados: list[dict] = []
 

@@ -1,41 +1,14 @@
-"""Second node: what the past says about a case like this one.
+"""Segundo nodo: qué dice el pasado sobre un caso como este.
 
-The line between this node and the context node is worth stating, because both read from the index
-and it would be easy to collapse them into one.
+Está separado del nodo de contexto, aunque los dos lean del índice, porque contestan preguntas
+distintas: contexto dice qué es este evento, y esto dice si es parte de algo mayor.
 
-    contexto     ¿qué es este evento?      el hecho y sus circunstancias
-    historial    ¿es parte de algo mayor?  la trayectoria y la ráfaga
+La ráfaga es lo que justifica el nodo. Las familias de huellas ya cuentan cuántas direcciones
+ejecutaron una secuencia, pero sobre tres meses, y ese número no separa un goteo de una campaña:
+cuarenta direcciones repartidas en un trimestre son el ruido de fondo de internet, y cuarenta
+dentro de una hora son otra cosa. La ventana es lo que le da sentido al conteo.
 
-The context node answers with facts about the event: who, from where, in which session, running
-what. This one answers a question that no single event can settle — whether the address had already
-climbed the scale before, and whether other addresses were doing the same thing at the same time.
-
-WHY THAT SECOND QUESTION IS THE ONE THAT EARNS THE NODE
-
-Everything the engine had until now is about one actor in isolation. But the corpus is mostly
-automation: 73 % of the observed addresses never got past a probe, and the fingerprint families show
-sequences repeated by hundreds of hosts. In that setting the interesting distinction is almost never
-"what did this one do" — it is "how many of them are doing it right now".
-
-The families already count how many addresses ever ran a sequence, over three months. That number
-cannot separate a slow drip from a burst, and the difference between the two is the whole point:
-forty addresses across a quarter is the background noise of the internet, forty inside one hour is a
-push. The window is what makes the count mean something.
-
-WHAT IT IS ALLOWED TO CONCLUDE: NOTHING
-
-Same rule as the context node. This node retrieves and records; it does not weigh.
-`maximo_alcanzado` is reported as the fact it is —"this address had already reached ALTO"— and never
-turned into a recommendation to escalate. The margin of `severidad.MARGEN_DE_ESCALADA` is the
-engine's to spend, with a justification, and pre-spending it here would hide the decision inside a
-lookup.
-
-THE PRECEDENT SEAM
-The obvious third source of history is what the engine itself already decided about similar events,
-which is what would make its answers consistent over time. That store belongs to the persistence
-node and does not exist yet. Rather than pretend, the absence is written into `hallazgos`
-explicitly: a model told that precedents were not consulted reasons differently from one that
-believes there are none.
+Igual que el nodo de contexto, acá no se pondera nada: se recupera y se anota.
 """
 
 from __future__ import annotations
@@ -66,16 +39,14 @@ def _intentar(nombre: str, hallazgos: dict[str, Any], fn: Any, *args: Any) -> An
 
 
 def recuperar(estado: EstadoTriaje) -> EstadoTriaje:
-    """Add the historical findings to the context the previous node assembled.
+    """Suma los hallazgos históricos al contexto que armó el nodo anterior.
 
-    Returns the same `contexto` key: the two nodes build one object between them, and splitting it
-    into `contexto` and `contexto_historico` would leave the inference node stitching two halves
-    back together on every call for no gain.
+    Devuelve la misma clave `contexto` a propósito: entre los dos nodos construyen un solo objeto.
     """
     contexto = estado.get("contexto")
     evento = estado.get("evento")
-    # El grafo solo llega acá con contexto armado —el corte por `sin_contexto` va directo a
-    # persistencia—, pero un nodo que asume su predecesor y se equivoca falla de forma ilegible.
+    # El grafo solo llega acá con contexto armado (el corte por `sin_contexto` va directo a
+    # persistencia), pero un nodo que da por sentado a su predecesor falla de forma ilegible.
     if contexto is None or evento is None:
         return {}
 

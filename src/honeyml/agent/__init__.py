@@ -1,8 +1,9 @@
-"""Agentic triage engine.
+"""Motor de triaje agéntico.
 
-Consumes normalized events from the bus, builds context, asks an inference service to classify
-them, validates the answer against a closed schema and persists the decision.
+Consume eventos normalizados del bus, arma el contexto, le pide a un servicio de inferencia que los
+clasifique, valida la respuesta contra un esquema cerrado y persiste la decisión.
 
-The structure follows the development view: one module per responsibility, so that the pieces
-that carry risk — the schema validation and the provider adapter — are isolated and replaceable.
+La estructura sigue la vista de desarrollo: un módulo por responsabilidad, así las piezas que
+concentran el riesgo (la validación del esquema y el adaptador del proveedor) quedan aisladas y se
+pueden reemplazar.
 """

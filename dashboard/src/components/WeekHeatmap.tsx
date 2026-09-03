@@ -4,28 +4,30 @@ import { dec, n } from '../lib/format';
 import { useI18n } from '../lib/i18n';
 
 /**
- * Day of week against hour of day, 168 cells.
+ * Día de la semana contra hora del día, 168 celdas.
  *
- * The hourly curve on its own already says the traffic is automated, but as twenty-four bars it
- * reads as a chart that happens to be even, and the reader has to take the conclusion on trust.
- * Spread across a full week, the claim becomes something they can check: anything driven by people
- * lights up on weekdays between nine and six and goes dark at night and on weekends.
+ * La curva horaria sola ya dice que el tráfico es automático, pero en veinticuatro barras se lee
+ * como un gráfico que casualmente quedó parejo, y el lector tiene que creerle a la conclusión.
+ * Desplegada sobre una semana entera, la afirmación pasa a ser algo que puede comprobar: cualquier
+ * cosa movida por personas se enciende de lunes a viernes entre las nueve y las seis, y se apaga de
+ * noche y los fines de semana.
  *
- * The three figures underneath exist because the grid alone invites the eye to find shapes in
- * noise. They state what the cells add up to, so the reading does not depend on impressions.
+ * Los tres números de abajo están porque la grilla sola invita al ojo a encontrar formas en el
+ * ruido. Dicen cuánto suman las celdas, así la lectura no depende de impresiones.
  */
 
 const HORAS_OFICINA = { desde: 9, hasta: 18 };
 const HORAS_MADRUGADA = { desde: 0, hasta: 6 };
 
 /**
- * Two-colour ramp across the project palette: teal for the quiet hours, amber in the middle, coral
- * at the peak.
+ * Rampa de dos colores sobre la paleta del proyecto: verde azulado para las horas tranquilas,
+ * ámbar en el medio, coral en el pico.
  *
- * A single hue at varying opacity made every cell the same colour and left the reader comparing
- * shades of one tone, which the eye is bad at. Three anchors give each band its own identity while
- * keeping perceived lightness rising with the value, so a darker cell always means less — the
- * property a rainbow scale breaks by putting bright yellow next to dark blue.
+ * Con un solo tono a distintas opacidades, todas las celdas quedaban del mismo color y el lector
+ * terminaba comparando matices de un mismo tono, que es algo que el ojo hace mal. Tres anclas le
+ * dan identidad propia a cada banda y a la vez mantienen la luminosidad percibida subiendo con el
+ * valor, así una celda más oscura siempre significa menos. Es la propiedad que una escala arcoíris
+ * rompe al poner un amarillo brillante al lado de un azul oscuro.
  */
 const RAMPA: [number, number, number][] = [
   [0, 184, 148], // --neural-teal

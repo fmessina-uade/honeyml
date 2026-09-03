@@ -32,8 +32,8 @@ import Archetypes from './components/sections/Archetypes';
 import Geography from './components/sections/Geography';
 import AttackCanvas from './components/AttackCanvas';
 
-// Order is narrative: scale, then one concrete intrusion, then the whole surface, then the
-// evidence behind the advice, and finally the formal framework.
+// El orden es narrativo: primero la escala, después una intrusión concreta, después toda la
+// superficie, después la evidencia detrás del consejo, y al final el marco formal.
 const SECTIONS = [
   { id: 'pulso', icon: Radar },
   { id: 'anatomia', icon: Terminal },
@@ -56,7 +56,7 @@ export default function App() {
   const [active, setActive] = useState<SectionId>('pulso');
   const [families, setFamilies] = useState<FingerprintData | null>(null);
   const [archetypes, setArchetypes] = useState<ArchetypeData | null>(null);
-  // capture mode freezes every animation so report screenshots are reproducible
+  // el modo captura congela todas las animaciones, así las capturas del informe se repiten igual
   const [capture, setCapture] = useState(false);
 
   useEffect(() => {
@@ -66,7 +66,7 @@ export default function App() {
         setReplays(r);
       })
       .catch((e) => setError(String(e)));
-    // separate call: the panel must still load if health is unavailable
+    // llamada aparte: el panel tiene que cargar igual si el chequeo de salud no responde
     api
       .health()
       .then(setHealth)
