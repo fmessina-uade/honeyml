@@ -15,7 +15,7 @@ repos:
       - id: check-added-large-files
         args: [--maxkb=500]
 
-  # shellcheck: lints bash scripts (uses the system binary: brew install shellcheck)
+  # shellcheck: revisa los scripts de bash (usa el binario del sistema: brew install shellcheck)
   - repo: local
     hooks:
       - id: shellcheck
@@ -52,10 +52,10 @@ repos:
         additional_dependencies: [types-requests, fastapi, redis>=5.0]
         pass_filenames: false
         args: [--ignore-missing-imports, src/]
-        # only runs when there are files under src/
+        # solo corre cuando hay archivos bajo src/
         files: ^src/
 
-  # Conventional Commits: validates the commit message
+  # Conventional Commits: valida el mensaje del commit
   - repo: https://github.com/compilerla/conventional-pre-commit
     rev: v3.4.0
     hooks:

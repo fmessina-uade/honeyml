@@ -1,32 +1,29 @@
-"""The triage graph: which nodes exist, in what order they run, and where the cycle can turn back.
+"""El grafo de triaje: qué nodos hay, en qué orden corren y dónde el ciclo puede volver atrás.
 
-The engine is a state machine and not a chain because of one edge — validation can send the answer
-back to inference with the error attached. Everything else is a straight line, and saying so
-explicitly is worth more than the flexibility of leaving it implicit.
+    contexto -> historial -> inferencia -> validación --(válida)---> persistencia -> fin
+        |                        ^             |                          ^
+        |                        +--(reproche)-+   hasta MAX_INTENTOS     |
+        +--(sin dirección de origen, nada que correlacionar)--------------+
 
-    contexto ─→ historial ─→ inferencia ─→ validación ─┬─(válida)──────────→ persistencia ─→ fin
-        │                         ↑                     │                         ↑
-        │                         └──(reproche)─────────┘   hasta MAX_INTENTOS    │
-        └──(sin dirección de origen: nada que correlacionar)──────────────────────┘
+Es una máquina de estados y no una cadena por una sola arista: la validación puede devolverle la
+respuesta al nodo de inferencia con el error adjunto. Todo lo demás es una línea recta.
 
-TWO WAYS OF FAILING, AND WHY THEY END DIFFERENTLY
+Hay dos formas de fallar y terminan distinto, que es la parte que más cuesta ver leyendo el código.
 
-*The provider answered, but never in the required shape.* After MAX_INTENTOS corrective attempts the
-cycle stops trying and persists a non-conclusive decision. The event is settled: the provider is
-reachable and retrying tomorrow will not produce a different grammar. Keeping it pending would burn
-one paid call per redelivery, forever, over an event that is already understood to be unusable.
+Si el proveedor contestó pero nunca con la forma pedida, después de MAX_INTENTOS el ciclo deja de
+insistir y persiste una decisión no concluyente. El evento queda cerrado: el proveedor está vivo y
+reintentar mañana no le va a cambiar la gramática. Dejarlo pendiente gastaría una llamada paga por
+cada reentrega, para siempre.
 
-*The provider could not be reached at all.* The node raises, the exception leaves the graph, and the
-consumer never acknowledges — so the event stays pending and another consumer reclaims it later.
-Nothing is persisted, because nothing was decided.
+Si el proveedor no se pudo alcanzar, el nodo levanta, la excepción sale del grafo y el consumidor
+no confirma, así que otro consumidor lo reclama más tarde. No se persiste nada porque no se decidió
+nada.
 
-The difference matters and is easy to collapse by accident. An outage is temporary and deserves a
-retry; a model that cannot follow a schema is not, and deserves a record saying so.
+Confundir las dos es fácil: una caída es temporal y merece reintento, un modelo que no puede seguir
+un esquema no lo es.
 
-WHY THE NODES ARE INJECTED
-Each node belongs to a different row of the plan (81 through 85). Passing them in means the topology
-can be built and tested before any of them exists, and each row swaps one function into a graph
-whose shape nobody has to touch again.
+Los nodos se inyectan (ver `construir_grafo`). Eso permitió construir y probar la topología antes
+de que existieran, y que cada nodo entre después sin tocar la forma del grafo.
 """
 
 from __future__ import annotations
@@ -38,13 +35,14 @@ from langgraph.graph import END, StateGraph
 
 from .nodes import contexto as nodo_contexto
 from .nodes import historial as nodo_historial
+from .nodes import inferencia as nodo_inferencia
 from .severidad import dentro_de_limites
 from .state import MAX_INTENTOS, EstadoTriaje, MotivoDeCorte
 
-# Un nodo devuelve el estado *parcial* que tocó, no un diccionario cualquiera. `EstadoTriaje` es
-# `total=False`, así que ese tipo ya dice exactamente eso: cualquier subconjunto de las claves del
-# estado, y ninguna otra. Escribirlo como `dict[str, Any]` aceptaba claves inventadas que LangGraph
-# después descarta en silencio.
+# Un nodo devuelve el estado parcial que tocó, no un diccionario cualquiera. `EstadoTriaje` es
+# `total=False`, así que ese tipo ya dice eso: cualquier subconjunto de las claves del estado y
+# ninguna otra. Escribirlo como `dict[str, Any]` aceptaba claves inventadas que LangGraph después
+# descarta en silencio.
 Nodo = Callable[[EstadoTriaje], EstadoTriaje]
 
 CONTEXTO = "contexto"
@@ -67,19 +65,19 @@ ORDEN = [CONTEXTO, HISTORIAL, INFERENCIA, VALIDACION, PERSISTENCIA]
 
 # Techo de pasos de una corrida, derivado de la topología y no elegido a ojo.
 #
-# El camino más largo legítimo es contexto → historial → (inferencia → validación) por cada intento
-# → persistencia. Con el margen de una vuelta, cualquier corrida que lo supere está en un bucle que
-# el diseño no contempla, y conviene que muera rápido y con un número que se pueda relacionar con
-# esta línea —en vez del 10.007 por defecto de LangGraph, que no le dice nada a nadie.
+# El camino más largo legítimo es contexto, historial, un par (inferencia, validación) por intento,
+# y persistencia. Con el margen de una vuelta, cualquier corrida que lo supere está en un bucle que
+# el diseño no contempla. Conviene que muera rápido y con un número que se pueda relacionar con
+# esta línea, en vez del 10.007 por defecto de LangGraph, que no le dice nada a nadie.
 LIMITE_DE_PASOS = 2 + 2 * (MAX_INTENTOS + 2) + 1
 
 
 def _pendiente(nombre: str) -> Nodo:
-    """Placeholder for a node that has not been written yet.
+    """Marcador para un nodo que todavía no está escrito.
 
-    Fails when the graph *runs*, not when it is imported, so the topology stays inspectable and
-    testable while the engine is half-written. The message says what the missing node would do, so
-    hitting it reads as "this is not built yet" and not as a bug.
+    Falla cuando el grafo corre, no cuando se importa, así la topología se puede inspeccionar y
+    probar con el motor a medio hacer. El mensaje dice qué haría el nodo que falta, para que se lea
+    como "esto no está construido" y no como un error.
     """
 
     def nodo(_: EstadoTriaje) -> EstadoTriaje:
@@ -92,70 +90,69 @@ def _pendiente(nombre: str) -> Nodo:
 
 
 def nodos_disponibles() -> dict[str, Nodo]:
-    """The real implementations that exist today; the rest come back as placeholders."""
+    """Las implementaciones que existen hoy. El resto vuelve como marcador."""
     reales: dict[str, Nodo] = {
         CONTEXTO: nodo_contexto.construir,
         HISTORIAL: nodo_historial.recuperar,
+        INFERENCIA: nodo_inferencia.consultar,
     }
     return {nombre: reales.get(nombre) or _pendiente(nombre) for nombre in ORDEN}
 
 
 def ruta_tras_contexto(estado: EstadoTriaje) -> str:
-    """Skip straight to persistence when there was nothing to reason about.
+    """Salta directo a persistencia cuando no había nada sobre lo que razonar.
 
-    An event with no source address has nothing to correlate: no history, no origin, no session.
-    Sending it down the full path would spend an inference call to be told what the absence of a
-    field already says. It is still persisted, marked non-conclusive, so the event does not simply
-    disappear between arriving and being classified.
+    Un evento sin dirección de origen no tiene con qué correlacionarse: ni historial, ni origen, ni
+    sesión. Mandarlo por el camino completo gastaría una llamada de inferencia para que nos digan lo
+    que la ausencia del campo ya dice. Igual se persiste, marcado como no concluyente, así el evento
+    no desaparece entre que llega y que se clasifica.
     """
     return PERSISTENCIA if estado.get("motivo_de_corte") else HISTORIAL
 
 
 def intentos_gastados(estado: EstadoTriaje) -> int:
-    """How many attempts this cycle has already spent.
+    """Cuántos intentos gastó ya este ciclo.
 
-    El máximo entre el contador y los reproches acumulados, y no solo el contador. Quien incrementa
-    `intentos` es el nodo de inferencia, y si algún día deja de hacerlo el ciclo no termina: con la
-    validación rechazando y el contador quieto, el bucle da diez mil vueltas antes de que LangGraph
-    lo corte por recursión. Son diez mil llamadas pagas sobre un solo evento, y un error genérico
-    al final que no nombra la causa.
+    Devuelve el máximo entre el contador y los reproches acumulados, no solo el contador. Quien
+    incrementa `intentos` es el nodo de inferencia, y si algún día deja de hacerlo el ciclo no
+    termina: con la validación rechazando y el contador quieto, el bucle da diez mil vueltas antes
+    de que LangGraph lo corte por recursión. Son diez mil llamadas pagas sobre un solo evento.
 
-    Como la validación no puede rechazar sin dejar un reproche —es lo que se le devuelve al
-    proveedor para que corrija—, contar reproches es un segundo camino hacia el mismo número, y
-    olvidarse del contador deja de ser catastrófico para pasar a ser inocuo.
+    Como la validación no puede rechazar sin dejar un reproche (es lo que se le devuelve al
+    proveedor para que corrija), contar reproches llega al mismo número por otro camino. Con eso,
+    olvidarse del contador deja de ser catastrófico.
     """
     return max(int(estado.get("intentos", 0)), len(estado.get("reproches", [])))
 
 
 def decision_utilizable(estado: EstadoTriaje) -> bool:
-    """Whether the decision may be persisted as the engine's answer.
+    """Si la decisión se puede guardar como la respuesta del motor.
 
-    Dos condiciones, no una. Que exista, y que sea defendible **para este evento**: la escala de
-    `severidad.py` está anclada a la evidencia justamente para que un nivel por debajo del piso —un
-    `informativo` sobre un evento que documenta una transferencia de archivo— sea una contradicción
+    Son dos condiciones, no una: que exista, y que sea defendible para este evento. La escala de
+    `severidad.py` está anclada a la evidencia justamente para que un nivel por debajo del piso (un
+    `informativo` sobre un evento que documenta una transferencia de archivo) sea una contradicción
     con el registro y no una diferencia de criterio.
 
-    Comprobar solo la existencia deja pasar esa contradicción sin que nada la mire, que es lo que
-    hace este grafo si a alguien le parece que la segunda condición sobra.
+    Comprobar solo la existencia deja pasar esa contradicción sin que nada la mire.
     """
     decision = estado.get("decision")
     if decision is None:
         return False
     evento = estado.get("evento")
     if evento is None:
-        # Sin evento no hay piso contra el cual medir. No debería pasar —el estado inicial siempre
-        # lo trae— y si pasa, el problema no es la severidad.
+        # Sin evento no hay piso contra el cual medir. No debería pasar (el estado inicial siempre
+        # lo trae) y si pasa, el problema no es la severidad.
         return True
     return dentro_de_limites(decision.severidad, evento)
 
 
 def ruta_tras_validar(estado: EstadoTriaje) -> str:
-    """Where to go once validation has had its say.
+    """A dónde va el ciclo después de que la validación dijo lo suyo.
 
-    Both non-retry branches lead to persistence on purpose. A decision that could not be validated
-    is still recorded — marked non-conclusive — because the alternative is an event that vanishes
-    between "arrived" and "classified" with nothing to show for it. The panel can then present it
-    the way CU-03 describes instead of simply not listing it.
+    Las dos ramas que no reintentan van a persistencia a propósito. Una decisión que no se pudo
+    validar igual se guarda, marcada como no concluyente, porque la alternativa es un evento que
+    desaparece entre "llegó" y "clasificado" sin dejar rastro. Así el panel lo puede mostrar como
+    pendiente, que es lo que describe el CU-03, en vez de simplemente no listarlo.
     """
     if decision_utilizable(estado):
         return PERSISTENCIA
@@ -173,15 +170,14 @@ def ruta_tras_validar(estado: EstadoTriaje) -> str:
 
 
 def resultado_del_ciclo(estado: EstadoTriaje) -> MotivoDeCorte | None:
-    """Why this cycle is ending. `None` means it ended with a decision worth persisting.
+    """Por qué termina este ciclo. `None` significa que terminó con una decisión que vale guardar.
 
     Lo usa el nodo de persistencia para saber qué está guardando. Vive acá y no allá porque es la
     contracara de `ruta_tras_validar`: las dos leen el mismo estado para responder la misma
     pregunta, y separarlas dejaría que una diga "andá a persistir" y la otra no sepa por qué.
 
-    Sin esto, con los intentos agotados el ciclo llega a persistencia sin decisión **y sin motivo**,
-    y el nodo no puede distinguir un esquema irrecuperable de cualquier otra cosa que haya salido
-    mal.
+    Sin esto, con los intentos agotados el ciclo llega a persistencia sin decisión y sin motivo, y
+    el nodo no puede distinguir un esquema irrecuperable de cualquier otra cosa que haya salido mal.
     """
     declarado = estado.get("motivo_de_corte")
     if declarado:
@@ -192,17 +188,17 @@ def resultado_del_ciclo(estado: EstadoTriaje) -> MotivoDeCorte | None:
 
 
 def construir_grafo(nodos: Mapping[str, Nodo] | None = None) -> Any:
-    """Wire the topology and compile it. `nodos` overrides any implementation, one by one."""
+    """Arma la topología y la compila. `nodos` permite reemplazar implementaciones de a una."""
     elegidos = {**nodos_disponibles(), **(nodos or {})}
 
     g: StateGraph[EstadoTriaje] = StateGraph(EstadoTriaje)
     for nombre in ORDEN:
-        # El `cast` es contra una limitación declarada de LangGraph, no contra un tipo mal puesto.
-        # `add_node` acota el estado a un protocolo estructural, y su propio `_typing.py` avisa:
-        # "we cannot use either TypedDict or dataclass directly due to limitations in type
-        # checking". Se probó también con el TypedDict de typing_extensions —el que usa la propia
-        # biblioteca— y el veredicto no cambia. En ejecución el nodo recibe y devuelve exactamente
-        # `EstadoTriaje`, que es lo que declara `Nodo` unas líneas más arriba.
+        # El `cast` es contra una limitación de LangGraph, no contra un tipo mal puesto. `add_node`
+        # acota el estado a un protocolo estructural, y su propio `_typing.py` lo avisa: "we cannot
+        # use either TypedDict or dataclass directly due to limitations in type checking". Probamos
+        # también con el TypedDict de typing_extensions (el que usa la propia biblioteca) y el
+        # veredicto no cambia. En ejecución el nodo recibe y devuelve `EstadoTriaje`, que es lo que
+        # declara `Nodo` unas líneas más arriba.
         g.add_node(nombre, cast("Any", elegidos[nombre]))
 
     g.set_entry_point(CONTEXTO)
@@ -223,18 +219,19 @@ def construir_grafo(nodos: Mapping[str, Nodo] | None = None) -> Any:
 
 
 def ejecutar(compilado: Any, estado: EstadoTriaje) -> EstadoTriaje:
-    """Run one event through the graph, with the step ceiling applied.
+    """Corre un evento por el grafo, con el techo de pasos aplicado.
 
-    Es el único punto de entrada que debería usar el motor. Invocar el grafo directamente también
-    funciona, pero se queda con el límite por defecto de LangGraph —diez mil pasos— y ese número no
-    tiene relación con esta topología: convierte un contrato incumplido en una factura.
+    Conviene usar siempre esta función y no invocar el grafo directamente. Invocarlo directo también
+    funciona, pero se queda con el límite por defecto de LangGraph (diez mil pasos), y ese número no
+    tiene ninguna relación con esta topología. En la práctica convierte un contrato incumplido en
+    una factura.
     """
     resultado: EstadoTriaje = compilado.invoke(estado, config={"recursion_limit": LIMITE_DE_PASOS})
     return resultado
 
 
 def describir() -> str:
-    """The topology as text, with each node's state today. Printed by `make grafo`."""
+    """La topología en texto, con el estado de cada nodo. Es lo que imprime `make grafo`."""
     disponibles = nodos_disponibles()
     lineas = ["Grafo de triaje", ""]
     for i, nombre in enumerate(ORDEN):
