@@ -26,6 +26,7 @@ from langgraph.graph import END, StateGraph
 from .nodes import contexto as nodo_contexto
 from .nodes import historial as nodo_historial
 from .nodes import inferencia as nodo_inferencia
+from .nodes import validacion as nodo_validacion
 from .severidad import dentro_de_limites
 from .state import MAX_INTENTOS, EstadoTriaje, MotivoDeCorte
 
@@ -80,6 +81,7 @@ def nodos_disponibles() -> dict[str, Nodo]:
         CONTEXTO: nodo_contexto.construir,
         HISTORIAL: nodo_historial.recuperar,
         INFERENCIA: nodo_inferencia.consultar,
+        VALIDACION: nodo_validacion.validar,
     }
     return {nombre: reales.get(nombre) or _pendiente(nombre) for nombre in ORDEN}
 

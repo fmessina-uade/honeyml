@@ -26,6 +26,21 @@ class Annotation:
     why_en: str = ""
 
 
+# Las tácticas que este señuelo puede observar, y por lo tanto las únicas que el motor de triaje
+# tiene permitido asignar. Están acá porque acá se asignan por comando, y el nodo de validación las
+# importa en vez de escribir una segunda copia que se desincronice.
+#
+# Las otras tres del panel (acceso a credenciales, movimiento lateral, impacto) quedan afuera a
+# propósito: la sección MITRE las muestra en gris justamente para explicar que un señuelo de baja
+# interacción no las ve. Si el motor pudiera asignarlas, esa explicación dejaría de ser cierta.
+TACTICAS_OBSERVABLES = (
+    "Descubrimiento",
+    "Ejecución",
+    "Evasión de defensas",
+    "Persistencia",
+)
+
+
 # El orden importa: gana el primer patrón que coincide, así que los específicos van arriba.
 RULES: list[tuple[re.Pattern[str], Annotation]] = [
     (
