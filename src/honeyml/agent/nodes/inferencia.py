@@ -91,7 +91,10 @@ def _pedido(estado: EstadoTriaje) -> str:
             _bloque("CONTEXTO RECUPERADO", json.dumps(ctx.hallazgos, indent=2, ensure_ascii=False))
         )
 
-    reproches = estado.get("reproches") or []
+    # Se deduplican conservando el orden. El estado guarda la historia completa, que es lo que hay
+    # que auditar después, pero repetir "falta la evidencia" tres veces en el pedido no le agrega
+    # nada al modelo: es la misma corrección numerada tres veces.
+    reproches = list(dict.fromkeys(estado.get("reproches") or []))
     if reproches:
         # Los reproches van fuera de la cerca porque los redacta el motor, no el atacante, y son la
         # única parte del pedido que sí es una instrucción.

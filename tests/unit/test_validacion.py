@@ -198,6 +198,33 @@ def test_los_problemas_salen_todos_juntos() -> None:
     assert len(salida["reproches"]) == 3
 
 
+def test_un_rechazo_cuenta_una_ronda_sin_importar_cuantos_problemas() -> None:
+    """Los reproches miden qué corregir; `rechazos` mide cuántos intentos quedan. No son lo mismo.
+
+    Cuando el presupuesto se medía contando reproches, un borrador con cuatro problemas se leía
+    como cuatro intentos gastados y el modelo se quedaba sin ninguna oportunidad de corregir.
+    """
+    salida = nodo.validar(
+        _estado(borrador=_borrador(doc_id="otro999", evidencia=[], severidad="bajo"))
+    )
+
+    assert len(salida["reproches"]) == 3
+    assert salida["rechazos"] == 1
+
+
+def test_todo_rechazo_suma_una_ronda() -> None:
+    """Si un camino de rechazo se olvidara de contarla, el ciclo giraría hasta el techo de pasos."""
+    borrador_incompleto = _borrador()
+    del borrador_incompleto["severidad"]
+
+    for borrador in (
+        {nodo.CLAVE_SIN_PARSEAR: "no era json"},  # ni siquiera parseó
+        borrador_incompleto,  # no cumple el esquema
+        _borrador(evidencia=[]),  # cumple el esquema, no el contenido
+    ):
+        assert nodo.validar(_estado(borrador=borrador))["rechazos"] == 1
+
+
 def test_nunca_devuelve_decision_y_reproches_a_la_vez() -> None:
     for borrador in (_borrador(), _borrador(evidencia=[]), _borrador(severidad="bajo")):
         salida = nodo.validar(_estado(borrador=borrador))

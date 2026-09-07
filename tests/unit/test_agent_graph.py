@@ -18,9 +18,12 @@ from typing import Any
 from urllib.error import URLError
 
 import pytest
+from langgraph.errors import GraphRecursionError
 from pydantic import ValidationError
 
-from honeyml.agent import graph, tools
+from honeyml.agent import consumer, graph, tools
+from honeyml.agent.adapters import config
+from honeyml.agent.adapters import inferencia as adaptador
 from honeyml.agent.consumer import EventoDelBus
 from honeyml.agent.nodes import contexto as nodo_contexto
 from honeyml.agent.severidad import Severidad
@@ -154,17 +157,18 @@ _CTX: dict[str, Any] = {"contexto": Contexto(doc_id="abc123", resumen="x")}
 
 
 def test_el_ciclo_termina_aunque_nadie_cuente_los_intentos() -> None:
-    """Sin esta guardia el ciclo da diez mil vueltas: diez mil llamadas pagas sobre un evento.
+    """Sin esta guardia el ciclo da vueltas hasta el techo de pasos, gastando llamadas pagas.
 
-    El contador lo lleva el nodo de inferencia. Contar también los reproches acumulados hace que
-    olvidarse de incrementarlo sea inocuo en vez de catastrófico.
+    Son dos contadores llevados por dos nodos distintos: `intentos` lo incrementa la inferencia,
+    donde se hace la llamada, y `rechazos` la validación, una vez por ronda. Que se olvide uno de
+    los dos es inocuo, porque el otro igual termina el ciclo.
     """
     visitados, final = _recorrer(
         {
             graph.CONTEXTO: _CTX,
             graph.HISTORIAL: {},
             graph.INFERENCIA: {"borrador": {}},  # nunca toca `intentos`
-            graph.VALIDACION: {"reproches": ["falta severidad"]},
+            graph.VALIDACION: {"reproches": ["falta severidad"], "rechazos": 1},
             graph.PERSISTENCIA: {},
         }
     )
@@ -183,7 +187,10 @@ def test_los_reproches_se_acumulan_en_vez_de_pisarse() -> None:
             graph.CONTEXTO: _CTX,
             graph.HISTORIAL: {},
             graph.INFERENCIA: {"borrador": {}},
-            graph.VALIDACION: lambda s: {"reproches": [f"error {graph.intentos_gastados(s)}"]},
+            graph.VALIDACION: lambda s: {
+                "reproches": [f"error {graph.intentos_gastados(s)}"],
+                "rechazos": 1,
+            },
             graph.PERSISTENCIA: {},
         }
     )
@@ -207,7 +214,11 @@ def test_una_severidad_por_debajo_del_piso_no_llega_a_persistirse() -> None:
             graph.CONTEXTO: _CTX,
             graph.HISTORIAL: {},
             graph.INFERENCIA: {"borrador": {}},
-            graph.VALIDACION: {"decision": imposible, "reproches": ["por debajo del piso"]},
+            graph.VALIDACION: {
+                "decision": imposible,
+                "reproches": ["por debajo del piso"],
+                "rechazos": 1,
+            },
             graph.PERSISTENCIA: {},
         }
     )
@@ -223,7 +234,7 @@ def test_persistencia_siempre_recibe_un_motivo_cuando_no_hay_decision() -> None:
             graph.CONTEXTO: _CTX,
             graph.HISTORIAL: {},
             graph.INFERENCIA: {"borrador": {}},
-            graph.VALIDACION: {"reproches": ["falta severidad"]},
+            graph.VALIDACION: {"reproches": ["falta severidad"], "rechazos": 1},
             graph.PERSISTENCIA: {},
         }
     )
@@ -265,13 +276,76 @@ def test_una_correccion_a_tiempo_corta_el_bucle() -> None:
             graph.VALIDACION: lambda s: (
                 {"decision": _decision()}
                 if graph.intentos_gastados(s) >= 1
-                else {"reproches": ["falta severidad"]}
+                else {"reproches": ["falta severidad"], "rechazos": 1}
             ),
             graph.PERSISTENCIA: {},
         }
     )
     assert visitados.count(graph.INFERENCIA) == 2
     assert graph.decision_utilizable(final) is True
+
+
+def test_un_borrador_con_varios_problemas_igual_se_reintenta() -> None:
+    """La regresión que buscábamos: cuatro problemas agotaban el presupuesto sin reintentar.
+
+    La validación junta todos los problemas de un borrador en una sola pasada, así que una ronda
+    puede dejar cuatro reproches. Mientras el presupuesto se medía contando reproches, esa ronda se
+    leía como cuatro intentos gastados y el modelo no llegaba nunca a corregir.
+    """
+    visitados, final = _recorrer(
+        {
+            graph.CONTEXTO: _CTX,
+            graph.HISTORIAL: {},
+            graph.INFERENCIA: lambda s: {"borrador": {}, "intentos": int(s.get("intentos", 0)) + 1},
+            graph.VALIDACION: lambda s: (
+                {"decision": _decision()}
+                if s.get("reproches")
+                else {"reproches": ["a", "b", "c", "d"], "rechazos": 1}
+            ),
+            graph.PERSISTENCIA: {},
+        }
+    )
+    assert visitados.count(graph.INFERENCIA) == 2
+    assert len(final["reproches"]) == 4  # la historia completa se conserva
+    assert final["rechazos"] == 1  # pero es una sola ronda
+    assert graph.decision_utilizable(final) is True
+
+
+def test_si_los_dos_contadores_se_olvidan_corta_el_techo_de_pasos() -> None:
+    """La última red: un ciclo sin salida muere acotado y ruidoso, no en diez mil vueltas pagas.
+
+    Es el caso de un defecto nuestro, no del proveedor. Se deja explotar a propósito: el evento
+    queda sin confirmar y el consumidor lo manda a la cola de muertos tras unas pocas entregas, en
+    vez de que un error de programación pase por una decisión legítima.
+    """
+    with pytest.raises(GraphRecursionError):
+        _recorrer(
+            {
+                graph.CONTEXTO: _CTX,
+                graph.HISTORIAL: {},
+                graph.INFERENCIA: {"borrador": {}},  # no cuenta intentos
+                graph.VALIDACION: {"reproches": ["x"]},  # ni rechazos
+                graph.PERSISTENCIA: {},
+            }
+        )
+
+
+def test_la_ventana_de_reclamo_cubre_el_ciclo_completo() -> None:
+    """El bus no puede reclamar un evento que todavía se está triando.
+
+    Es la única guardia de este archivo que no vive dentro del grafo, sino entre el grafo y el bus,
+    y por eso es la más fácil de romper sin darse cuenta: alcanza con subir el timeout del proveedor
+    o MAX_INTENTOS y nadie se entera hasta que en producción aparecen decisiones duplicadas y
+    eventos en la cola de muertos sin motivo.
+
+    Si esta prueba se pone en rojo, lo que hay que revisar es `consumer.INACTIVIDAD_MS`.
+    """
+    por_llamada = config.TIMEOUT_SEGUNDOS * adaptador.MAX_REINTENTOS + sum(
+        adaptador.ESPERA_BASE * (2**i) for i in range(adaptador.MAX_REINTENTOS - 1)
+    )
+    ciclo_completo = por_llamada * MAX_INTENTOS
+
+    assert consumer.INACTIVIDAD_MS / 1000 >= ciclo_completo
 
 
 def test_el_techo_de_pasos_sale_de_la_topologia() -> None:

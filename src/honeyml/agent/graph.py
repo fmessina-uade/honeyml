@@ -99,13 +99,15 @@ def ruta_tras_contexto(estado: EstadoTriaje) -> str:
 def intentos_gastados(estado: EstadoTriaje) -> int:
     """Cuántos intentos gastó ya este ciclo.
 
-    El máximo entre el contador y los reproches acumulados, no solo el contador. Quien incrementa
-    `intentos` es el nodo de inferencia, y si algún día deja de hacerlo, con la validación
-    rechazando y el contador quieto el bucle da diez mil vueltas pagas antes de que LangGraph lo
-    corte. Como la validación no puede rechazar sin dejar un reproche, contarlos llega al mismo
-    número por otro camino.
+    El máximo entre dos contadores que se llevan por separado a propósito. `intentos` lo incrementa
+    el nodo de inferencia, donde se hace la llamada paga. `rechazos` lo incrementa la validación,
+    una vez por ronda. Si alguno de los dos se olvidara, el otro igual termina el ciclo.
+
+    Cuenta rondas y no reproches sueltos. Contarlos era el número correcto mientras la validación
+    devolvía uno por vez, pero desde que junta todos los problemas de un borrador en una pasada, un
+    borrador con cuatro problemas daba el presupuesto por agotado sin haber reintentado nunca.
     """
-    return max(int(estado.get("intentos", 0)), len(estado.get("reproches", [])))
+    return max(int(estado.get("intentos", 0)), int(estado.get("rechazos", 0)))
 
 
 def decision_utilizable(estado: EstadoTriaje) -> bool:

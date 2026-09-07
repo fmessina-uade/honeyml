@@ -53,9 +53,20 @@ MAX_ENTREGAS = int(os.getenv("BUS_MAX_ENTREGAS", "3"))
 STREAM_MUERTOS = os.getenv("BUS_STREAM_MUERTOS", "honeyml:events:muertos")
 
 # Cuánto tiene que quedarse quieto un mensaje pendiente antes de que otro consumidor lo pueda
-# tomar. Lo bastante largo para no robarle el evento a una decisión lenta, lo bastante corto para
-# que una caída no quede estacionada una hora.
-INACTIVIDAD_MS = int(os.getenv("BUS_INACTIVIDAD_MS", "60000"))
+# tomar. Sale del presupuesto de tiempo del ciclo de triaje y no de una corazonada:
+#
+#   una llamada    60 s de timeout × 3 reintentos del cliente + 6 s de espera exponencial = 186 s
+#   un ciclo       186 s × 3 intentos correctivos                                         = 558 s
+#
+# Estaba en 60 s, que es menos que una sola llamada lenta. Con ese valor, un ciclo que se demora
+# pierde el evento: otro consumidor lo reclama mientras el primero sigue trabajando, los dos pagan
+# la inferencia, y el contador de entregas sube hasta mandarlo a la cola de muertos sin que haya
+# nada roto. `test_la_ventana_de_reclamo_cubre_el_ciclo_completo` fija la relación, así que cambiar
+# el timeout o MAX_INTENTOS sin revisar esto rompe una prueba en vez de aparecer en producción.
+#
+# El costo de que sobre es que un consumidor caído deja su evento quieto diez minutos. Para un
+# sistema que recibe 21 eventos por minuto y no tiene requisito de latencia, es barato.
+INACTIVIDAD_MS = int(os.getenv("BUS_INACTIVIDAD_MS", "600000"))
 
 # Marcas de deduplicación. Una clave por documento, así cada una vence por su cuenta en lugar de
 # caerse todo el conjunto junto. Un día sobra para la ventana de reenvío: los duplicados llegan a

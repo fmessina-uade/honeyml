@@ -112,12 +112,21 @@ def _reproches_de_contenido(decision: Decision, evento: EventoDelBus) -> list[st
     return problemas
 
 
+def _rechazo(problemas: list[str]) -> EstadoTriaje:
+    """Un rechazo es una ronda, traiga los problemas que traiga. Ver `graph.intentos_gastados`."""
+    return {"reproches": problemas, "rechazos": 1}
+
+
 def validar(estado: EstadoTriaje) -> EstadoTriaje:
     """Convierte el borrador en una decisión, o deja escrito por qué no se pudo.
 
     Devuelve `decision` cuando todo cierra, y `reproches` cuando no. Nunca las dos, y nunca ninguna:
     quien decide si se reintenta o se persiste es `graph.ruta_tras_validar`, que se apoya
     justamente en esa distinción.
+
+    Cada rechazo suma uno a `rechazos`, sin importar cuántos problemas traiga. Ese contador es el
+    que mide el presupuesto de intentos: los reproches pueden ser varios por ronda y no sirven para
+    contar vueltas.
     """
     borrador = estado.get("borrador")
     evento = estado.get("evento")
@@ -129,17 +138,17 @@ def validar(estado: EstadoTriaje) -> EstadoTriaje:
         return {}
 
     if CLAVE_SIN_PARSEAR in borrador:
-        return {
-            "reproches": [
+        return _rechazo(
+            [
                 "La respuesta anterior no era JSON válido. Respondé únicamente con el objeto JSON "
                 "que pide el esquema, sin texto alrededor."
             ]
-        }
+        )
 
     try:
         decision = Decision.model_validate(borrador)
     except ValidationError as exc:
-        return {"reproches": _reproches_del_esquema(exc)}
+        return _rechazo(_reproches_del_esquema(exc))
 
     problemas = _reproches_de_contenido(decision, evento)
 
@@ -151,5 +160,5 @@ def validar(estado: EstadoTriaje) -> EstadoTriaje:
         problemas.append(fuera_de_escala)
 
     if problemas:
-        return {"reproches": problemas}
+        return _rechazo(problemas)
     return {"decision": decision}

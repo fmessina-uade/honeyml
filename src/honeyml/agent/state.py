@@ -99,8 +99,12 @@ class EstadoTriaje(TypedDict, total=False):
     # campo que le señalaron y rompe otro queda alternando entre dos errores sin verlos nunca
     # juntos.
     reproches: Annotated[list[str], operator.add]
+    # Cuántas veces la validación rechazó, que no es lo mismo que cuántos reproches hay: una sola
+    # ronda puede dejar cuatro. Existe como contador aparte porque el grafo necesita saber cuántos
+    # intentos se gastaron, y contar reproches daba por agotado el presupuesto en la primera vuelta.
+    rechazos: Annotated[int, operator.add]
     motivo_de_corte: MotivoDeCorte
 
 
 def estado_inicial(evento: EventoDelBus) -> EstadoTriaje:
-    return {"evento": evento, "intentos": 0, "reproches": []}
+    return {"evento": evento, "intentos": 0, "reproches": [], "rechazos": 0}
