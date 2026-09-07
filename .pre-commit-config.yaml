@@ -1,12 +1,12 @@
 repos:
-  # standard pre-commit hooks
+  # los hooks estándar de pre-commit
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
-        # --unsafe: check syntax without building custom tags (docker-compose uses !override)
+        # --unsafe: valida la sintaxis sin construir las etiquetas propias (docker-compose usa !override)
         args: [--allow-multiple-documents, --unsafe]
       - id: check-json
       - id: check-toml
@@ -25,7 +25,7 @@ repos:
         args: [--severity=warning]
         files: \.sh$
 
-  # yamllint: YAML validation
+  # yamllint: validación de YAML
   - repo: https://github.com/adrienverge/yamllint
     rev: v1.35.1
     hooks:

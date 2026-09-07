@@ -3,7 +3,7 @@
 # Firewall UFW y reglas de aislamiento con iptables para HoneyML.
 # Se corre DESPUÉS de 01_hardening.sh y de confirmar el acceso SSH por el puerto 2200.
 #
-# Usage: sudo bash 02_firewall.sh
+# Uso: sudo bash 02_firewall.sh
 
 set -euo pipefail
 
@@ -38,18 +38,18 @@ ufw default deny incoming
 ufw default allow outgoing
 ufw default deny routed
 
-# 2. admin access rules
+# 2. reglas de acceso administrativo
 log "[2/5] Configurando acceso administrativo..."
 ufw limit "${SSH_ADMIN_PORT}/tcp" comment 'SSH Admin - rate limited'
 
-# 3. honeypot ports (attacker traffic)
+# 3. puertos de los honeypots (tráfico de atacantes)
 log "[3/5] Habilitando puertos de honeypots..."
 
 # honeypot Cowrie de SSH y Telnet
 ufw allow 22/tcp   comment 'Cowrie SSH honeypot'
 ufw allow 23/tcp   comment 'Cowrie Telnet honeypot'
 
-# Dionaea multiprotocol capture
+# captura multiprotocolo de Dionaea
 ufw allow 21/tcp   comment 'Dionaea FTP'
 ufw allow 80/tcp   comment 'Dionaea HTTP'
 ufw allow 443/tcp  comment 'Dionaea HTTPS'

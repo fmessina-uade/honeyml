@@ -53,8 +53,8 @@ def build_pipeline() -> Pipeline:
     clf = RandomForestClassifier(
         n_estimators=120,
         max_depth=None,
-        max_samples=0.3,  # bootstrap subsample keeps the fit tractable on ~1.9M rows
-        class_weight="balanced_subsample",  # the classes are wildly imbalanced (none 50% vs 0.03%)
+        max_samples=0.3,  # el bootstrap mantiene el ajuste manejable sobre 1,9 millones de filas
+        class_weight="balanced_subsample",  # muy desbalanceadas: none 50 % contra 0,03 %
         n_jobs=-1,
         random_state=42,
     )
@@ -74,7 +74,7 @@ def main() -> None:
     print(f"Train: {len(x_tr):,}  |  Test: {len(x_te):,}  |  clases: {y.nunique()}")
 
     pipe = build_pipeline()
-    pipe.fit(x_tr, y_tr)  # fit on train only
+    pipe.fit(x_tr, y_tr)  # se ajusta solo con entrenamiento
 
     # las importancias, devueltas a los nombres de las características
     prep = pipe.named_steps["prep"]

@@ -14,7 +14,7 @@ from pathlib import Path
 
 import matplotlib
 
-matplotlib.use("Agg")  # headless backend, we only save figures
+matplotlib.use("Agg")  # backend sin ventana: acá solo se guardan figuras
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
@@ -40,7 +40,7 @@ STAGE_BY_ACTION = {
 }
 
 
-LOCAL_IP = "127.0.0.1"  # the container's own healthchecks, not attacker traffic
+LOCAL_IP = "127.0.0.1"  # los healthchecks del propio contenedor, no tráfico de atacantes
 
 
 def load() -> pd.DataFrame:

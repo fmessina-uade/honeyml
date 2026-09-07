@@ -48,7 +48,7 @@ def encode(docs: pd.Series, max_features: int = 200) -> tuple[csr_matrix, TfidfV
         tokenizer=_tokenizer,
         token_pattern=None,
         max_features=max_features,
-        min_df=2,  # drop terms that show up in a single IP (noise)
+        min_df=2,  # descarta los términos que aparecen en una sola dirección, que son ruido
     )
     matrix = vectorizer.fit_transform(docs)
     return matrix, vectorizer

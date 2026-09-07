@@ -2,7 +2,7 @@
 # validate_local.sh: chequeo local del stack de HoneyML antes de desplegar.
 # Se corre antes de subir al VPS, para agarrar lo que se rompe de forma obvia.
 #
-# Usage: bash scripts/validate_local.sh
+# Uso: bash scripts/validate_local.sh
 
 set -euo pipefail
 
@@ -259,7 +259,7 @@ else
     info "sshpass no disponible - test de auth SSH salteado (brew install hudochenkov/sshpass/sshpass)"
 fi
 
-# Dionaea HTTP content
+# contenido HTTP de Dionaea
 HTTP_RESP=$(curl -s --connect-timeout 5 http://127.0.0.1:8080/ 2>/dev/null || echo "")
 if echo "$HTTP_RESP" | grep -q "Directory listing"; then
     ok "Dionaea HTTP: responde con directory listing"

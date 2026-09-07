@@ -3,8 +3,8 @@
 # Endurecimiento inicial del VPS Ubuntu 22.04 LTS de HoneyML.
 # Se corre como root apenas se aprovisiona el Droplet en DigitalOcean.
 #
-# Usage: sudo bash 01_hardening.sh <admin_user>
-# Example: sudo bash 01_hardening.sh honeyml
+# Uso: sudo bash 01_hardening.sh <usuario_admin>
+# Ejemplo: sudo bash 01_hardening.sh honeyml
 
 set -euo pipefail
 
@@ -26,7 +26,7 @@ log "=== HoneyML - Hardening del Sistema Operativo ==="
 log "Usuario administrador: $ADMIN_USER"
 log "SO detectado: $(lsb_release -ds 2>/dev/null || uname -r)"
 
-# 1. system update
+# 1. actualización del sistema
 log "[1/12] Actualizando paquetes del sistema..."
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
@@ -57,7 +57,7 @@ apt-get install -y -qq \
     net-tools \
     tcpdump
 
-# 3. create a non-root admin user
+# 3. se crea un usuario admin que no es root
 log "[3/12] Configurando usuario administrador..."
 if ! id "$ADMIN_USER" &>/dev/null; then
     useradd -m -s /bin/bash -G sudo "$ADMIN_USER"
@@ -86,7 +86,7 @@ echo "$ADMIN_USER ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/$ADMIN_USER"
 chmod 440 "/etc/sudoers.d/$ADMIN_USER"
 log "  Sudo NOPASSWD configurado para '$ADMIN_USER'."
 
-# 4. automatic security updates
+# 4. actualizaciones de seguridad automáticas
 log "[4/12] Configurando actualizaciones automáticas..."
 cat > /etc/apt/apt.conf.d/20auto-upgrades << 'EOF'
 APT::Periodic::Update-Package-Lists "1";
@@ -108,34 +108,34 @@ reject_username = 1
 gecoscheck = 1
 EOF
 
-# 6. kernel security params (sysctl)
+# 6. parámetros de seguridad del kernel (sysctl)
 log "[6/12] Aplicando parámetros de hardening del kernel..."
 cat > /etc/sysctl.d/99-honeyml.conf << 'EOF'
-# guard against IP spoofing / source routing
+# protege contra suplantación de IP y enrutado desde el origen
 net.ipv4.conf.all.rp_filter = 1
 net.ipv4.conf.default.rp_filter = 1
 net.ipv4.conf.all.accept_source_route = 0
 net.ipv4.conf.default.accept_source_route = 0
 
-# disable ICMP redirects
+# se deshabilitan las redirecciones ICMP
 net.ipv4.conf.all.accept_redirects = 0
 net.ipv4.conf.default.accept_redirects = 0
 net.ipv4.conf.all.send_redirects = 0
 net.ipv6.conf.all.accept_redirects = 0
 net.ipv6.conf.default.accept_redirects = 0
 
-# ignore ICMP broadcasts
+# se ignoran los broadcast ICMP
 net.ipv4.icmp_echo_ignore_broadcasts = 1
 
-# SYN flood protection
+# protección contra inundación de SYN
 net.ipv4.tcp_syncookies = 1
 net.ipv4.tcp_max_syn_backlog = 2048
 net.ipv4.tcp_synack_retries = 2
 
-# TIME_WAIT protection
+# protección de TIME_WAIT
 net.ipv4.tcp_rfc1337 = 1
 
-# log suspicious packets
+# se registran los paquetes sospechosos
 net.ipv4.conf.all.log_martians = 1
 net.ipv4.conf.default.log_martians = 1
 
@@ -148,7 +148,7 @@ net.ipv6.conf.default.disable_ipv6 = 1
 EOF
 sysctl -p /etc/sysctl.d/99-honeyml.conf
 
-# 7. system limits
+# 7. límites del sistema
 log "[7/12] Configurando límites del sistema..."
 cat >> /etc/security/limits.conf << 'EOF'
 # HoneyML limits
@@ -158,7 +158,7 @@ cat >> /etc/security/limits.conf << 'EOF'
 * hard nproc  4096
 EOF
 
-# 8. disable unneeded services
+# 8. se deshabilitan los servicios que no hacen falta
 log "[8/12] Deshabilitando servicios no requeridos..."
 UNWANTED_SERVICES=(avahi-daemon cups bluetooth rpcbind snapd)
 for svc in "${UNWANTED_SERVICES[@]}"; do
@@ -173,7 +173,7 @@ log "[9/12] Configurando sincronización NTP con chrony..."
 systemctl enable --now chrony
 chronyc makestep || true
 
-# 10. fail2ban, SSH protection
+# 10. fail2ban, protección de SSH
 log "[10/12] Configurando fail2ban..."
 cat > /etc/fail2ban/jail.local << 'EOF'
 [DEFAULT]
@@ -192,7 +192,7 @@ bantime  = 604800
 EOF
 systemctl enable --now fail2ban
 
-# 11. install Docker Engine
+# 11. instalación de Docker Engine
 log "[11/12] Instalando Docker Engine..."
 if ! command -v docker &>/dev/null; then
     curl -fsSL https://get.docker.com | bash
@@ -219,7 +219,7 @@ cat > /etc/docker/daemon.json << 'EOF'
 EOF
 systemctl restart docker || true
 
-# Docker Compose plugin
+# el plugin de Docker Compose
 if ! docker compose version &>/dev/null 2>&1; then
     apt-get install -y -qq docker-compose-plugin
 fi
@@ -242,7 +242,7 @@ if [[ -f "$SSHD_CONFIG_SRC" ]]; then
     cp "$SSHD_CONFIG_SRC" /etc/ssh/sshd_config
     # AllowUsers tiene que apuntar al usuario admin real
     sed -i "s/^AllowUsers.*/AllowUsers $ADMIN_USER/" /etc/ssh/sshd_config
-    mkdir -p /run/sshd  # needed by sshd -t on freshly installed systems
+    mkdir -p /run/sshd  # sshd -t lo necesita en un sistema recién instalado
     sshd -t || die "sshd_config inválido - verificar $SSHD_CONFIG_SRC"
     log "  sshd_config hardened aplicado (Port 2200, AllowUsers $ADMIN_USER)."
 else
@@ -263,11 +263,11 @@ else
     log "  ADVERTENCIA - sshd no detectado en puerto 2200. Verificar manualmente antes de continuar."
 fi
 
-# 13. init AIDE (file-based intrusion detection)
+# 13. inicialización de AIDE (detección de intrusos por integridad de archivos)
 log "[13/13] Inicializando base de datos AIDE..."
 aideinit -y -f 2>/dev/null || aide --init 2>/dev/null || log "  AIDE: completar manualmente con 'aideinit'"
 
-# summary
+# resumen
 log ""
 log "=== Hardening completado (13/13 pasos) ==="
 log ""

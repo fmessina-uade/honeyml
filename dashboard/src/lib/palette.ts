@@ -8,7 +8,7 @@ export const COLORS = {
   slate: '#94A3B8',
 } as const;
 
-/** Tactic colors by index: 0 = Initial Access, 1 = Execution, 2 = Exfiltration */
+/** Colores de táctica por índice: 0 = acceso inicial, 1 = ejecución, 2 = exfiltración */
 export const TACTIC_HEX = [COLORS.coral, COLORS.amber, COLORS.teal] as const;
 
 export function hexToRgb(hex: string): [number, number, number] {

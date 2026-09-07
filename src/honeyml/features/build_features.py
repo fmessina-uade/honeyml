@@ -64,7 +64,7 @@ SKEWED = [
     "dur_sesion_media_s",
 ]
 
-MIN_SPAN_H = 1 / 60  # 1-minute floor for the events-per-hour rate
+MIN_SPAN_H = 1 / 60  # piso de un minuto para la tasa de eventos por hora
 
 
 def _prepare(df: pd.DataFrame) -> pd.DataFrame:

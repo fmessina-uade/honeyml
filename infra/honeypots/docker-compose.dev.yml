@@ -1,18 +1,18 @@
 # docker-compose.dev.yml: override para desarrollo local (macOS/Linux)
 #
-# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
-#        or just: make dev-up
+# Uso: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#      o directamente: make dev-up
 #
 # Por qué cambian los puertos:
 #   Puerto 22   -> macOS corre su propio sshd en el 22
-#   Port 445  -> macOS has native SMB (File Sharing)
+#   Puerto 445  -> macOS tiene SMB nativo (Compartir archivos)
 #   Puerto 3306 -> puede haber un MySQL local corriendo
 #   Puerto 80   -> puede haber un servidor web local
 
 services:
   cowrie:
     ports:
-      - "127.0.0.1:2222:2222/tcp"   # SSH honeypot  (test with: ssh -p 2222 root@localhost)
+      - "127.0.0.1:2222:2222/tcp"   # honeypot SSH  (se prueba con: ssh -p 2222 root@localhost)
       - "127.0.0.1:2323:2223/tcp"   # Telnet honeypot
     # sin tope de CPU en local, para que no moleste mientras se desarrolla
     cpus: "1.0"
@@ -21,7 +21,7 @@ services:
   dionaea:
     ports:
       - "127.0.0.1:2121:21/tcp"     # FTP
-      - "127.0.0.1:8080:80/tcp"     # HTTP  (test with: curl http://localhost:8080)
+      - "127.0.0.1:8080:80/tcp"     # HTTP  (se prueba con: curl http://localhost:8080)
       - "127.0.0.1:8443:443/tcp"    # HTTPS
       - "127.0.0.1:4445:445/tcp"    # SMB
       - "127.0.0.1:1350:135/tcp"    # MSRPC

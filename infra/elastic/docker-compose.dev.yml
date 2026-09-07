@@ -1,12 +1,12 @@
-# Local dev override.
+# Override para desarrollo local.
 #
 # Diferencias con producción:
 #   - heaps más chicos, así corre en la Mac junto con todo lo demás.
 #   - Filebeat NO lee los volúmenes de los honeypots: lee un directorio local (data/logs/) con
 #     datos reales bajados del VPS, así podemos iterar la normalización ECS sin honeypot
-#     containers running locally.
+#     contenedores corriendo en la máquina local.
 #
-# Usage:  docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+# Uso:    docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 #         (o `make elastic-dev-up` desde la raíz del repositorio)
 
 services:

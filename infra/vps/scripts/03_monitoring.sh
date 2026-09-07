@@ -4,8 +4,8 @@
 # Instala un script de chequeo con alertas por webhook (Slack, Discord o el que sea).
 # En la fase 2 esto lo absorbe el Elastic Stack (Metricbeat).
 #
-# Usage: sudo bash 03_monitoring.sh <webhook_url>
-# Example: sudo bash 03_monitoring.sh "https://hooks.slack.com/services/..."
+# Uso: sudo bash 03_monitoring.sh <url_del_webhook>
+# Ejemplo: sudo bash 03_monitoring.sh "https://hooks.slack.com/services/..."
 
 set -euo pipefail
 
@@ -25,7 +25,7 @@ log() {
 
 log "=== HoneyML - Configuración de Monitoreo de Salud ==="
 
-# 1. main health-check script
+# 1. el script principal de chequeo de salud
 log "[1/3] Creando script de health check en $HEALTHCHECK_SCRIPT..."
 cat > "$HEALTHCHECK_SCRIPT" << HEALTH_SCRIPT
 #!/usr/bin/env bash
@@ -101,7 +101,7 @@ for container in cowrie dionaea; do
     fi
 done
 
-# admin SSH service
+# el servicio SSH de administración
 if ! ss -tlnp | grep -q ":2200 "; then
     send_alert "CRITICAL" "sshd no escucha en puerto 2200 - pérdida de acceso administrativo"
 fi
@@ -112,18 +112,18 @@ HEALTH_SCRIPT
 chmod +x "$HEALTHCHECK_SCRIPT"
 log "  Script creado."
 
-# 2. daily report script
+# 2. el script del reporte diario
 DAILY_REPORT_SCRIPT="/usr/local/bin/honeyml_daily_report.sh"
 cat > "$DAILY_REPORT_SCRIPT" << 'DAILY_SCRIPT'
 #!/usr/bin/env bash
-# honeyml_daily_report.sh - daily honeypot activity summary.
+# honeyml_daily_report.sh: resumen diario de actividad de los honeypots.
 set -euo pipefail
 
 WEBHOOK_URL="${WEBHOOK_URL:-}"
 DATE=$(date '+%Y-%m-%d')
 COWRIE_LOG="/var/lib/docker/volumes/honeypots_cowrie_logs/_data/cowrie.json"
 
-# Cowrie activity counters
+# contadores de actividad de Cowrie
 SSH_ATTEMPTS=0
 SUCCESSFUL_LOGINS=0
 UNIQUE_IPS=0
@@ -153,19 +153,19 @@ DAILY_SCRIPT
 
 chmod +x "$DAILY_REPORT_SCRIPT"
 
-# 3. register cron jobs
+# 3. se registran las tareas de cron
 log "[3/3] Registrando tareas en cron..."
 
 CRON_FILE="/etc/cron.d/honeyml-monitoring"
 cat > "$CRON_FILE" << CRONEOF
-# HoneyML - VPS health monitoring
+# HoneyML: monitoreo de salud del VPS
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 
 # chequeo de salud cada 5 minutos
 */5 * * * * root $HEALTHCHECK_SCRIPT >> $HEALTHCHECK_LOG 2>&1
 
-# daily report at 07:00 ART (UTC-3 = 10:00 UTC)
+# reporte diario a las 07:00 de Argentina (UTC-3, o 10:00 UTC)
 0 10 * * * root $DAILY_REPORT_SCRIPT >> $HEALTHCHECK_LOG 2>&1
 
 # rotación semanal del registro de actividad de los honeypots, hasta que esté Logstash

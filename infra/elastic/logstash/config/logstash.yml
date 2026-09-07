@@ -1,5 +1,5 @@
 http.host: "0.0.0.0"
-# X-Pack monitoring off (security off, private setup)
+# monitoreo de X-Pack apagado (seguridad apagada, despliegue privado)
 xpack.monitoring.enabled: false
 # el pipeline principal vive en los archivos bajo /usr/share/logstash/pipeline
 pipeline.ordered: auto

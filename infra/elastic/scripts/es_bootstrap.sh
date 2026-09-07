@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Elasticsearch bootstrap: applies HoneyML's composable ECS template.
-# Idempotent: safe to run as many times as needed.
+# Arranque de Elasticsearch: aplica la plantilla ECS componible de HoneyML.
+# Es idempotente, así que se puede correr todas las veces que haga falta.
 set -euo pipefail
 
 ES_URL="${ES_URL:-http://localhost:9200}"
