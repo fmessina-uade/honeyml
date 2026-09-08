@@ -24,7 +24,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from ..adapters.inferencia import esquema_estricto
+from ..adapters.inferencia import costo_de, esquema_estricto
 from ..adapters.servicio import AdaptadorDeInferencia, ServicioDeInferencia
 from ..severidad import para_el_proveedor
 from ..state import Decision, EstadoTriaje
@@ -142,4 +142,14 @@ def consultar(estado: EstadoTriaje, servicio: ServicioDeInferencia | None = None
     except json.JSONDecodeError:
         borrador = {"_sin_parsear": respuesta.contenido}
 
-    return {"borrador": borrador, "intentos": intento + 1}
+    # El consumo se pisa en cada vuelta a propósito: lo que hay que guardar es el costo de la
+    # llamada que produjo la decisión que se persiste, no la suma del ciclo. El total por modelo lo
+    # lleva el adaptador, y `rechazos` dice cuántas vueltas hubo.
+    consumo = {
+        "nombre": respuesta.modelo,
+        "tokens_entrada": respuesta.tokens_entrada,
+        "tokens_salida": respuesta.tokens_salida,
+        "segundos": round(respuesta.segundos, 3),
+        "costo_usd": costo_de(respuesta),
+    }
+    return {"borrador": borrador, "intentos": intento + 1, "consumo": consumo}

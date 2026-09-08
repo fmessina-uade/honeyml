@@ -4,6 +4,9 @@ Es el único nodo que no habla con nadie. No hay red, no hay índice, no hay pro
 borrador y sale una decisión o una lista de reproches. Por eso tampoco levanta excepciones, a
 diferencia de contexto y de historial: acá no hay nada que pueda estar caído.
 
+Lo que no se comprueba, porque ya no se pide: que el modelo repita el identificador del evento. Ver
+el comentario de `Decision` en `state.py`.
+
 El reproche tiene dos lectores y eso condiciona cómo se escribe. Uno es el modelo, que lo recibe en
 el siguiente intento y tiene que poder corregir con eso. El otro es quien audite la decisión meses
 después. Los errores crudos de Pydantic no le sirven a ninguno de los dos ("Input should be a valid
@@ -81,18 +84,10 @@ def _reproches_del_esquema(exc: ValidationError) -> list[str]:
 def _reproches_de_contenido(decision: Decision, evento: EventoDelBus) -> list[str]:
     """Lo que el esquema no puede exigir, pero el motor sí.
 
-    Son tres cosas que un JSON puede cumplir y aun así dejar la decisión inservible: que hable de
-    otro evento, que no se apoye en nada, o que asigne una táctica que el señuelo no observa.
+    Son dos cosas que un JSON puede cumplir y aun así dejar la decisión inservible: que no se apoye
+    en nada, o que asigne una táctica que el señuelo no observa.
     """
     problemas: list[str] = []
-
-    # Una decisión con el identificador equivocado es peor que ninguna: se persiste, queda
-    # archivada bajo otro evento, y nada la vuelve a mirar.
-    if decision.doc_id != evento.doc_id:
-        problemas.append(
-            f"El campo 'doc_id' dice '{decision.doc_id}' y el evento que se está clasificando es "
-            f"'{evento.doc_id}'. Tiene que copiarse tal cual del contexto."
-        )
 
     # El esquema admite una lista vacía y no hay forma de prohibirlo ahí. Pero una decisión sin los
     # hechos que la sostienen no se puede auditar, que es exactamente para lo que existe el campo.

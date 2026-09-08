@@ -186,6 +186,19 @@ class Respuesta:
     crudo: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
+def costo_de(respuesta: Respuesta) -> float | None:
+    """Cuánto costó una respuesta, o None si su modelo no tiene precio registrado.
+
+    `Consumo.costo_estimado` responde lo mismo sobre un acumulado. Esto existe para el nodo de
+    persistencia, que guarda el costo de la llamada que produjo cada decisión.
+    """
+    precios = PRECIOS.get(respuesta.modelo)
+    if precios is None:
+        return None
+    p_entrada, p_salida = precios
+    return (respuesta.tokens_entrada * p_entrada + respuesta.tokens_salida * p_salida) / 1_000_000
+
+
 def esquema_estricto(esquema: dict[str, Any]) -> dict[str, Any]:
     """Lleva un JSON Schema de Pydantic a la forma que exige el modo estricto.
 

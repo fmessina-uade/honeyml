@@ -190,10 +190,15 @@ def reproche(nivel: Severidad, evento: EventoDelBus) -> str | None:
     )
 
 
-# Qué niveles puede producir hoy el motor por el camino real. El filtro del pipeline publica al bus
-# autenticaciones exitosas, ejecución de comandos y transferencia de archivos, así que
-# `INFORMATIVO` está definido pero no llega por acá. No se lo saca de la escala porque la campaña de
-# validación adversaria va a generar reconocimiento y su etiqueta esperada tiene que existir.
+# Qué niveles puede producir hoy el motor por el camino real. Sale de las cuatro condiciones del
+# filtro de `80-bus.conf`: autenticaciones exitosas (piso `medio`), ejecución de comandos (`alto`),
+# transferencia de archivos (`critico`), y los intentos de credenciales contra Dionaea prosperen o
+# no, que son los que traen `bajo` porque ese sensor casi nunca puede declarar el resultado.
+#
+# Esa cuarta condición es la que hay que tener presente al leer este conjunto: sin ella, `bajo` no
+# tendría por qué estar acá. `INFORMATIVO` sí está definido y no llega, y no se lo saca de la escala
+# porque la campaña de validación adversaria va a generar reconocimiento, y su etiqueta esperada
+# tiene que existir.
 LLEGAN_POR_EL_BUS: set[Severidad] = {
     Severidad.BAJO,
     Severidad.MEDIO,

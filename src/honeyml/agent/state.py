@@ -18,7 +18,7 @@ from typing import Annotated, Any, Literal, TypedDict
 from pydantic import BaseModel, ConfigDict, Field
 
 from .consumer import EventoDelBus
-from .severidad import Severidad
+from .severidad import Severidad, dentro_de_limites
 
 # Cuántas veces se le devuelve el reproche al proveedor antes de abandonar. Tres y no diez: si el
 # modelo no acertó el esquema con el error explicado dos veces, la vuelta once tampoco lo va a
@@ -37,7 +37,22 @@ class Decision(BaseModel):
     # que el modelo inventa y que nadie lee es una alucinación que pasa en silencio.
     model_config = ConfigDict(extra="forbid")
 
-    doc_id: str = Field(description="identidad del evento en el índice")
+    # El `doc_id` no está acá a propósito, y vale explicar por qué: se lo pedía al modelo y se
+    # rechazaba la decisión si no coincidía con el del evento. Pero es un SHA-256 de 64 caracteres
+    # hexadecimales, y copiar eso exacto es justo lo que un modelo hace mal. Cada carácter errado
+    # costaba un reproche y un reintento pago, sobre una severidad que podía estar bien juzgada.
+    #
+    # Nadie lo leía, además: persistencia indexa bajo el `doc_id` del evento, que viene del bus. El
+    # campo solo servía para compararse consigo mismo. El anclaje al contexto lo verifica
+    # `evidencia`, que tiene que citar hechos concretos y no puede venir vacía.
+    #
+    # Sigue viajando en el pedido como parte del contexto, para que el prompt reconstruido
+    # identifique su evento. Lo que se saca es la obligación de devolverlo.
+    #
+    # `concluyente` salió por lo mismo. Describe cómo terminó el ciclo, que el modelo no puede
+    # saber, y el nodo de persistencia lo escribe desde `resultado_del_ciclo`. Pedírselo era
+    # obligarlo a inventar un valor que después se descartaba.
+
     # Enum y no `str`: así el nodo de validación rechaza un nivel inventado sin escribir una sola
     # comprobación. Que el nivel además sea defendible para este evento es otra cosa, y la resuelve
     # `severidad.dentro_de_limites`, que necesita el evento y por eso no puede vivir acá.
@@ -49,9 +64,6 @@ class Decision(BaseModel):
         default_factory=list,
         description="hechos del contexto en los que se apoya; sin esto no se puede auditar",
     )
-    # Ver `motivo_de_corte`: una decisión no concluyente sigue siendo una decisión persistida, y
-    # tiene que poder distinguirse de una que el motor sí pudo tomar.
-    concluyente: bool = True
 
 
 class Contexto(BaseModel):
@@ -93,6 +105,10 @@ class EstadoTriaje(TypedDict, total=False):
     # nodo de validación tenga algo que reprochar y el registro conserve qué se recibió realmente.
     borrador: dict[str, Any]
     decision: Decision
+    # Qué modelo contestó y cuánto costó la llamada que produjo el borrador vigente. Viaja en el
+    # estado porque el contador del adaptador vive en memoria y se pierde al reiniciar, y "cuántos
+    # eventos resolvió el modelo económico" es una de las métricas que hay que poder informar.
+    consumo: dict[str, Any]
     intentos: int
     # Los errores de validación, redactados para devolvérselos al proveedor. El `operator.add` es
     # necesario: sin reductor, LangGraph pisa la clave en cada vuelta, y un modelo que arregla el
@@ -108,3 +124,37 @@ class EstadoTriaje(TypedDict, total=False):
 
 def estado_inicial(evento: EventoDelBus) -> EstadoTriaje:
     return {"evento": evento, "intentos": 0, "reproches": [], "rechazos": 0}
+
+
+def decision_utilizable(estado: EstadoTriaje) -> bool:
+    """Si la decisión se puede guardar como la respuesta del motor.
+
+    Son dos condiciones y no una: que exista, y que sea defendible para este evento. Comprobar solo
+    la existencia deja pasar un `informativo` sobre una transferencia de archivo, que contradice el
+    registro en vez de ser una diferencia de criterio.
+    """
+    decision = estado.get("decision")
+    if decision is None:
+        return False
+    evento = estado.get("evento")
+    if evento is None:
+        # Sin evento no hay piso contra el cual medir. No debería pasar (el estado inicial siempre
+        # lo trae) y si pasa, el problema no es la severidad.
+        return True
+    return dentro_de_limites(decision.severidad, evento)
+
+
+def resultado_del_ciclo(estado: EstadoTriaje) -> MotivoDeCorte | None:
+    """Por qué termina este ciclo. `None` significa que terminó con una decisión que vale guardar.
+
+    Las dos funciones de acá abajo son predicados sobre el estado, no topología, y por eso viven en
+    este módulo. Estuvieron en `graph.py` hasta que el nodo de persistencia necesitó la segunda: un
+    nodo importando el grafo que lo importa a él es un ciclo, y la dependencia tiene que ir en un
+    solo sentido. Que las lean el grafo y un nodo es justamente la señal de que son del contrato.
+    """
+    declarado = estado.get("motivo_de_corte")
+    if declarado:
+        return declarado
+    if decision_utilizable(estado):
+        return None
+    return "esquema_invalido"

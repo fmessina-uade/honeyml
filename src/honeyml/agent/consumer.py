@@ -267,6 +267,17 @@ class ConsumidorDelBus:
 
     def procesar(self, evento: EventoDelBus) -> None:
         """Pasa un evento por el manejador y lo resuelve según cómo haya salido."""
+        # Sin identificador no hay nada que hacer con este evento, y conviene cortarlo acá antes de
+        # gastar una llamada paga. No se puede deduplicar, porque la marca se guarda por `doc_id`, y
+        # no se puede persistir la decisión, porque el documento se indexa bajo ese mismo valor.
+        #
+        # El pipeline lo arma con `.to_s` sobre la metadata, así que si la huella no se calculó
+        # llega la cadena vacía en lugar de faltar el campo. Es un defecto nuestro, aguas arriba, y
+        # la cola de muertos es donde queda visible en vez de dar vueltas.
+        if not evento.doc_id:
+            self._a_muertos(evento, motivo="sin doc_id: no se puede deduplicar ni persistir")
+            return
+
         if self._ya_procesado(evento.doc_id):
             # Ya se decidió en una entrega anterior. Confirmarlo es lo correcto: el trabajo está
             # hecho, y dejarlo pendiente haría que vuelva para siempre.

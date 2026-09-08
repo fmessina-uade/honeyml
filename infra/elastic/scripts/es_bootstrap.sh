@@ -6,6 +6,7 @@ set -euo pipefail
 ES_URL="${ES_URL:-http://localhost:9200}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATE_FILE="${SCRIPT_DIR}/../templates/honeypot-ecs-template.json"
+TEMPLATE_DECISIONES="${SCRIPT_DIR}/../templates/honeyml-decisiones-template.json"
 
 echo "==> Esperando a Elasticsearch en ${ES_URL} ..."
 for i in $(seq 1 30); do
@@ -27,5 +28,14 @@ curl -sf -X PUT "${ES_URL}/_index_template/honeypot-ecs" \
 echo "==> Plantilla aplicada. Verificación:"
 curl -sf "${ES_URL}/_index_template/honeypot-ecs" \
   | python3 -c "import sys,json; t=json.load(sys.stdin)['index_templates'][0]; print('    nombre:', t['name']); print('    patrones:', t['index_template']['index_patterns']); print('    prioridad:', t['index_template']['priority'])"
+
+echo "==> Aplicando plantilla componible honeyml-decisiones ..."
+curl -sf -X PUT "${ES_URL}/_index_template/honeyml-decisiones" \
+  -H 'Content-Type: application/json' \
+  --data-binary "@${TEMPLATE_DECISIONES}" >/dev/null
+
+echo "==> Plantilla aplicada. Verificación:"
+curl -sf "${ES_URL}/_index_template/honeyml-decisiones" \
+  | python3 -c "import sys,json; t=json.load(sys.stdin)['index_templates'][0]; print('    nombre:', t['name']); print('    patrones:', t['index_template']['index_patterns']); print('    dinamico:', t['index_template']['template']['mappings']['dynamic'])"
 
 echo "==> Bootstrap completo."

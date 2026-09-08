@@ -22,6 +22,7 @@ from langgraph.errors import GraphRecursionError
 from pydantic import ValidationError
 
 from honeyml.agent import consumer, graph, tools
+from honeyml.agent import state as estado
 from honeyml.agent.adapters import config
 from honeyml.agent.adapters import inferencia as adaptador
 from honeyml.agent.consumer import EventoDelBus
@@ -53,7 +54,6 @@ def _decision() -> Decision:
     para atrapar.
     """
     return Decision(
-        doc_id="abc123",
         severidad=Severidad.ALTO,
         confianza=0.8,
         justificacion="ejecutó comandos dentro del señuelo",
@@ -204,7 +204,6 @@ def test_una_severidad_por_debajo_del_piso_no_llega_a_persistirse() -> None:
     criterio: contradice el registro.
     """
     imposible = Decision(
-        doc_id="abc123",
         severidad=Severidad.INFORMATIVO,
         confianza=0.9,
         justificacion="parece inofensivo",
@@ -222,9 +221,9 @@ def test_una_severidad_por_debajo_del_piso_no_llega_a_persistirse() -> None:
             graph.PERSISTENCIA: {},
         }
     )
-    assert graph.decision_utilizable(final) is False
+    assert estado.decision_utilizable(final) is False
     assert visitados.count(graph.INFERENCIA) == MAX_INTENTOS  # se reintentó, no se aceptó
-    assert graph.resultado_del_ciclo(final) == "esquema_invalido"
+    assert estado.resultado_del_ciclo(final) == "esquema_invalido"
 
 
 def test_persistencia_siempre_recibe_un_motivo_cuando_no_hay_decision() -> None:
@@ -238,7 +237,7 @@ def test_persistencia_siempre_recibe_un_motivo_cuando_no_hay_decision() -> None:
             graph.PERSISTENCIA: {},
         }
     )
-    assert graph.resultado_del_ciclo(agotado) == "esquema_invalido"
+    assert estado.resultado_del_ciclo(agotado) == "esquema_invalido"
 
     _, sin_ctx = _recorrer(
         {
@@ -250,7 +249,7 @@ def test_persistencia_siempre_recibe_un_motivo_cuando_no_hay_decision() -> None:
         },
         evento=_evento(source_ip=""),
     )
-    assert graph.resultado_del_ciclo(sin_ctx) == "sin_contexto"
+    assert estado.resultado_del_ciclo(sin_ctx) == "sin_contexto"
 
 
 def test_una_decision_valida_no_declara_motivo_de_corte() -> None:
@@ -263,7 +262,7 @@ def test_una_decision_valida_no_declara_motivo_de_corte() -> None:
             graph.PERSISTENCIA: {},
         }
     )
-    assert graph.resultado_del_ciclo(final) is None
+    assert estado.resultado_del_ciclo(final) is None
 
 
 def test_una_correccion_a_tiempo_corta_el_bucle() -> None:
@@ -282,7 +281,7 @@ def test_una_correccion_a_tiempo_corta_el_bucle() -> None:
         }
     )
     assert visitados.count(graph.INFERENCIA) == 2
-    assert graph.decision_utilizable(final) is True
+    assert estado.decision_utilizable(final) is True
 
 
 def test_un_borrador_con_varios_problemas_igual_se_reintenta() -> None:
@@ -308,7 +307,7 @@ def test_un_borrador_con_varios_problemas_igual_se_reintenta() -> None:
     assert visitados.count(graph.INFERENCIA) == 2
     assert len(final["reproches"]) == 4  # la historia completa se conserva
     assert final["rechazos"] == 1  # pero es una sola ronda
-    assert graph.decision_utilizable(final) is True
+    assert estado.decision_utilizable(final) is True
 
 
 def test_si_los_dos_contadores_se_olvidan_corta_el_techo_de_pasos() -> None:

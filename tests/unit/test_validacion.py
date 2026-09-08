@@ -3,7 +3,6 @@
 Lo que se fija acá son las formas de fallar que el esquema solo no atrapa, porque son las que
 después no se notan:
 
-- un JSON impecable que habla de otro evento
 - un JSON impecable que no se apoya en ningún hecho
 - una severidad que contradice lo que prueba el registro
 - varios problemas a la vez, que tienen que salir juntos y no de a uno por intento
@@ -18,6 +17,7 @@ from typing import Any
 
 from honeyml.agent.consumer import EventoDelBus
 from honeyml.agent.nodes import validacion as nodo
+from honeyml.agent.state import Decision
 from honeyml.education.annotations import TACTICAS_OBSERVABLES
 
 
@@ -39,13 +39,11 @@ def _evento(**kw: Any) -> EventoDelBus:
 def _borrador(**kw: Any) -> dict[str, Any]:
     """Un borrador válido para `_evento()`, que es de categoría `process` y tiene piso 'alto'."""
     base: dict[str, Any] = {
-        "doc_id": "abc123",
         "severidad": "alto",
         "confianza": 0.8,
         "tactica_mitre": "Descubrimiento",
         "justificacion": "Ejecutó un comando de reconocimiento dentro del señuelo.",
         "evidencia": ["comando ejecutado: uname -a"],
-        "concluyente": True,
     }
     base.update(kw)
     return base
@@ -131,11 +129,15 @@ def test_el_reproche_no_arrastra_el_texto_crudo_de_pydantic() -> None:
 # ---- lo que el esquema no puede atrapar --------------------------------------------------------
 
 
-def test_una_decision_sobre_otro_evento_se_rechaza() -> None:
-    """El caso más peligroso: el JSON está perfecto y la decisión se archiva bajo otro evento."""
-    salida = nodo.validar(_estado(borrador=_borrador(doc_id="otro999")))
+def test_el_esquema_no_le_pide_el_identificador_al_modelo() -> None:
+    """Se lo pedía, y era un SHA-256 de 64 caracteres que había que copiar exacto.
 
-    assert "decision" not in salida
+    Cada carácter errado costaba un reproche y un reintento pago sobre una severidad que podía estar
+    bien juzgada. Nadie leía ese campo: persistencia indexa bajo el `doc_id` que viene del bus.
+    """
+    assert "doc_id" not in Decision.model_fields
+    # Y si el modelo lo manda igual, `extra="forbid"` lo rechaza como cualquier campo inventado.
+    salida = nodo.validar(_estado(borrador=_borrador(doc_id="lo que sea")))
     assert any("doc_id" in r for r in salida["reproches"])
 
 
@@ -192,7 +194,7 @@ def test_la_escalada_dentro_del_margen_se_acepta() -> None:
 def test_los_problemas_salen_todos_juntos() -> None:
     """De a uno por intento, un borrador con tres problemas se come el presupuesto entero."""
     salida = nodo.validar(
-        _estado(borrador=_borrador(doc_id="otro999", evidencia=[], severidad="bajo"))
+        _estado(borrador=_borrador(evidencia=[], severidad="bajo", tactica_mitre="Impacto"))
     )
 
     assert len(salida["reproches"]) == 3
@@ -205,7 +207,7 @@ def test_un_rechazo_cuenta_una_ronda_sin_importar_cuantos_problemas() -> None:
     como cuatro intentos gastados y el modelo se quedaba sin ninguna oportunidad de corregir.
     """
     salida = nodo.validar(
-        _estado(borrador=_borrador(doc_id="otro999", evidencia=[], severidad="bajo"))
+        _estado(borrador=_borrador(evidencia=[], severidad="bajo", tactica_mitre="Impacto"))
     )
 
     assert len(salida["reproches"]) == 3

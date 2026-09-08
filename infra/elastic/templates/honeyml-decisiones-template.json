@@ -1,0 +1,64 @@
+{
+  "index_patterns": [
+    "honeyml-decisiones"
+  ],
+  "priority": 200,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "refresh_interval": "5s"
+    },
+    "mappings": {
+      "dynamic": "strict",
+      "properties": {
+        "@timestamp": {
+          "type": "date"
+        },
+        "evento": {
+          "properties": {
+            "doc_id": { "type": "keyword" },
+            "momento": { "type": "date" },
+            "sensor": { "type": "keyword" },
+            "categoria": { "type": "keyword" },
+            "accion": { "type": "keyword" },
+            "resultado": { "type": "keyword" },
+            "protocolo": { "type": "keyword" },
+            "origen": { "type": "ip" },
+            "sesion": { "type": "keyword" },
+            "resumen": { "type": "text" }
+          }
+        },
+        "decision": {
+          "properties": {
+            "severidad": { "type": "keyword" },
+            "piso": { "type": "keyword" },
+            "techo": { "type": "keyword" },
+            "confianza": { "type": "float" },
+            "tactica_mitre": { "type": "keyword" },
+            "justificacion": { "type": "text" },
+            "evidencia": { "type": "text" },
+            "concluyente": { "type": "boolean" }
+          }
+        },
+        "ciclo": {
+          "properties": {
+            "motivo_de_corte": { "type": "keyword" },
+            "intentos": { "type": "integer" },
+            "rechazos": { "type": "integer" },
+            "reproches": { "type": "text" }
+          }
+        },
+        "modelo": {
+          "properties": {
+            "nombre": { "type": "keyword" },
+            "tokens_entrada": { "type": "long" },
+            "tokens_salida": { "type": "long" },
+            "costo_usd": { "type": "float" },
+            "segundos": { "type": "float" }
+          }
+        }
+      }
+    }
+  }
+}

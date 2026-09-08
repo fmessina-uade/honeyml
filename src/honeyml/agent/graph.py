@@ -26,9 +26,9 @@ from langgraph.graph import END, StateGraph
 from .nodes import contexto as nodo_contexto
 from .nodes import historial as nodo_historial
 from .nodes import inferencia as nodo_inferencia
+from .nodes import persistencia as nodo_persistencia
 from .nodes import validacion as nodo_validacion
-from .severidad import dentro_de_limites
-from .state import MAX_INTENTOS, EstadoTriaje, MotivoDeCorte
+from .state import MAX_INTENTOS, EstadoTriaje, decision_utilizable
 
 # Un nodo devuelve el estado parcial que tocó, no un diccionario cualquiera: con `dict[str, Any]`
 # entraban claves inventadas que LangGraph después descarta en silencio.
@@ -82,6 +82,7 @@ def nodos_disponibles() -> dict[str, Nodo]:
         HISTORIAL: nodo_historial.recuperar,
         INFERENCIA: nodo_inferencia.consultar,
         VALIDACION: nodo_validacion.validar,
+        PERSISTENCIA: nodo_persistencia.guardar,
     }
     return {nombre: reales.get(nombre) or _pendiente(nombre) for nombre in ORDEN}
 
@@ -110,24 +111,6 @@ def intentos_gastados(estado: EstadoTriaje) -> int:
     return max(int(estado.get("intentos", 0)), int(estado.get("rechazos", 0)))
 
 
-def decision_utilizable(estado: EstadoTriaje) -> bool:
-    """Si la decisión se puede guardar como la respuesta del motor.
-
-    Son dos condiciones y no una: que exista, y que sea defendible para este evento. Comprobar solo
-    la existencia deja pasar un `informativo` sobre una transferencia de archivo, que contradice el
-    registro en vez de ser una diferencia de criterio.
-    """
-    decision = estado.get("decision")
-    if decision is None:
-        return False
-    evento = estado.get("evento")
-    if evento is None:
-        # Sin evento no hay piso contra el cual medir. No debería pasar (el estado inicial siempre
-        # lo trae) y si pasa, el problema no es la severidad.
-        return True
-    return dentro_de_limites(decision.severidad, evento)
-
-
 def ruta_tras_validar(estado: EstadoTriaje) -> str:
     """A dónde va el ciclo después de que la validación dijo lo suyo.
 
@@ -147,20 +130,6 @@ def ruta_tras_validar(estado: EstadoTriaje) -> str:
     if intentos_gastados(estado) < MAX_INTENTOS:
         return INFERENCIA
     return PERSISTENCIA
-
-
-def resultado_del_ciclo(estado: EstadoTriaje) -> MotivoDeCorte | None:
-    """Por qué termina este ciclo. `None` significa que terminó con una decisión que vale guardar.
-
-    Vive acá y no en persistencia porque es la contracara de `ruta_tras_validar`: separarlas dejaría
-    que una diga "andá a persistir" y la otra no sepa por qué.
-    """
-    declarado = estado.get("motivo_de_corte")
-    if declarado:
-        return declarado
-    if decision_utilizable(estado):
-        return None
-    return "esquema_invalido"
 
 
 def construir_grafo(nodos: Mapping[str, Nodo] | None = None) -> Any:

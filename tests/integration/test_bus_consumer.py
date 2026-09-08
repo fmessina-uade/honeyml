@@ -222,3 +222,23 @@ def test_evento_venenoso_termina_en_muertos(bus, stream):
     assert "entregas" in campos["_motivo"]
 
     _limpiar_marcas(bus, doc_id)
+
+
+def test_un_evento_sin_doc_id_va_directo_a_la_cola_de_muertos(bus, stream):
+    """No se puede deduplicar ni persistir, así que no vale gastar una llamada paga en él.
+
+    El pipeline arma el campo con `.to_s` sobre la metadata, así que si la huella no se calculó
+    llega la cadena vacía en lugar de faltar. Sin esta guardia el evento entraba al grafo, se
+    triaba, y recién fallaba al indexar bajo un identificador que no existe: hasta tres llamadas
+    pagas por entrega, y tres entregas antes de que la cola lo apartara.
+    """
+    _publicar(bus, stream, doc_id="")
+
+    vistos: list[EventoDelBus] = []
+    c = _consumidor(stream, vistos.append, nombre="agente-1")
+    c.correr(limite=1)
+
+    assert vistos == []  # el manejador no llegó a verlo
+    assert c.contadores.descartados == 1
+    assert bus.xpending(stream, "triaje-prueba")["pending"] == 0  # el grupo avanza
+    assert bus.xlen(f"{stream}:muertos") == 1
