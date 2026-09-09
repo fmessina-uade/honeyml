@@ -16,6 +16,7 @@ from typing import Any
 
 from honeyml.agent.adapters.inferencia import Respuesta
 from honeyml.agent.nodes import inferencia as nodo
+from honeyml.agent.severidad import piso_de
 from honeyml.agent.state import Contexto
 from honeyml.education.annotations import TACTICAS_OBSERVABLES
 
@@ -242,3 +243,58 @@ def test_lo_que_se_publica_es_lo_que_la_validacion_exige() -> None:
     inventada = "Movimiento lateral"
     assert inventada not in s.sistema
     assert inventada not in TACTICAS_OBSERVABLES
+
+
+def test_el_pedido_lleva_lo_que_determina_el_piso() -> None:
+    """El modelo no puede calcular el piso si no ve de qué depende, y lo rechazamos igual.
+
+    La categoría y el resultado son los dos campos con los que `severidad.piso_de` decide. Faltaban
+    en el contexto, y en la segunda corrida contra datos reales las cuatro autenticaciones exitosas
+    salieron como 'bajo' con su reproche: el modelo veía "authentication" sin saber si había
+    prosperado, y elegía el nivel más bajo, que es exactamente lo que el pedido le indica ante la
+    duda. Le pedíamos un número que dependía de un dato que le escondíamos.
+    """
+    s = _ServicioFalso()
+    estado = _estado(
+        contexto=Contexto(
+            doc_id="abc123",
+            resumen="cowrie/authentication 198.51.100.77 ssh · root",
+            categoria="authentication",
+            resultado="success",
+            sensor="cowrie",
+            protocolo="ssh",
+            origen="198.51.100.77",
+            usuario="root",
+            momento="2026-09-09T10:00:00Z",
+        )
+    )
+    nodo.consultar(estado, servicio=s)
+
+    assert "categoria: authentication" in s.usuario
+    assert "resultado: success" in s.usuario
+
+
+def test_lo_que_el_pedido_muestra_alcanza_para_derivar_el_piso() -> None:
+    """Con la categoría y el resultado a la vista, el piso deja de ser una adivinanza.
+
+    Se comprueba contra la escala de verdad y no contra una lista escrita acá, para que un cambio
+    en `severidad` no deje esta prueba pasando sobre algo que ya no es cierto.
+    """
+    for categoria, resultado in [
+        ("authentication", "success"),
+        ("authentication", "failure"),
+        ("process", ""),
+        ("file", ""),
+    ]:
+        s = _ServicioFalso()
+        nodo.consultar(
+            _estado(
+                contexto=Contexto(
+                    doc_id="abc123", resumen="x", categoria=categoria, resultado=resultado
+                )
+            ),
+            servicio=s,
+        )
+        assert f"categoria: {categoria}" in s.usuario
+        # El piso que la escala deriva de ese par tiene que estar nombrado en la escala publicada.
+        assert piso_de(categoria, resultado).value in s.sistema

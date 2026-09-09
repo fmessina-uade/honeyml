@@ -98,6 +98,8 @@ def _pedido(estado: EstadoTriaje) -> str:
     campos = {
         "identificador": ctx.doc_id,
         "resumen": ctx.resumen,
+        "categoria": ctx.categoria,
+        "resultado": ctx.resultado,
         "sensor": ctx.sensor,
         "protocolo": ctx.protocolo,
         "direccion_de_origen": ctx.origen,

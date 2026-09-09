@@ -91,6 +91,8 @@ def construir(estado: EstadoTriaje) -> EstadoTriaje:
         "contexto": Contexto(
             doc_id=evento.doc_id,
             resumen=evento.resumen(),
+            categoria=evento.category,
+            resultado=evento.outcome,
             sensor=evento.honeypot,
             protocolo=evento.protocol,
             origen=evento.source_ip,

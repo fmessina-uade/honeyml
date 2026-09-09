@@ -75,6 +75,13 @@ class Contexto(BaseModel):
 
     doc_id: str
     resumen: str = Field(description="el evento en una línea")
+    # La categoría y el resultado son los dos campos de los que la escala deriva el piso, así que
+    # sin ellos el modelo no lo puede calcular. Faltaban, y se notó midiendo: toda autenticación
+    # exitosa venía como `bajo` y se llevaba un reproche, porque el modelo veía "authentication" sin
+    # saber si había prosperado y elegía el nivel más bajo, que es lo que el propio pedido le pide
+    # ante la duda.
+    categoria: str = ""
+    resultado: str = ""
     sensor: str = ""
     protocolo: str = ""
     origen: str = ""

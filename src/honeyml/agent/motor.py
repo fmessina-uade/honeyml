@@ -167,7 +167,10 @@ def main() -> int:
         stream=args.stream,
         grupo=args.grupo,
         nombre=args.nombre,
-        lote=args.lote,
+        # Con `--limite 5` y un lote de diez, el consumidor leía diez y confirmaba cinco: los otros
+        # cinco quedaban entregados sin confirmar y había que esperar la ventana de reclamo para
+        # que otro los tomara. Se ve en la corrida siguiente como cinco huérfanos reclamados.
+        lote=min(args.lote, args.limite) if args.limite else args.lote,
     )
 
     try:
