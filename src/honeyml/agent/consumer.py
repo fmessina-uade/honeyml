@@ -4,8 +4,8 @@ Todo lo que viene después (contexto, recuperación, inferencia, validación, pe
 eventos de acá y nunca habla con el bus.
 
 El contrato del manejador es una sola regla: si levanta una excepción el evento no se confirma y
-vuelve, y si retorna, la decisión es durable y se confirma. Nada más. Eso permitió que los nodos del
-grafo se enchufaran después sin tocar una línea de este módulo.
+vuelve, y si retorna, la decisión es durable y se confirma. Nada más. Eso permitió que el grafo se
+enchufara después sin tocar una línea de este módulo: quien los une es `motor.py`.
 
 Hay cuatro problemas resueltos a propósito, y los cuatro son silenciosos si no se los atiende.
 
@@ -403,11 +403,14 @@ class ConsumidorDelBus:
 
 
 def manejador_de_registro(evento: EventoDelBus) -> None:
-    """Manejador por defecto: imprime el evento y lo da por resuelto.
+    """Manejador de inspección: imprime el evento y lo da por resuelto, sin clasificarlo.
 
-    Es un relleno con una razón de ser: ejercita el ciclo de confirmación completo sin depender de
-    un proveedor de inferencia, así el consumidor se puede verificar solo. El grafo de triaje lo
-    reemplaza sin que cambie nada más de este módulo.
+    El que tría es el de `motor.py`, que corre el grafo. Este queda porque sigue siendo útil: mira
+    qué está llegando al bus sin gastar una sola llamada paga, que es justo lo que uno quiere cuando
+    está revisando el pipeline y no el motor.
+
+    Sirvió además para verificar el ciclo de confirmación entero antes de que existiera un solo
+    nodo, y esa parte no cambió ni una línea de este módulo al enchufar el grafo.
     """
     print(f"  · {evento.resumen()}")
 

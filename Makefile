@@ -1,5 +1,5 @@
 .PHONY: help up down logs status ps clean deploy-vps dev-up dev-down dev-logs validate lint test \
-        test-integration consumer arquetipos \
+        test-integration consumer triaje grafo arquetipos \
         api dash replays \
         elastic-up elastic-down elastic-logs elastic-dev-up elastic-dev-down elastic-dev-logs \
         es-bootstrap validate-indexing pull-logs
@@ -260,6 +260,19 @@ bus-status:
 #   make consumer            make consumer LIMITE=20
 consumer:
 	@./.venv/bin/python -m honeyml.agent.consumer $(if $(LIMITE),--limite $(LIMITE),)
+
+# El motor completo: consume el bus, tría cada evento por el grafo y persiste la decisión. Necesita
+# el stack y el bus arriba, y la credencial del proveedor de inferencia exportada.
+#
+# Con LIMITE=N tría N eventos y sale, que es la forma de probarlo sin quedarse escuchando y sin
+# gastar más llamadas pagas de las que uno quería.
+# Antes de arrancar informa el atraso del grupo y lo que costaría triarlo. Si son más de dos mil
+# eventos y no se pidió un límite, no arranca: el bus llegó a tener 52.165 mensajes acumulados, que
+# son entre siete y quince dólares de inferencia, y eso no se gasta sin pedirlo.
+#   make triaje LIMITE=5      prueba con cinco eventos
+#   make triaje TODO=1        tría el atraso completo
+triaje:
+	@./.venv/bin/python -m honeyml.agent.motor $(if $(LIMITE),--limite $(LIMITE),) $(if $(TODO),--todo,)
 
 # Topología del motor de triaje y qué nodo tiene implementación hoy.
 grafo:
