@@ -9,7 +9,7 @@ desarrollo, y cuando vuelva a pasar lo que se reescribe es este archivo.
 
 La política de selección es barato primero, capaz al reintentar:
 
-    intento 0        openai/gpt-oss-20b     mitad de precio, el doble de velocidad
+    intento 0        openai/gpt-oss-20b     la mitad de precio
     intento 1 y +    openai/gpt-oss-120b    el que razona mejor
 
 Escala al reintentar y no al revés porque un reintento existe justamente porque la anterior no se

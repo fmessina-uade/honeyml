@@ -17,6 +17,7 @@ from typing import Any
 from honeyml.agent.adapters.inferencia import Respuesta
 from honeyml.agent.nodes import inferencia as nodo
 from honeyml.agent.state import Contexto
+from honeyml.education.annotations import TACTICAS_OBSERVABLES
 
 
 class _ServicioFalso:
@@ -212,3 +213,32 @@ def test_los_hallazgos_llegan_legibles() -> None:
     nodo.consultar(_estado(), servicio=s)
     assert "maximo_alcanzado" in s.usuario
     assert json.dumps({"a": "á"}, ensure_ascii=False) == '{"a": "á"}'  # sin escapes
+
+
+# ---- el vocabulario que el motor exige tiene que estar en el pedido ------------------------------
+
+
+def test_el_pedido_publica_las_tacticas_admitidas() -> None:
+    """Si el motor exige un vocabulario cerrado, tiene que decirlo. No decirlo cuesta plata.
+
+    En la primera corrida contra datos reales los cinco eventos necesitaron un reintento, y los
+    cinco por lo mismo: el modelo contestó 'Execution' y 'Credential Access', que son los nombres
+    canónicos de MITRE, y la validación exigía las etiquetas en español del panel sin habérselas
+    dicho nunca. Una llamada paga de más por evento, por un dato que estaba de nuestro lado.
+    """
+    s = _ServicioFalso()
+    nodo.consultar(_estado(), servicio=s)
+
+    for tactica in TACTICAS_OBSERVABLES:
+        assert tactica in s.sistema, f"'{tactica}' no viaja en el mensaje de sistema"
+    assert "nulo" in s.sistema  # y que puede no aplicar ninguna
+
+
+def test_lo_que_se_publica_es_lo_que_la_validacion_exige() -> None:
+    """Las dos listas tienen que salir de la misma constante, o vuelven a divergir en silencio."""
+    s = _ServicioFalso()
+    nodo.consultar(_estado(), servicio=s)
+
+    inventada = "Movimiento lateral"
+    assert inventada not in s.sistema
+    assert inventada not in TACTICAS_OBSERVABLES

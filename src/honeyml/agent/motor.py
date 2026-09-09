@@ -47,9 +47,13 @@ from .state import EstadoTriaje, estado_inicial, resultado_del_ciclo
 # por accidente.
 TOPE_SIN_CONFIRMAR = 2000
 
-# Tokens de una llamada típica, medidos sobre el corpus. Sirven para estimar el gasto antes de
-# arrancar, no para contabilizarlo: lo real lo lleva el adaptador y queda en cada decisión.
-TOKENS_TIPICOS = (1200, 180)
+# Tokens de una llamada típica. Sirven para estimar el gasto antes de arrancar, no para
+# contabilizarlo: lo real lo lleva el adaptador y queda guardado en cada decisión.
+#
+# Salen de la primera corrida contra datos reales, no de una cuenta a ojo. Estaban en (1200, 180) y
+# la estimación daba menos de la mitad de lo que el motor gasta de verdad, que para una guardia
+# pensada justamente para avisar antes de gastar es el error que peor viene.
+TOKENS_TIPICOS = (2545, 980)
 
 
 def compilar(servicio: ServicioDeInferencia | None = None, almacen: Almacen | None = None) -> Any:

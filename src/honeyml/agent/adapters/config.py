@@ -25,8 +25,12 @@ ARCHIVO_ENV = Path(".env")
 # campaña de validación sería la segunda sustitución forzada del proyecto.
 MODELO_POR_DEFECTO = "openai/gpt-oss-120b"
 
-# Para tandas masivas o si aparecen límites de tasa: mitad de precio, el doble de velocidad y el
-# mismo modo estricto. La política que elige entre los dos está en `servicio.py`.
+# Para tandas masivas o si aparecen límites de tasa: la mitad de precio y el mismo modo estricto.
+# La política que elige entre los dos está en `servicio.py`.
+#
+# Decía además que era el doble de velocidad, y la primera medición contra datos reales dio lo
+# contrario: 13,6 segundos por llamada contra 1,5 del modelo grande. Son cinco llamadas de cada uno,
+# muy poco para concluir algo, pero alcanza para no seguir afirmando lo que no se midió.
 MODELO_ALTERNATIVO = "openai/gpt-oss-20b"
 
 BASE_URL_POR_DEFECTO = "https://api.groq.com/openai/v1"
