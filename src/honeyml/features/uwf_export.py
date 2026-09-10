@@ -365,11 +365,17 @@ def main() -> None:
         if ranking
         else None,
         "segundos_entrenamiento": round(segundos_ajuste, 1),
-        "limitacion_declarada": (
+        "limitaciones_declaradas": [
+            "dest_port_zeek se lleva 0,439 de la importancia por permutación, y entrenado con esa "
+            "columna sola el modelo saca 0,634 de F1 macro contra 0,878 con las quince. Buena "
+            "parte de eso es cómo estaba montado el laboratorio y no una regularidad del ataque: "
+            "el puerto 4848 aporta 871.186 filas y todas son Credential Access, el 53 aporta "
+            "943.766 y ninguna es maliciosa. Entre los dos son el 96 % del corpus. En una red "
+            "donde esos puertos no signifiquen lo mismo, el número no se sostiene.",
             f"{WEAK_CLASS} tiene 559 observaciones en 1,9 millones (0,029 %). El techo lo pone la "
             "cantidad de ejemplos, no la configuración: la búsqueda de hiperparámetros lo confirmó "
-            "con un resultado negativo."
-        ),
+            "con un resultado negativo.",
+        ],
     }
 
     CARD_FILE.write_text(json.dumps(tarjeta, indent=2, ensure_ascii=False), encoding="utf-8")
