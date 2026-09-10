@@ -29,16 +29,33 @@ ES_URL = "http://localhost:9200"
 INDEX = "honeypot-*"
 OUT_FILE = Path("data/processed/password_index.json")
 PREFIX_LEN = 5
-# cuántas contraseñas distintas se traen; en las capturas hay unas 54.000
-MAX_TERMS = 100_000
+
+# Cuántas contraseñas distintas se piden por página.
+#
+# Antes esto era un `terms` con `size` 100.000 y una sola consulta. Funcionó mientras hubo unas
+# 54.000 distintas y se rompió cuando pasamos las 90.000: Elasticsearch corta en 65.536 cubos y
+# devuelve 400, así que el refresh venía fallando entero en este paso. Un `composite` pagina y no
+# tiene ese techo, que es lo que hace falta acá porque la cantidad solo va a seguir creciendo.
+POR_PAGINA = 10_000
+
+# Cuántas páginas se aceptan antes de cortar. Con el tamaño de arriba son cinco millones de
+# contraseñas distintas, muy por encima de cualquier cosa que estos sensores puedan capturar. Está
+# para que un error de paginación no deje el proceso girando para siempre.
+MAX_PAGINAS = 500
 
 
-def fetch_passwords(es_url: str = ES_URL) -> list[tuple[str, int]]:
-    """Cada contraseña distinta capturada, con cuántas veces se intentó."""
+def _pagina(es_url: str, despues: dict[str, Any] | None) -> dict[str, Any]:
+    """Una página del agregado compuesto, desde donde haya quedado la anterior."""
+    compuesto: dict[str, Any] = {
+        "sources": [{"clave": {"terms": {"field": "cowrie.password"}}}],
+        "size": POR_PAGINA,
+    }
+    if despues is not None:
+        compuesto["after"] = despues
     body = {
         "size": 0,
         "query": {"bool": {"must_not": [{"term": {"source.ip": "127.0.0.1"}}]}},
-        "aggs": {"p": {"terms": {"field": "cowrie.password", "size": MAX_TERMS}}},
+        "aggs": {"p": {"composite": compuesto}},
     }
     req = urllib.request.Request(
         f"{es_url}/{INDEX}/_search",
@@ -47,8 +64,25 @@ def fetch_passwords(es_url: str = ES_URL) -> list[tuple[str, int]]:
         method="POST",
     )
     with urllib.request.urlopen(req, timeout=300) as resp:
-        buckets = json.load(resp)["aggregations"]["p"]["buckets"]
-    return [(b["key"], b["doc_count"]) for b in buckets]
+        datos: dict[str, Any] = json.load(resp)
+    agregado: dict[str, Any] = datos["aggregations"]["p"]
+    return agregado
+
+
+def fetch_passwords(es_url: str = ES_URL) -> list[tuple[str, int]]:
+    """Cada contraseña distinta capturada, con cuántas veces se intentó."""
+    encontradas: list[tuple[str, int]] = []
+    despues: dict[str, Any] | None = None
+    for _ in range(MAX_PAGINAS):
+        agregado = _pagina(es_url, despues)
+        cubos = agregado.get("buckets") or []
+        encontradas += [(str(b["key"]["clave"]), int(b["doc_count"])) for b in cubos]
+        despues = agregado.get("after_key")
+        # Sin `after_key` no hay más páginas. El corte por página incompleta no sirve: la última
+        # puede venir llena y `after_key` es lo único que dice si quedó algo atrás.
+        if despues is None or not cubos:
+            break
+    return encontradas
 
 
 def build(es_url: str = ES_URL) -> dict[str, Any]:
