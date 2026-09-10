@@ -1,5 +1,5 @@
 .PHONY: help up down logs status ps clean deploy-vps dev-up dev-down dev-logs validate lint test \
-        test-integration consumer triaje grafo arquetipos \
+        test-integration consumer triaje grafo arquetipos modelo evaluacion \
         api dash replays \
         elastic-up elastic-down elastic-logs elastic-dev-up elastic-dev-down elastic-dev-logs \
         es-bootstrap validate-indexing pull-logs
@@ -286,6 +286,13 @@ severidad:
 # Tarda unos dos minutos: la parte lenta son las probabilidades fuera de muestra del umbral.
 modelo:
 	@./.venv/bin/python -m honeyml.features.uwf_export
+
+# Las tres preguntas que la comparación y el ajuste no contestan: si el modelo le gana a un
+# clasificador trivial, adónde se equivoca, y cuánto se mueve el resultado al cambiar la partición.
+# Ajusta seis veces sobre 1,4 millones de filas, así que tarda unos minutos.
+#   make evaluacion RAPIDO=1     submuestreado, para validar el armado
+evaluacion:
+	@./.venv/bin/python -m honeyml.features.uwf_evaluacion $(if $(RAPIDO),--rapido,)
 
 # Un solo comando para todo el ciclo de datos: bajar registros frescos de los sensores, esperar a
 # que el pipeline los ingiera, y regenerar todos los artefactos derivados. Reemplaza correr cinco

@@ -367,8 +367,8 @@ def main() -> None:
         "segundos_entrenamiento": round(segundos_ajuste, 1),
         "limitacion_declarada": (
             f"{WEAK_CLASS} tiene 559 observaciones en 1,9 millones (0,029 %). El techo lo pone la "
-            "cantidad de ejemplos, no la configuración: la búsqueda de hiperparámetros de la fila "
-            "89 lo confirmó con un resultado negativo."
+            "cantidad de ejemplos, no la configuración: la búsqueda de hiperparámetros lo confirmó "
+            "con un resultado negativo."
         ),
     }
 

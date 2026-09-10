@@ -145,12 +145,11 @@ def evaluate(
     }
 
 
-def cargar_y_partir() -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
-    """Carga el conjunto de referencia y lo parte, siempre de la misma forma.
+def cargar() -> tuple[pd.DataFrame, pd.Series]:
+    """El conjunto de referencia con las columnas que se modelan, todavía sin partir.
 
-    Se extrajo acá para que el ajuste de hiperparámetros entrene y mida sobre exactamente la misma
-    partición que esta comparación. Si cada módulo armara la suya, una mejora aparente podría ser
-    nada más una partición de prueba más fácil, y desde los números no habría manera de notarlo.
+    Se separó de `cargar_y_partir` para el análisis de dispersión, que necesita repartir el mismo
+    conjunto con varias semillas. Leer los parquet una vez por semilla sería tiempo tirado.
     """
     df = load_uwf()
     x, y = features_target(df)
@@ -158,12 +157,32 @@ def cargar_y_partir() -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]
     for c in ("local_orig", "local_resp"):
         if c in x.columns:
             x[c] = x[c].astype(int)
+    return x, y
 
+
+def partir(
+    x: pd.DataFrame, y: pd.Series, semilla: int = RANDOM_STATE
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
+    """Parte estratificado, un cuarto para prueba.
+
+    La semilla es parámetro solo para medir cuánto se mueve el resultado al cambiarla. Todo lo que
+    informa métricas usa la de siempre, o dejarían de ser comparables entre módulos.
+    """
     # train_test_split no está tipada: devuelve una lista sin anotar. El cast declara la forma que
     # el llamador puede confiar (cuatro objetos, en el orden entrenamiento/prueba de x y después de
     # y) en lugar de dejar que se propague un Any por todo el módulo de ajuste.
-    partes = train_test_split(x, y, test_size=0.25, stratify=y, random_state=RANDOM_STATE)
+    partes = train_test_split(x, y, test_size=0.25, stratify=y, random_state=semilla)
     return cast("tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]", tuple(partes))
+
+
+def cargar_y_partir() -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
+    """Carga el conjunto de referencia y lo parte, siempre de la misma forma.
+
+    Se extrajo acá para que el ajuste de hiperparámetros entrene y mida sobre exactamente la misma
+    partición que esta comparación. Si cada módulo armara la suya, una mejora aparente podría ser
+    nada más una partición de prueba más fácil, y desde los números no habría manera de notarlo.
+    """
+    return partir(*cargar())
 
 
 def main() -> None:
