@@ -127,6 +127,13 @@ class EstadoTriaje(TypedDict, total=False):
     # intentos se gastaron, y contar reproches daba por agotado el presupuesto en la primera vuelta.
     rechazos: Annotated[int, operator.add]
     motivo_de_corte: MotivoDeCorte
+    # La firma de conducta del evento, calculada por el primer nodo. Viaja en el estado porque la
+    # calcula uno y la usan dos: el nodo de memoria para buscar y el de persistencia para registrar.
+    firma: str
+    # El `doc_id` del evento cuya decisión se copió, cuando la firma ya estaba resuelta. Vacío o
+    # ausente quiere decir que esta decisión se razonó. Es lo que separa una cosa de la otra en el
+    # registro, así que se guarda en el documento y no solo en el estado.
+    reutilizada_de: str
 
 
 def estado_inicial(evento: EventoDelBus) -> EstadoTriaje:

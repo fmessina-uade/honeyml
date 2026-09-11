@@ -28,6 +28,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from ..adapters.almacen import Almacen, AlmacenElastic
+from ..adapters.repertorio import Repertorio
 from ..severidad import piso, techo
 from ..state import EstadoTriaje, resultado_del_ciclo
 
@@ -96,12 +97,22 @@ def documento(estado: EstadoTriaje) -> dict[str, Any]:
             "intentos": int(estado.get("intentos", 0)),
             "rechazos": int(estado.get("rechazos", 0)),
             "reproches": list(estado.get("reproches") or [])[:MAX_REPROCHES_GUARDADOS],
+            # La firma agrupa los eventos de la misma conducta, y `reutilizada_de` dice de cuál se
+            # copió esta decisión. Vacío quiere decir que se razonó. Con los dos campos, el panel
+            # cuenta a cuántos eventos cubre cada decisión con una sola agregación, y cualquiera
+            # puede verificar que una copia coincide con su original.
+            "firma": estado.get("firma") or None,
+            "reutilizada_de": estado.get("reutilizada_de") or None,
         },
         "modelo": estado.get("consumo") or {},
     }
 
 
-def guardar(estado: EstadoTriaje, almacen: Almacen | None = None) -> EstadoTriaje:
+def guardar(
+    estado: EstadoTriaje,
+    almacen: Almacen | None = None,
+    repertorio: Repertorio | None = None,
+) -> EstadoTriaje:
     """Persiste la decisión. Levanta si el almacén no responde, para que el evento no se pierda.
 
     `almacen` se inyecta igual que el servicio de inferencia: así el nodo se prueba sin levantar el
@@ -115,4 +126,30 @@ def guardar(estado: EstadoTriaje, almacen: Almacen | None = None) -> EstadoTriaj
 
     destino = almacen or AlmacenElastic()
     destino.guardar(evento.doc_id, documento(estado))
+    _registrar_la_firma(estado, repertorio)
     return {}
+
+
+def _registrar_la_firma(estado: EstadoTriaje, repertorio: Repertorio | None) -> None:
+    """Anota la conducta como resuelta, recién después de que la decisión quedó guardada.
+
+    El orden importa y es el mismo que usa el consumidor para la deduplicación: la marca se escribe
+    después del éxito y nunca antes. Al revés, un almacén que falla dejaría la firma apuntando a una
+    decisión que no se persistió, y las miles de repeticiones que vienen detrás copiarían de un
+    documento inexistente.
+
+    Solo se registran las concluyentes. Una decisión que no pasó la validación describe un ciclo que
+    salió mal, no una conducta resuelta: propagarla le pondría el mismo fracaso a las 6.588
+    repeticiones de la firma en lugar de darles otra oportunidad.
+
+    Y no se re-registra lo que ya vino del repertorio: el `doc_id` de origen tiene que seguir siendo
+    el del evento que efectivamente se razonó, o la cadena de auditoría apunta a una copia.
+    """
+    if repertorio is None or estado.get("reutilizada_de"):
+        return
+    firma = estado.get("firma")
+    decision = estado.get("decision")
+    if not firma or decision is None or resultado_del_ciclo(estado) is not None:
+        return
+    evento = estado["evento"]
+    repertorio.registrar(firma, decision.model_dump(mode="json"), evento.doc_id)

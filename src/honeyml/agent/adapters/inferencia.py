@@ -88,6 +88,17 @@ AGENTE = "honeyml/0.1 (+https://www.honeyml.com.ar)"
 # mandan a revisar cosas distintas.
 CODIGO_AGENTE_BLOQUEADO = "1010"
 
+# El proveedor devuelve este código, con un 400, cuando su decodificación restringida no logró
+# producir una respuesta que cumpla el esquema. Parece un pedido mal armado y no lo es: sobre una
+# tanda de treinta eventos falló en cuatro, y los cuatro pasaron al reintentarlos tal cual, sin
+# cambiarles una coma. Es una falla pasajera del proveedor.
+#
+# Importa clasificarlo bien. Como rechazo, el evento salía del grafo sin confirmar y había que
+# esperar los diez minutos de la ventana de reclamo para que otro consumidor lo tomara; a razón de
+# uno de cada ocho eventos, eso convierte una puesta al día en una espera. Como pasajero, se
+# reintenta en el acto y el evento sigue.
+CODIGO_ESQUEMA_NO_CUMPLIDO = "json_validate_failed"
+
 AYUDA_CERTIFICADOS = (
     "TLS falló al verificar el certificado del proveedor. No es que el proveedor no responda: "
     "este intérprete de Python no tiene instalado su paquete de certificados raíz.\n"
@@ -269,6 +280,8 @@ class ClienteDeInferencia:
                 raise _LimiteDeTasaError(exc.headers.get("retry-after")) from exc
             if 500 <= exc.code < 600:
                 raise _TransitorioError(f"HTTP {exc.code}") from exc
+            if exc.code == 400 and CODIGO_ESQUEMA_NO_CUMPLIDO in detalle:
+                raise _TransitorioError(f"HTTP 400, {CODIGO_ESQUEMA_NO_CUMPLIDO}") from exc
             # Un 403 con el código 1010 no lo emite el proveedor sino el borde que tiene adelante,
             # y culpar a la credencial, que es lo que hacía esta rama antes, manda a revisar algo
             # que está bien. Los dos rechazos se ven casi iguales y se arreglan de forma opuesta.

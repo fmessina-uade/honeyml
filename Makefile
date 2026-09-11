@@ -269,10 +269,16 @@ consumer:
 # Antes de arrancar informa el atraso del grupo y lo que costaría triarlo. Si son más de dos mil
 # eventos y no se pidió un límite, no arranca: el bus llegó a tener 52.165 mensajes acumulados, que
 # son entre siete y quince dólares de inferencia, y eso no se gasta sin pedirlo.
-#   make triaje LIMITE=5      prueba con cinco eventos
-#   make triaje TODO=1        tría el atraso completo
+#
+# Con REUTILIZAR=1 copia la decisión cuando otro evento ya resolvió la misma conducta (mismo sensor,
+# categoría, acción, resultado, usuario y comando). Sobre el atraso acumulado son 2.088 conductas
+# distintas en 71.654 eventos, o sea que el 97 % se resuelve sin pagar una llamada. Cada documento
+# dice de qué decisión copió, así que la reutilización es auditable y no un atajo escondido.
+#   make triaje LIMITE=5                prueba con cinco eventos
+#   make triaje LIMITE=200 REUTILIZAR=1 pone a prueba la reutilización sobre una tanda
+#   make triaje TODO=1 REUTILIZAR=1     tría el atraso completo
 triaje:
-	@./.venv/bin/python -m honeyml.agent.motor $(if $(LIMITE),--limite $(LIMITE),) $(if $(TODO),--todo,)
+	@./.venv/bin/python -m honeyml.agent.motor $(if $(LIMITE),--limite $(LIMITE),) $(if $(TODO),--todo,) $(if $(REUTILIZAR),--reutilizar,)
 
 # Topología del motor de triaje y qué nodo tiene implementación hoy.
 grafo:

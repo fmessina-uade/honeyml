@@ -10,6 +10,7 @@ Lo que se fija acá son las tres propiedades que, si se rompen, se rompen en sil
 
 from __future__ import annotations
 
+import io
 import json
 import ssl
 import urllib.error
@@ -311,3 +312,71 @@ def test_una_respuesta_sin_contenido_se_reporta_como_defecto() -> None:
     cliente, _ = _cliente_con([{"choices": []}])
     with pytest.raises(inferencia.PedidoRechazadoError):
         cliente.completar("s", "u", {"type": "object"})
+
+
+def test_el_esquema_no_cumplido_es_pasajero_y_se_reintenta(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Un 400 con `json_validate_failed` se reintenta en el acto, no se devuelve el evento al bus.
+
+    Lo medimos: sobre treinta eventos falló en cuatro, y los cuatro pasaron al reintentarlos sin
+    cambiarles nada. Clasificado como rechazo, cada uno costaba los diez minutos de la ventana de
+    reclamo antes de que otro consumidor lo tomara.
+    """
+    cli = inferencia.ClienteDeInferencia(
+        config=ConfigInferencia(api_key="k", modelo="m", base_url="http://x", timeout=1)
+    )
+    llamadas: list[int] = []
+    bueno = {"choices": [{"message": {"content": "{}"}}], "usage": {}}
+
+    class Respuesta:
+        def read(self) -> bytes:
+            return json.dumps(bueno).encode()
+
+        def __enter__(self) -> Respuesta:
+            return self
+
+        def __exit__(self, *_a: Any) -> None:
+            return None
+
+    def falla_una_vez(*_a: Any, **_k: Any) -> Any:
+        # Se parchea `urlopen` y no `_postear` a propósito: lo que se prueba es la clasificación del
+        # error, y vive adentro de `_postear`.
+        llamadas.append(1)
+        if len(llamadas) == 1:
+            raise urllib.error.HTTPError(
+                "http://x",
+                400,
+                "Bad Request",
+                {},  # type: ignore[arg-type]
+                io.BytesIO(
+                    b'{"error":{"code":"' + inferencia.CODIGO_ESQUEMA_NO_CUMPLIDO.encode() + b'"}}'
+                ),
+            )
+        return Respuesta()
+
+    monkeypatch.setattr(inferencia.urllib.request, "urlopen", falla_una_vez)
+    monkeypatch.setattr(inferencia.time, "sleep", lambda _s: None)
+
+    assert cli._con_reintentos({}) == bueno
+    assert len(llamadas) == 2
+
+
+def test_un_400_cualquiera_sigue_siendo_un_rechazo(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Solo ese código es pasajero. Un pedido mal armado de verdad no se reintenta tres veces."""
+    cli = inferencia.ClienteDeInferencia(
+        config=ConfigInferencia(api_key="k", modelo="m", base_url="http://x", timeout=1)
+    )
+
+    def rechaza(*_a: Any, **_k: Any) -> Any:
+        raise urllib.error.HTTPError(
+            "http://x",
+            400,
+            "Bad Request",
+            {},  # type: ignore[arg-type]
+            io.BytesIO(b'{"error":{"code":"model_not_found"}}'),
+        )
+
+    monkeypatch.setattr(inferencia.urllib.request, "urlopen", rechaza)
+    with pytest.raises(inferencia.PedidoRechazadoError):
+        cli._postear({})

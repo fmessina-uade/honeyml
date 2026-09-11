@@ -107,7 +107,7 @@ def test_sin_contexto_saltea_la_inferencia() -> None:
     )
 
 
-def test_el_grafo_recorre_los_cinco_nodos_con_implementaciones_de_prueba() -> None:
+def test_el_grafo_recorre_todos_los_nodos_con_implementaciones_de_prueba() -> None:
     visitados: list[str] = []
 
     def falso(nombre: str, devuelve: dict[str, Any]) -> graph.Nodo:
@@ -119,6 +119,9 @@ def test_el_grafo_recorre_los_cinco_nodos_con_implementaciones_de_prueba() -> No
 
     compilado = graph.construir_grafo(
         {
+            # Sin decisión: el camino largo es el que tiene que recorrer todos los nodos. Un falso
+            # que devolviera una decisión saltearía cinco de ellos y la prueba pasaría igual.
+            graph.MEMORIA: falso(graph.MEMORIA, {"firma": "abc123"}),
             graph.CONTEXTO: falso(graph.CONTEXTO, {"contexto": Contexto(doc_id="a", resumen="b")}),
             graph.HISTORIAL: falso(graph.HISTORIAL, {}),
             graph.INFERENCIA: falso(graph.INFERENCIA, {"borrador": {}}),
@@ -349,7 +352,11 @@ def test_la_ventana_de_reclamo_cubre_el_ciclo_completo() -> None:
 
 def test_el_techo_de_pasos_sale_de_la_topologia() -> None:
     """Que sea derivado y no un número a ojo es lo que lo mantiene correcto si cambia el margen."""
-    assert graph.LIMITE_DE_PASOS == 2 + 2 * (MAX_INTENTOS + 2) + 1
+    assert graph.LIMITE_DE_PASOS == 3 + 2 * (MAX_INTENTOS + 2) + 1
+
+    # Y que le alcance para el camino más largo de verdad, que es la razón de que exista: los tres
+    # nodos lineales, un par (inferencia, validación) por intento, y persistencia.
+    assert graph.LIMITE_DE_PASOS >= 3 + 2 * MAX_INTENTOS + 1
 
 
 # ---- nodo de contexto ---------------------------------------------------------------------

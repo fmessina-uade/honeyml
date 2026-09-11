@@ -46,7 +46,9 @@
             "motivo_de_corte": { "type": "keyword" },
             "intentos": { "type": "integer" },
             "rechazos": { "type": "integer" },
-            "reproches": { "type": "text" }
+            "reproches": { "type": "text" },
+            "firma": { "type": "keyword" },
+            "reutilizada_de": { "type": "keyword" }
           }
         },
         "modelo": {

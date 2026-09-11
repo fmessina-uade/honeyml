@@ -38,4 +38,18 @@ echo "==> Plantilla aplicada. Verificación:"
 curl -sf "${ES_URL}/_index_template/honeyml-decisiones" \
   | python3 -c "import sys,json; t=json.load(sys.stdin)['index_templates'][0]; print('    nombre:', t['name']); print('    patrones:', t['index_template']['index_patterns']); print('    dinamico:', t['index_template']['template']['mappings']['dynamic'])"
 
+# Una plantilla solo alcanza a los índices que se crean después, así que sobre uno que ya existe no
+# hace nada. Con `dynamic: strict` eso no se nota hasta que el motor manda un campo nuevo y
+# Elasticsearch rechaza el documento, con el evento ya sacado del bus. Agregar campos a un mapeo
+# vivo sí está permitido; cambiar el tipo de uno existente no, y ahí conviene que falle fuerte.
+if curl -sf -o /dev/null "${ES_URL}/honeyml-decisiones"; then
+  echo "==> El índice honeyml-decisiones ya existe: sincronizando su mapeo ..."
+  python3 -c "import sys,json; print(json.dumps({'properties': json.load(open(sys.argv[1]))['template']['mappings']['properties']}))" \
+    "${TEMPLATE_DECISIONES}" \
+    | curl -sf -X PUT "${ES_URL}/honeyml-decisiones/_mapping" \
+        -H 'Content-Type: application/json' --data-binary @- >/dev/null \
+    || { echo "ERROR: el mapeo del índice vivo no admite la plantilla actual." >&2; exit 1; }
+  echo "    mapeo al día."
+fi
+
 echo "==> Bootstrap completo."

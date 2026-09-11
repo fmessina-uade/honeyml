@@ -1,12 +1,18 @@
 """El grafo de triaje: qué nodos hay, en qué orden corren y dónde el ciclo puede volver atrás.
 
-    contexto -> historial -> inferencia -> validación --(válida)---> persistencia -> fin
-        |                        ^             |                          ^
-        |                        +--(reproche)-+   hasta MAX_INTENTOS     |
-        +--(sin dirección de origen, nada que correlacionar)--------------+
+    memoria -> contexto -> historial -> inferencia -> validación --(válida)--> persistencia -> fin
+       |          |                        ^             |                         ^
+       |          |                        +--(reproche)-+   hasta MAX_INTENTOS    |
+       |          +--(sin dirección de origen, nada que correlacionar)-------------+
+       +--(esta conducta ya se decidió antes)--------------------------------------+
 
-Es una máquina de estados y no una cadena por una sola arista: la validación puede devolverle la
-respuesta al nodo de inferencia con el error adjunto. Todo lo demás es una línea recta.
+Es una máquina de estados y no una cadena por dos aristas: la validación puede devolverle la
+respuesta al nodo de inferencia con el error adjunto, y hay dos atajos que saltan a persistencia sin
+pasar por el proveedor. Todo lo demás es una línea recta.
+
+Los dos atajos se parecen y no son lo mismo. El de contexto corta porque no hay nada sobre lo que
+razonar y guarda una decisión no concluyente. El de memoria corta porque ya se razonó sobre esta
+misma conducta y guarda una decisión concluyente, copiada y declarada como tal.
 
 La parte que más cuesta ver leyendo el código es que hay dos formas de fallar y terminan distinto.
 Si el proveedor contestó pero nunca con la forma pedida, después de MAX_INTENTOS se persiste una
@@ -26,6 +32,7 @@ from langgraph.graph import END, StateGraph
 from .nodes import contexto as nodo_contexto
 from .nodes import historial as nodo_historial
 from .nodes import inferencia as nodo_inferencia
+from .nodes import memoria as nodo_memoria
 from .nodes import persistencia as nodo_persistencia
 from .nodes import validacion as nodo_validacion
 from .state import MAX_INTENTOS, EstadoTriaje, decision_utilizable
@@ -34,6 +41,7 @@ from .state import MAX_INTENTOS, EstadoTriaje, decision_utilizable
 # entraban claves inventadas que LangGraph después descarta en silencio.
 Nodo = Callable[[EstadoTriaje], EstadoTriaje]
 
+MEMORIA = "memoria"
 CONTEXTO = "contexto"
 HISTORIAL = "historial"
 INFERENCIA = "inferencia"
@@ -43,6 +51,7 @@ PERSISTENCIA = "persistencia"
 # Qué hace cada nodo, en una línea. Está acá porque es lo que vuelve accionable el error cuando
 # falta una implementación: el mensaje dice qué falta escribir.
 RESPONSABILIDAD: dict[str, str] = {
+    MEMORIA: "calcula la firma de conducta y trae la decisión si esa firma ya se resolvió",
     CONTEXTO: "arma el contexto del evento a partir de las consultas de solo lectura",
     HISTORIAL: "agrega la trayectoria de la dirección y la correlación de ráfaga",
     INFERENCIA: "le pide al servicio de inferencia una decisión sobre el contexto",
@@ -50,13 +59,13 @@ RESPONSABILIDAD: dict[str, str] = {
     PERSISTENCIA: "guarda la decisión de forma durable",
 }
 
-ORDEN = [CONTEXTO, HISTORIAL, INFERENCIA, VALIDACION, PERSISTENCIA]
+ORDEN = [MEMORIA, CONTEXTO, HISTORIAL, INFERENCIA, VALIDACION, PERSISTENCIA]
 
-# Techo de pasos, derivado de la topología y no elegido a ojo: contexto, historial, un par
+# Techo de pasos, derivado de la topología y no elegido a ojo: memoria, contexto, historial, un par
 # (inferencia, validación) por intento, persistencia, y una vuelta de margen. Cualquier corrida que
 # lo supere está en un bucle que el diseño no contempla, y conviene que muera rápido con un número
 # que se pueda relacionar con esta línea, en vez del 10.007 por defecto de LangGraph.
-LIMITE_DE_PASOS = 2 + 2 * (MAX_INTENTOS + 2) + 1
+LIMITE_DE_PASOS = 3 + 2 * (MAX_INTENTOS + 2) + 1
 
 
 def _pendiente(nombre: str) -> Nodo:
@@ -78,6 +87,7 @@ def _pendiente(nombre: str) -> Nodo:
 def nodos_disponibles() -> dict[str, Nodo]:
     """Las implementaciones que existen hoy. El resto vuelve como marcador."""
     reales: dict[str, Nodo] = {
+        MEMORIA: nodo_memoria.recordar,
         CONTEXTO: nodo_contexto.construir,
         HISTORIAL: nodo_historial.recuperar,
         INFERENCIA: nodo_inferencia.consultar,
@@ -85,6 +95,15 @@ def nodos_disponibles() -> dict[str, Nodo]:
         PERSISTENCIA: nodo_persistencia.guardar,
     }
     return {nombre: reales.get(nombre) or _pendiente(nombre) for nombre in ORDEN}
+
+
+def ruta_tras_memoria(estado: EstadoTriaje) -> str:
+    """Salta a persistencia cuando esta conducta ya tenía decisión.
+
+    La condición es que haya decisión, no que haya firma: el nodo devuelve la firma siempre, porque
+    la persistencia la necesita para registrar, y solo devuelve decisión cuando hubo acierto.
+    """
+    return PERSISTENCIA if estado.get("decision") is not None else CONTEXTO
 
 
 def ruta_tras_contexto(estado: EstadoTriaje) -> str:
@@ -146,7 +165,12 @@ def construir_grafo(nodos: Mapping[str, Nodo] | None = None) -> Any:
         # declara `Nodo` unas líneas más arriba.
         g.add_node(nombre, cast("Any", elegidos[nombre]))
 
-    g.set_entry_point(CONTEXTO)
+    g.set_entry_point(MEMORIA)
+    g.add_conditional_edges(
+        MEMORIA,
+        ruta_tras_memoria,
+        {CONTEXTO: CONTEXTO, PERSISTENCIA: PERSISTENCIA},
+    )
     g.add_conditional_edges(
         CONTEXTO,
         ruta_tras_contexto,

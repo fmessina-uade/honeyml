@@ -1,4 +1,4 @@
-"""Une el bus con el grafo: lo que convierte cinco nodos sueltos en un motor que corre.
+"""Une el bus con el grafo: lo que convierte los nodos sueltos en un motor que corre.
 
 Hasta acá el grafo funcionaba y nadie lo llamaba. `make consumer` leía el bus con
 `manejador_de_registro`, que imprime el evento y lo confirma, y el grafo solo se ejercitaba desde
@@ -32,9 +32,11 @@ from . import consumer as bus
 from .adapters.almacen import Almacen, AlmacenElastic
 from .adapters.config import MODELO_POR_DEFECTO, CredencialAusenteError
 from .adapters.inferencia import PRECIOS
+from .adapters.repertorio import Repertorio, RepertorioEnRedis
 from .adapters.servicio import AdaptadorDeInferencia, ServicioDeInferencia
-from .graph import INFERENCIA, PERSISTENCIA, construir_grafo, ejecutar
+from .graph import INFERENCIA, MEMORIA, PERSISTENCIA, construir_grafo, ejecutar
 from .nodes import inferencia as nodo_inferencia
+from .nodes import memoria as nodo_memoria
 from .nodes import persistencia as nodo_persistencia
 from .state import EstadoTriaje, estado_inicial, resultado_del_ciclo
 
@@ -56,19 +58,31 @@ TOPE_SIN_CONFIRMAR = 2000
 TOKENS_TIPICOS = (2545, 980)
 
 
-def compilar(servicio: ServicioDeInferencia | None = None, almacen: Almacen | None = None) -> Any:
+def compilar(
+    servicio: ServicioDeInferencia | None = None,
+    almacen: Almacen | None = None,
+    repertorio: Repertorio | None = None,
+) -> Any:
     """Arma el grafo con los adaptadores ya inyectados, una sola vez por corrida.
 
-    Los dos nodos que hablan con el mundo reciben su dependencia acá. El resto de la topología queda
-    tal como la define `construir_grafo`, así que esto no puede cambiar el orden de los nodos ni las
-    condiciones de las aristas por accidente.
+    Los tres nodos que hablan con el mundo reciben su dependencia acá. El resto de la topología
+    queda tal como la define `construir_grafo`, así que esto no puede cambiar el orden de los nodos
+    ni las condiciones de las aristas por accidente.
+
+    El repertorio se pasa explícito y no se construye por omisión, al revés que los otros dos. Sin
+    él el motor razona cada evento, que es el comportamiento correcto y el más caro: que reutilizar
+    haya que pedirlo es lo que evita que una corrida de prueba empiece a copiar decisiones sin que
+    quien la lanzó lo haya decidido.
     """
     inferencia = servicio or AdaptadorDeInferencia()
     destino = almacen or AlmacenElastic()
     return construir_grafo(
         {
+            MEMORIA: lambda estado: nodo_memoria.recordar(estado, repertorio=repertorio),
             INFERENCIA: lambda estado: nodo_inferencia.consultar(estado, servicio=inferencia),
-            PERSISTENCIA: lambda estado: nodo_persistencia.guardar(estado, almacen=destino),
+            PERSISTENCIA: lambda estado: nodo_persistencia.guardar(
+                estado, almacen=destino, repertorio=repertorio
+            ),
         }
     )
 
@@ -111,19 +125,24 @@ def _linea(evento: bus.EventoDelBus, final: EstadoTriaje) -> str:
 
     intentos = int(final.get("intentos", 0))
     corregido = f" tras {intentos} intentos" if intentos > 1 else ""
+    # Una marca distinta para lo copiado: en una corrida larga lo que importa ver de un vistazo es
+    # cuántas decisiones se pagaron y cuántas salieron del repertorio.
+    marca = "=" if final.get("reutilizada_de") else "·"
     tactica = decision.tactica_mitre or "sin táctica"
-    return f"  · {decision.severidad.value:<10} {tactica:<22}{corregido} {evento.resumen()}"
+    return f"  {marca} {decision.severidad.value:<10} {tactica:<22}{corregido} {evento.resumen()}"
 
 
 def manejador(
-    servicio: ServicioDeInferencia | None = None, almacen: Almacen | None = None
+    servicio: ServicioDeInferencia | None = None,
+    almacen: Almacen | None = None,
+    repertorio: Repertorio | None = None,
 ) -> Callable[[bus.EventoDelBus], None]:
     """El manejador que reemplaza a `manejador_de_registro`: corre un evento por el grafo.
 
     Devuelve una función y no una clase porque el consumidor solo pide eso. El grafo compilado queda
     capturado en la clausura, así se arma una vez y no por evento.
     """
-    compilado = compilar(servicio=servicio, almacen=almacen)
+    compilado = compilar(servicio=servicio, almacen=almacen, repertorio=repertorio)
 
     def triar(evento: bus.EventoDelBus) -> None:
         final = ejecutar(compilado, estado_inicial(evento))
@@ -151,6 +170,11 @@ def main() -> int:
         action="store_true",
         help=f"triar el atraso completo aunque supere los {TOPE_SIN_CONFIRMAR} eventos",
     )
+    ap.add_argument(
+        "--reutilizar",
+        action="store_true",
+        help="copiar la decisión cuando otra conducta idéntica ya se resolvió",
+    )
     args = ap.parse_args()
 
     # El adaptador se crea acá y no dentro del manejador para poder pedirle el resumen al final.
@@ -160,8 +184,10 @@ def main() -> int:
         print(f"✗ {exc}")
         return 1
 
+    repertorio = RepertorioEnRedis() if args.reutilizar else None
+
     consumidor = bus.ConsumidorDelBus(
-        manejador(servicio=inferencia),
+        manejador(servicio=inferencia, repertorio=repertorio),
         host=args.host,
         puerto=args.puerto,
         stream=args.stream,
@@ -204,6 +230,8 @@ def main() -> int:
     print(f"    descartados: {c.descartados}   (a '{consumidor.stream_muertos}')")
     print("\n  consumo de inferencia")
     print(inferencia.resumen())
+    if repertorio is not None:
+        print(repertorio.resumen())
     return 0
 
 
