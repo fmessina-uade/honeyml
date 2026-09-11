@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import signal
 import socket
 import sys
@@ -78,6 +79,16 @@ TTL_VISTO = int(os.getenv("BUS_TTL_VISTO", "86400"))
 # Un mensaje tal como lo entrega Redis con decode_responses activo: el id de entrada y sus campos.
 Mensaje = tuple[str, dict[str, str]]
 
+# Prefijos que Cowrie deja en la línea del registro y que no son parte del comando que tipeó el
+# atacante. El pipeline ya los saca antes de indexar, pero el bus retiene mensajes publicados antes
+# de ese arreglo: al 10/09 eran 3.338 de los 71.654 acumulados. Un evento así llega con
+# `CMD: uname -a` y el motor razona sobre el prefijo como si fuera parte de lo ejecutado.
+#
+# Se sanea acá y no solo en el pipeline porque son dos poblaciones distintas: lo que ya está en el
+# bus no se vuelve a publicar. Que el mismo recorte viva en los dos lados es a propósito, y la
+# expresión es la misma que la del filtro de Logstash para que no se separen.
+PREFIJOS_DEL_REGISTRO = re.compile(r"^(CMD: |Command (not )?found: )")
+
 
 def _mensajes(respuesta: Any) -> list[Mensaje]:
     """Reduce la respuesta de un stream de Redis a la forma que el protocolo sí garantiza.
@@ -122,6 +133,8 @@ class EventoDelBus:
     def desde_mensaje(
         cls, entry_id: str, campos: dict[str, str], entregas: int = 1
     ) -> EventoDelBus:
+        # `crudo` conserva el mensaje sin tocar: si mañana hay que revisar qué llegó del bus, el
+        # saneamiento no puede haber borrado la prueba.
         return cls(
             entry_id=entry_id,
             doc_id=campos.get("doc_id", ""),
@@ -134,7 +147,7 @@ class EventoDelBus:
             source_ip=campos.get("source_ip", ""),
             session=campos.get("session", ""),
             user=campos.get("user", ""),
-            command=campos.get("command", ""),
+            command=PREFIJOS_DEL_REGISTRO.sub("", campos.get("command", "")),
             entregas=entregas,
             crudo=campos,
         )
