@@ -57,7 +57,7 @@ class RepertorioEnRedis:
         """La decisión ya tomada para esta firma, o None.
 
         Un Redis caído no puede frenar el triaje: sin repertorio el evento va por el camino
-        completo, que es exactamente lo que hacía antes de que esto existiera.
+        completo, que es el mismo que sigue con la reutilización apagada.
         """
         try:
             crudo = self.r.get(f"{PREFIJO}{firma}")

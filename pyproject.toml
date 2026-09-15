@@ -7,9 +7,8 @@ name = "honeyml"
 version = "0.1.0"
 description = "HoneyML - open-source threat intelligence platform: honeypots + Agentic AI"
 # 3.12 es lo que corre en todos lados: el servidor (Ubuntu 24.04 trae 3.12.3), el entorno de
-# desarrollo y el hook de pre-commit. Antes acá decía 3.11, que no corría en ningún lado (solo
-# estaba declarado en CI), y esa diferencia entre lo declarado y lo real hacía que la verificación
-# de tipos no pudiera correr localmente.
+# desarrollo, el hook de pre-commit y CI. Declarar una versión que no corre en ningún lado deja a la
+# verificación de tipos sin poder correr localmente.
 requires-python = ">=3.12"
 
 [project.optional-dependencies]
@@ -28,8 +27,8 @@ api = [
     "uvicorn>=0.32",
 ]
 # Motor de triaje agéntico. Se instala con: pip install -e ".[agent]"
-# El proveedor de inferencia no está acá a propósito: el motor lo alcanza a través de un adaptador
-# (ver el ADR sobre sustitución de proveedor), así que la dependencia es del adaptador y no de acá.
+# El proveedor de inferencia no está acá a propósito: el motor lo alcanza a través de un adaptador,
+# así que la dependencia es del adaptador y no de acá.
 agent = [
     "langgraph>=0.2",
     "redis>=5.0",
@@ -37,12 +36,12 @@ agent = [
     # Solo el paquete de certificados raíz, no un cliente HTTP: el adaptador habla por `urllib`.
     # Se declara porque el adaptador lo usa de respaldo cuando el intérprete no tiene almacén de
     # certificados (el caso del Python de python.org en macOS sin `Install Certificates.command`),
-    # y hasta ahora venía arrastrado por otra dependencia, que es una forma frágil de depender.
+    # y recibirlo arrastrado por otra dependencia es una forma frágil de depender.
     "certifi>=2024.2",
 ]
 # Herramientas de verificación. Instalar con: pip install -e ".[dev]"
-# Estaban declaradas en la configuración de pytest y ruff pero no como dependencia, así que
-# `make test` respondía "pytest no instalado" y la suite no se corría nunca.
+# Van como dependencia y no solo en la configuración de pytest y ruff: sin instalarlas, `make test`
+# responde "pytest no instalado" y la suite no corre.
 dev = [
     "pytest>=8.0",
     "ruff>=0.6",
@@ -73,9 +72,9 @@ target-version = "py312"
 select = ["E", "F", "W", "I", "N", "UP"]
 
 [tool.mypy]
-# Tiene que coincidir con requires-python y con CI. Cuando decía 3.11 y el entorno real era 3.12,
-# mypy no podía parsear los stubs de numpy, que usan sintaxis de 3.12, y abortaba antes de mirar
-# una línea del proyecto, con lo que la verificación de tipos solo corría en el hook.
+# Tiene que coincidir con requires-python y con CI. Con un destino anterior a 3.12, mypy no puede
+# parsear los stubs de numpy, que usan sintaxis de 3.12, y aborta antes de mirar una línea del
+# proyecto.
 python_version = "3.12"
 strict = true
 ignore_missing_imports = true

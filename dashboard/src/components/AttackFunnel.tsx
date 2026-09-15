@@ -10,8 +10,8 @@ import { useI18n } from '../lib/i18n';
  * imagen: la barra de "golpearon" es el ancho del panel y la de "se llevaron algo" es una astilla.
  *
  * Todos los números se derivan de los perfiles de arquetipos, así que esto no puede contradecir a
- * las tarjetas de abajo. La alternativa era una segunda consulta devolviendo totales apenas
- * distintos, por motivos que nadie querría explicar en una defensa.
+ * las tarjetas de abajo. Una segunda consulta devolvería totales apenas distintos, por motivos
+ * difíciles de explicar a quien mira el panel.
  */
 
 /**

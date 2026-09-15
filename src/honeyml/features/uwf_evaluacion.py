@@ -1,6 +1,6 @@
 """Qué tan bueno es el clasificador, qué tan seguros estamos de ese número y de dónde sale.
 
-La comparación eligió familia y el ajuste confirmó que los valores por defecto ya estaban bien.
+La comparación elige la familia y el ajuste confirma que los valores por defecto son adecuados.
 Ninguno de los dos contesta las cuatro preguntas que un lector escéptico hace primero, y este
 módulo existe para eso.
 
@@ -12,15 +12,14 @@ La segunda es adónde se equivoca. Exfiltration tiene precisión 0,24: de cada c
 son falsas. Saber de qué clase vienen esas tres cambia la lectura, porque no es lo mismo confundirla
 con reconocimiento que con acceso inicial.
 
-La tercera es cuánto se mueve el resultado. Todo lo que informamos sale de una sola partición con
-una sola semilla, y Exfiltration queda con unas 140 filas en la mitad de prueba. Con esa cantidad,
-un F1 de 0,376 puede ser bastante distinto con otro sorteo, y hasta ahora no teníamos con qué
-responder cuánto.
+La tercera es cuánto se mueve el resultado. Una sola partición con una sola semilla deja a
+Exfiltration con unas 140 filas en la mitad de prueba, y con esa cantidad un F1 de 0,376 puede ser
+bastante distinto con otro sorteo. Sin varias particiones no hay con qué responder cuánto.
 
-La cuarta la trajo la discusión sobre para qué sirve el modelo. La importancia por permutación le
-da al puerto de destino 0,439 y a la que le sigue 0,065, y con esa distancia hay que saber cuánto
-del acierto es esa columna sola y qué trae cada puerto detrás. De ahí sale hasta dónde se puede
-afirmar algo del clasificador fuera del banco de pruebas donde se grabó el corpus.
+La cuarta es para qué sirve el modelo. La importancia por permutación le da al puerto de destino
+0,439 y a la que le sigue 0,065, y con esa distancia hay que saber cuánto del acierto es esa columna
+sola y qué trae cada puerto detrás. De ahí sale hasta dónde se puede afirmar algo del clasificador
+fuera del banco de pruebas donde se grabó el corpus.
 
 Uso:
     python -m honeyml.features.uwf_evaluacion

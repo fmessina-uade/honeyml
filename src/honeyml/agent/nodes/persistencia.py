@@ -2,8 +2,8 @@
 
 Todo camino del grafo termina acá, incluidos los que no produjeron decisión. Un evento que llegó al
 motor y no aparece en ningún lado es peor que uno mal clasificado: el segundo se puede discutir, el
-primero no se puede ni contar. Así el panel lo muestra como no concluyente, que es lo que describe
-el CU-03, en vez de simplemente no listarlo.
+primero no se puede ni contar. Así el panel lo muestra como no concluyente y pendiente, en vez de
+simplemente no listarlo.
 
 Qué se guarda, además del nivel. La justificación y la evidencia, porque una decisión de triaje que
 no se puede releer es una opinión. El piso y el techo que la escala calculó para ese evento, así
@@ -152,7 +152,7 @@ def _registrar_la_firma(estado: EstadoTriaje, repertorio: Repertorio | None) -> 
     documento inexistente.
 
     Solo se registran las concluyentes. Una decisión que no pasó la validación describe un ciclo que
-    salió mal, no una conducta resuelta: propagarla le pondría el mismo fracaso a las 6.588
+    salió mal, no una conducta resuelta: propagarla le pondría el mismo fracaso a todas las
     repeticiones de la firma en lugar de darles otra oportunidad.
 
     Y no se re-registra lo que ya vino del repertorio: el `doc_id` de origen tiene que seguir siendo

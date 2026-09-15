@@ -230,7 +230,7 @@ def test_una_severidad_por_debajo_del_piso_no_llega_a_persistirse() -> None:
 
 
 def test_persistencia_siempre_recibe_un_motivo_cuando_no_hay_decision() -> None:
-    """Antes llegaba sin decisión *y sin motivo*, y el nodo no podía distinguir qué había pasado."""
+    """Sin decisión tiene que llegar con motivo, o el nodo no puede distinguir qué pasó."""
     _, agotado = _recorrer(
         {
             graph.CONTEXTO: _CTX,

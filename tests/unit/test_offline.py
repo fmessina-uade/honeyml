@@ -1,7 +1,7 @@
 """El respaldo congelado: qué puede seguir contestando el panel con Elasticsearch abajo.
 
-Es la ruta que sostiene la demo y la que se usa para las capturas del informe, así que conviene que
-esté fijada. Lo que se prueba acá son las cuatro cosas que se rompen en silencio:
+Es la ruta que sostiene el panel cuando Elasticsearch no responde, así que conviene fijarla. Lo que
+se prueba acá son las cuatro cosas que se rompen en silencio:
 
 - que el rango de fechas incluya el último día pedido, y no lo deje afuera por comparar cadenas
 - que elegir un sensor cambie el total y no solo la etiqueta

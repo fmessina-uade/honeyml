@@ -1,8 +1,8 @@
-"""Contrasta contra el sistema andando las afirmaciones de implementación que hace el informe.
+"""Contrasta contra el sistema andando las cifras de implementación que se publican sobre él.
 
-Cada tabla del documento que describe comportamiento en ejecución se vuelve a derivar acá desde
-Elasticsearch, en lugar de darla por buena. Se corre antes de entregar, y la salida se pega al lado
-del capítulo que respalda.
+Cada número que describe comportamiento en ejecución se vuelve a derivar acá desde Elasticsearch,
+en lugar de darlo por bueno. Se corre antes de publicar cifras nuevas, y la salida queda como
+respaldo de cada una.
 
 Uso:
     python scripts/verify_claims.py
@@ -101,7 +101,7 @@ def complementarity() -> None:
 
 
 def totals() -> None:
-    """Los números finales al corte del informe."""
+    """Los totales del corpus al momento de correrlo."""
     body = {
         "size": 0,
         "track_total_hits": True,

@@ -1,9 +1,9 @@
 """Dónde queda guardada una decisión, detrás de una interfaz para poder probar el nodo sin red.
 
 Misma frontera que en `inferencia.py` y por el mismo motivo: el nodo de persistencia depende del
-protocolo `Almacen` y no sabe que del otro lado hay un Elasticsearch. Acá el proveedor no se cambió
-nunca, pero la frontera igual paga: el nodo se prueba sin levantar el stack, que son treinta
-segundos de arranque en cada corrida de las pruebas.
+protocolo `Almacen` y no sabe que del otro lado hay un Elasticsearch. Acá no hay un proveedor que se
+vaya a cambiar, pero la frontera igual paga: el nodo se prueba sin levantar el stack, que son
+treinta segundos de arranque en cada corrida de las pruebas.
 
 Un solo índice, `honeyml-decisiones`, y no uno por fecha como los de los honeypots. Aquellos reciben
 unos 40.000 eventos por día y el corte diario tiene sentido; acá son unas 800, así que un índice por
@@ -92,12 +92,12 @@ class AlmacenElastic:
     def guardar(self, doc_id: str, documento: dict[str, Any]) -> bool:
         """Indexa la decisión bajo el `doc_id` del evento, sin pisar una que ya esté.
 
-        Escribe con `_create`, que contesta 409 si el documento existe. Hasta el 14/09 era un `PUT`
-        a `_doc`, que sobrescribe, y alcanzaba mientras las repeticiones llegaran a los minutos de
-        un reinicio. Ese día se midió lo contrario: Filebeat releyó el corpus, el bus recibió otra
-        vez eventos decididos semanas antes, y la marca de deduplicación del consumidor, que vence
-        a las 24 horas, ya no los reconocía. Con la reutilización encendida, el evento de origen de
-        una firma se copiaba de sí mismo y pisaba la decisión razonada.
+        Escribe con `_create`, que contesta 409 si el documento existe. Un `PUT` a `_doc`
+        sobrescribe, y eso solo sería seguro si las repeticiones llegaran a los minutos de un
+        reinicio. Una relectura de Filebeat trae eventos decididos semanas antes, cuando la marca
+        de deduplicación del consumidor, que vence a las 24 horas, ya no los reconoce, y con la
+        reutilización encendida el evento de origen de una firma se copiaría de sí mismo y pisaría
+        la decisión razonada.
 
         El reintento sigue siendo idempotente. Si un viaje falla pero la escritura llegó igual, el
         siguiente recibe 409 y se informa como ya existente: el documento es el nuestro de todos

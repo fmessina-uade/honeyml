@@ -18,17 +18,11 @@ abierta no termina nunca. La consecuencia a tener presente es que una sesión de
 produce cincuenta decisiones, casi todas del mismo nivel; eso lo absorbe el panel agrupando, que es
 información que ya tiene.
 
-Medido sobre los 52.165 mensajes que había en el bus al 25/08/2026, el piso mecánico reparte así:
-
-    bajo       4.245   8,1 %
-    medio     13.871  26,6 %
-    alto      33.501  64,2 %
-    critico      548   1,1 %
-
-El 1,1 % de crítico coincide con lo que encontró el agrupamiento no supervisado por otro camino
-(1,5 % de las direcciones llegan a intrusión efectiva), y que dos métodos independientes den lo
-mismo es la mejor señal de que la escala está bien puesta. Que el 64 % caiga en `alto` no es un
-defecto: el filtro del bus ya selecciona eventos donde el atacante hizo algo.
+Sobre el bus, el piso mecánico deja la mayoría de los eventos en `alto` y muy pocos en `critico`.
+Que `alto` domine no es un defecto: el filtro del bus ya selecciona eventos donde el atacante hizo
+algo. Y la proporción de `critico` es parecida a la fracción de direcciones que el agrupamiento no
+supervisado ubica en intrusión efectiva: que dos métodos independientes den lo mismo es la mejor
+señal de que la escala está bien puesta.
 """
 
 from __future__ import annotations
@@ -73,7 +67,7 @@ class Criterio(NamedTuple):
     nivel: Severidad
     #: Qué tiene que haber pasado, en términos de la telemetría.
     evidencia: str
-    #: Cómo se le explica a una persona, en el panel y en el informe.
+    #: Cómo se le explica a una persona en el panel.
     lectura: str
     #: Escalón del embudo de intrusión al que corresponde.
     escalon: str

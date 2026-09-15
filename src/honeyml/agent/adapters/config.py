@@ -21,16 +21,15 @@ ARCHIVO_ENV = Path(".env")
 # y no por precio ni velocidad: con 100 % de conformidad, el ciclo de reintentos correctivos pasa a
 # ser la red de seguridad que debería ser, en vez del camino habitual.
 #
-# Es de producción y no preview. La defensa es en diciembre, y un modelo discontinuado a mitad de la
-# campaña de validación sería la segunda sustitución forzada del proyecto.
+# Es de producción y no preview: un modelo preview se puede discontinuar con poco aviso, y perderlo
+# a mitad de una campaña de validación obliga a cambiar de modelo en el peor momento.
 MODELO_POR_DEFECTO = "openai/gpt-oss-120b"
 
 # Para tandas masivas o si aparecen límites de tasa: la mitad de precio y el mismo modo estricto.
 # La política que elige entre los dos está en `servicio.py`.
 #
-# Decía además que era el doble de velocidad, y la primera medición contra datos reales dio lo
-# contrario: 13,6 segundos por llamada contra 1,5 del modelo grande. Son cinco llamadas de cada uno,
-# muy poco para concluir algo, pero alcanza para no seguir afirmando lo que no se midió.
+# La ventaja que se puede sostener es el precio. Que sea más rápido no está demostrado: en las pocas
+# llamadas medidas contra datos reales tarda más que el modelo grande.
 MODELO_ALTERNATIVO = "openai/gpt-oss-20b"
 
 BASE_URL_POR_DEFECTO = "https://api.groq.com/openai/v1"
@@ -49,8 +48,8 @@ def _del_archivo(clave: str) -> str | None:
     """Lee una variable de `.env`, o None. Nunca pisa lo que ya está en el entorno.
 
     El orden importa: el entorno le gana al archivo. Con la precedencia invertida, poner
-    `GROQ_API_KEY=… make lo-que-sea` para probar otra clave usa la del archivo sin avisar. Lo
-    descubrimos midiendo: una prueba con una clave inválida a propósito devolvió éxito.
+    `GROQ_API_KEY=… make lo-que-sea` para probar otra clave usaría la del archivo sin avisar, y
+    una prueba con una clave inválida a propósito daría éxito.
     """
     if not ARCHIVO_ENV.exists():
         return None

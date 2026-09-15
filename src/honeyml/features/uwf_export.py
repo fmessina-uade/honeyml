@@ -1,9 +1,9 @@
 """Ajusta el clasificador final una vez y lo persiste con todo lo necesario para confiar en él.
 
-Hasta acá el modelo se entrenaba y se descartaba en cada corrida. Eso está bien mientras la pregunta
-es cuál modelo, y deja de servir cuando la respuesta es este modelo: el motor de triaje no puede
-reentrenar en cada evento, y un número en un informe que nadie puede reproducir es una afirmación,
-no un resultado.
+Los módulos de comparación y de ajuste entrenan el modelo y lo descartan en cada corrida. Eso está
+bien mientras la pregunta es cuál modelo, y deja de servir cuando la respuesta es este modelo: el
+motor de triaje no puede reentrenar en cada evento, y un número que nadie puede reproducir es una
+afirmación, no un resultado.
 
 El módulo produce dos archivos que viajan juntos:
 
@@ -12,17 +12,16 @@ El módulo produce dos archivos que viajan juntos:
 
 Deja resueltas tres cosas que el joblib no puede decir por sí solo.
 
-El punto de operación. El estudio del umbral (`uwf_umbral`) recortó la validación de la mitad de
-entrenamiento, lo que le costó el 20 % de los datos y dejó su línea base (0,8741) por debajo de la
-del modelo completo (0,8782), una salvedad que había que explicar cada vez que se los ponía lado a
+El punto de operación. El estudio del umbral (`uwf_umbral`) recorta la validación de la mitad de
+entrenamiento, lo que le cuesta el 20 % de los datos y deja su línea base (0,8741) por debajo de la
+del modelo completo (0,8782), una salvedad que habría que explicar cada vez que se los pone lado a
 lado. Acá el umbral sale de probabilidades fuera de muestra sobre la mitad de entrenamiento entera,
 así que el modelo exportado se entrena con toda ella y el umbral sigue sin ver una fila con la que
 se ajustó.
 
 El ranking de características. Importancia por permutación sobre las quince columnas originales,
-medida sobre el modelo que efectivamente se despliega. El informe cita un ranking del bosque
-aleatorio que se descartó en la comparación, y ese ranking responde qué le importaba a un
-clasificador que nadie corre.
+medida sobre el modelo que efectivamente se despliega, y no la del bosque aleatorio que se descarta
+en la comparación, que responde qué le importa a un clasificador que nadie corre.
 
 Y la procedencia. Versiones de las bibliotecas, orden de clases, lista de columnas, tamaños de
 partición y el resumen criptográfico del propio artefacto. Un objeto de sklearn cargado bajo otra

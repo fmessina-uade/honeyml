@@ -1,10 +1,10 @@
 """Lo que llega repetido no pisa nada.
 
-El 14/09 se midió que el bus recibe otra vez eventos decididos semanas antes: Filebeat releía desde
-el principio cada archivo que cambiaba de inodo, algo que en desarrollo pasaba al bajar registros
-con rsync y, en algunos arranques del stack, con el corpus entero. Las marcas de deduplicación del
-consumidor vencen a las 24 horas y ya no los reconocen, y con la reutilización encendida el evento
-de origen de una firma se copiaba de sí mismo y pisaba la decisión razonada. Había 13 así.
+El bus puede recibir otra vez eventos decididos semanas antes: Filebeat relee desde el principio un
+archivo que cambia de identidad, algo que en desarrollo pasa al bajar registros con rsync. Las
+marcas de deduplicación del consumidor vencen a las 24 horas y ya no los reconocen, y con la
+reutilización encendida el evento de origen de una firma se copiaría de sí mismo y pisaría la
+decisión razonada.
 
 Se fija la protección en las tres capas que la sostienen: el almacén no sobrescribe, la persistencia
 no escribe una copia de sí misma, y el motor le avisa al consumidor que el evento ya estaba

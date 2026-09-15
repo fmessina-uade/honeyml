@@ -233,7 +233,7 @@ body {
   }
 }
 
-/* ---- modo captura: se congela todo para que las capturas del informe se repitan igual ---- */
+/* ---- modo captura: se congela todo para que las capturas de pantalla se repitan igual ---- */
 :root[data-capture='on'] .reveal {
   opacity: 1 !important;
   transform: none !important;

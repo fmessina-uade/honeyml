@@ -130,10 +130,10 @@ def test_el_reproche_no_arrastra_el_texto_crudo_de_pydantic() -> None:
 
 
 def test_el_esquema_no_le_pide_el_identificador_al_modelo() -> None:
-    """Se lo pedía, y era un SHA-256 de 64 caracteres que había que copiar exacto.
+    """Es un SHA-256 de 64 caracteres que habría que copiar exacto.
 
-    Cada carácter errado costaba un reproche y un reintento pago sobre una severidad que podía estar
-    bien juzgada. Nadie leía ese campo: persistencia indexa bajo el `doc_id` que viene del bus.
+    Cada carácter errado costaría un reproche y un reintento pago sobre una severidad que puede
+    estar bien juzgada. Nadie lee ese campo: persistencia indexa bajo el `doc_id` que viene del bus.
     """
     assert "doc_id" not in Decision.model_fields
     # Y si el modelo lo manda igual, `extra="forbid"` lo rechaza como cualquier campo inventado.
@@ -203,8 +203,8 @@ def test_los_problemas_salen_todos_juntos() -> None:
 def test_un_rechazo_cuenta_una_ronda_sin_importar_cuantos_problemas() -> None:
     """Los reproches miden qué corregir; `rechazos` mide cuántos intentos quedan. No son lo mismo.
 
-    Cuando el presupuesto se medía contando reproches, un borrador con cuatro problemas se leía
-    como cuatro intentos gastados y el modelo se quedaba sin ninguna oportunidad de corregir.
+    Contando reproches, un borrador con cuatro problemas se leería como cuatro intentos gastados y
+    el modelo se quedaría sin ninguna oportunidad de corregir.
     """
     salida = nodo.validar(
         _estado(borrador=_borrador(evidencia=[], severidad="bajo", tactica_mitre="Impacto"))

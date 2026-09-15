@@ -77,7 +77,7 @@ def build(logs_dir: Path = LOGS_DIR) -> dict[str, Any]:
                 "tactics": tactics,
                 "first_seen": fam["first"],
                 "last_seen": fam["last"],
-                # una etiqueta estable, para poder referirse a la familia en el informe
+                # una etiqueta estable, para poder referirse a la familia sin repetir sus comandos
                 "label": anonymize("|".join(fam["commands"])).replace("attacker-", "family-"),
             }
         )

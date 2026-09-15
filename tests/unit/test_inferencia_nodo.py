@@ -222,10 +222,9 @@ def test_los_hallazgos_llegan_legibles() -> None:
 def test_el_pedido_publica_las_tacticas_admitidas() -> None:
     """Si el motor exige un vocabulario cerrado, tiene que decirlo. No decirlo cuesta plata.
 
-    En la primera corrida contra datos reales los cinco eventos necesitaron un reintento, y los
-    cinco por lo mismo: el modelo contestó 'Execution' y 'Credential Access', que son los nombres
-    canónicos de MITRE, y la validación exigía las etiquetas en español del panel sin habérselas
-    dicho nunca. Una llamada paga de más por evento, por un dato que estaba de nuestro lado.
+    Sin la lista, el modelo contesta 'Execution' y 'Credential Access', que son los nombres
+    canónicos de MITRE, y la validación exige las etiquetas en español del panel sin habérselas
+    dicho: una llamada paga de más por evento, por un dato que está de nuestro lado.
     """
     s = _ServicioFalso()
     nodo.consultar(_estado(), servicio=s)
@@ -248,11 +247,10 @@ def test_lo_que_se_publica_es_lo_que_la_validacion_exige() -> None:
 def test_el_pedido_lleva_lo_que_determina_el_piso() -> None:
     """El modelo no puede calcular el piso si no ve de qué depende, y lo rechazamos igual.
 
-    La categoría y el resultado son los dos campos con los que `severidad.piso_de` decide. Faltaban
-    en el contexto, y en la segunda corrida contra datos reales las cuatro autenticaciones exitosas
-    salieron como 'bajo' con su reproche: el modelo veía "authentication" sin saber si había
-    prosperado, y elegía el nivel más bajo, que es exactamente lo que el pedido le indica ante la
-    duda. Le pedíamos un número que dependía de un dato que le escondíamos.
+    La categoría y el resultado son los dos campos con los que `severidad.piso_de` decide. Sin
+    ellos en el contexto, una autenticación exitosa sale como 'bajo' con su reproche: el modelo ve
+    "authentication" sin saber si prosperó, y elige el nivel más bajo, que es exactamente lo que el
+    pedido le indica ante la duda. Sería pedirle un número que depende de un dato escondido.
     """
     s = _ServicioFalso()
     estado = _estado(

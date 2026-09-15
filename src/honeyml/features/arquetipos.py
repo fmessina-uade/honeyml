@@ -45,7 +45,7 @@ KS = range(3, 9)
 # que es lo habitual y suficiente para comparar k entre sí.
 MUESTRA_SILUETA = 5000
 
-# Cuántas características definen a cada grupo en el informe. Con 35 disponibles, mostrarlas todas
+# Cuántas características definen a cada grupo en su perfil. Con 35 disponibles, mostrarlas todas
 # no describe: esconde.
 RASGOS_POR_GRUPO = 5
 

@@ -82,8 +82,8 @@ def test_la_firma_ignora_quien_y_cuando() -> None:
 def test_el_protocolo_parte_la_firma() -> None:
     """Fuerza bruta por SSH y por telnet no son la misma conducta, ni MSSQL y MySQL.
 
-    Sin el protocolo adentro se juntaban, y no era un caso de borde: alcanzaba al 28 % de los
-    eventos del bus. Cuesta veintitrés llamadas sobre 2.088.
+    Sin el protocolo adentro se juntarían, y no es un caso de borde: alcanza a una parte grande de
+    los eventos del bus, a cambio de unas pocas firmas más.
     """
     ssh = _evento(category="authentication", action="login", protocol="ssh", user="root")
     telnet = _evento(category="authentication", action="login", protocol="telnet", user="root")

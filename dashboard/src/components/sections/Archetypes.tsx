@@ -38,8 +38,8 @@ export default function Archetypes({ data }: { data: ArchetypeData }) {
    * Los rasgos se etiquetan desde el nombre crudo de la columna y no desde el texto que manda la
    * API.
    *
-   * La etiqueta de la API está en español, así que usarla dejaba los chips sin traducir cuando el
-   * panel estaba en inglés. El nombre de la columna es neutro respecto del idioma y ya viaja en la
+   * La etiqueta de la API está en español, así que usarla dejaría los chips sin traducir con el
+   * panel en inglés. El nombre de la columna es neutro respecto del idioma y ya viaja en la
    * respuesta, lo que lo vuelve la clave correcta y evita mandar dos copias de cada etiqueta desde
    * el backend.
    */

@@ -139,8 +139,8 @@ def test_un_manejador_que_avisa_repeticion_cuenta_como_repetido(bus, stream):
     """Si la decisión ya existía, el evento se confirma igual pero no se cuenta como procesado.
 
     Es lo que separa una relectura del corpus de una tanda de triaje en el resumen de la corrida.
-    El 14/09 el bus recibió decenas de miles de eventos ya decididos, y contados como procesados
-    habrían parecido trabajo nuevo.
+    Una relectura puede traer decenas de miles de eventos ya decididos, y contados como procesados
+    parecerían trabajo nuevo.
     """
     doc_id = uuid.uuid4().hex
     _limpiar_marcas(bus, doc_id)
@@ -251,9 +251,9 @@ def test_un_evento_sin_doc_id_va_directo_a_la_cola_de_muertos(bus, stream):
     """No se puede deduplicar ni persistir, así que no vale gastar una llamada paga en él.
 
     El pipeline arma el campo con `.to_s` sobre la metadata, así que si la huella no se calculó
-    llega la cadena vacía en lugar de faltar. Sin esta guardia el evento entraba al grafo, se
-    triaba, y recién fallaba al indexar bajo un identificador que no existe: hasta tres llamadas
-    pagas por entrega, y tres entregas antes de que la cola lo apartara.
+    llega la cadena vacía en lugar de faltar. Sin esta guardia el evento entraría al grafo, se
+    triaría, y recién fallaría al indexar bajo un identificador que no existe: hasta tres llamadas
+    pagas por entrega, y tres entregas antes de que la cola lo aparte.
     """
     _publicar(bus, stream, doc_id="")
 
@@ -265,3 +265,38 @@ def test_un_evento_sin_doc_id_va_directo_a_la_cola_de_muertos(bus, stream):
     assert c.contadores.descartados == 1
     assert bus.xpending(stream, "triaje-prueba")["pending"] == 0  # el grupo avanza
     assert bus.xlen(f"{stream}:muertos") == 1
+
+
+def test_una_parada_del_manejador_corta_y_no_cobra_entregas(bus, stream):
+    """Un `DetenerConsumo` corta la corrida y devuelve el lote sin sumarle entregas.
+
+    Es la protección para cuando se agota la cuota del proveedor: todos los eventos fallarían igual,
+    y tratados como fallas comunes terminarían en la cola de muertos a la tercera entrega.
+    """
+    from honeyml.agent.consumer import DetenerConsumo
+
+    ids = [uuid.uuid4().hex for _ in range(3)]
+    _limpiar_marcas(bus, *ids)
+    for doc_id in ids:
+        _publicar(bus, stream, doc_id)
+
+    vistos: list[str] = []
+
+    def corta_en_el_segundo(evento: EventoDelBus) -> None:
+        vistos.append(evento.doc_id)
+        if len(vistos) == 2:
+            raise DetenerConsumo("sin cuota")
+
+    c = _consumidor(stream, corta_en_el_segundo, nombre="agente-1", lote=3)
+    c.correr()
+
+    assert vistos == ids[:2], "el tercero no tiene que llegar al manejador"
+    assert c.motivo_de_parada == "sin cuota"
+    assert c.contadores.procesados == 1
+    assert c.contadores.fallados == 0
+    pendientes = bus.xpending_range(stream, "triaje-prueba", "-", "+", 10)
+    assert len(pendientes) == 2
+    assert all(p["times_delivered"] == 0 for p in pendientes)
+    assert bus.xlen(f"{stream}:muertos") == 0
+
+    _limpiar_marcas(bus, *ids)

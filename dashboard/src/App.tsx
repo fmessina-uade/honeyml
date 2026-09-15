@@ -56,7 +56,7 @@ export default function App() {
   const [active, setActive] = useState<SectionId>('pulso');
   const [families, setFamilies] = useState<FingerprintData | null>(null);
   const [archetypes, setArchetypes] = useState<ArchetypeData | null>(null);
-  // el modo captura congela todas las animaciones, así las capturas del informe se repiten igual
+  // el modo captura congela todas las animaciones, así las capturas de pantalla se repiten igual
   const [capture, setCapture] = useState(false);
 
   useEffect(() => {

@@ -8,9 +8,9 @@ Marcados con @pytest.mark.integration para poder saltearse en CI
 sin Docker (pytest tests/unit/ -v).
 
 Si los sensores no están levantados en esta máquina, se saltean en lugar de fallar. La distinción
-importa: un sensor apagado es una precondición que no se cumple, no un defecto. Antes fallaban, y
-como los sensores viven en el servidor, la suite de integración quedaba en rojo permanente por un
-motivo que no era un problema. Una puerta que siempre está roja deja de mirarse.
+importa: un sensor apagado es una precondición que no se cumple, no un defecto. Como los sensores
+viven en el servidor, fallar dejaría la suite de integración en rojo permanente por un motivo que no
+es un problema, y una puerta que siempre está roja deja de mirarse.
 """
 
 import socket

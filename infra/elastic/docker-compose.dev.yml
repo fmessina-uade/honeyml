@@ -19,11 +19,10 @@ services:
   logstash:
     environment:
       - "LS_JAVA_OPTS=-Xmx512m -Xms256m"
-    # Estaba en 768m y quedaba demasiado justo: con el heap en 512m, lo que Logstash usa fuera
-    # del heap lo dejaba en 749m aun quieto, y el 15/09, en medio de una relectura del corpus, el
-    # proceso murió sin dejar volcado ni error. Con 1g aguantó una ingesta de 300.000 eventos,
-    # pero terminó con 891m de memoria anónima, que no es caché y no se libera: le quedaban unos
-    # 130m. Con 1536m el margen pasa del medio giga. Queda igual que en producción.
+    # Con el heap en 512m, lo que Logstash usa fuera del heap lo deja cerca de los 750m aun quieto,
+    # y durante una relectura del corpus la memoria anónima, que no es caché y no se libera, pasa
+    # los 850m. Un tope de 768m o de 1g lo deja sin margen; con 1536m el margen pasa del medio giga.
+    # Queda igual que en producción.
     mem_limit: 1536m
 
   kibana:
@@ -37,9 +36,9 @@ services:
     # salteamos los volúmenes externos de los honeypots, que localmente pueden no existir.
     volumes: !override
       # Después de editar este archivo conviene recrear el contenedor (docker compose up -d
-      # --force-recreate --no-deps filebeat): no está verificado que un reinicio simple lo refresque.
-      # El 15/09, tras una edición, el contenedor lo seguía viendo con el tamaño anterior, leía el
-      # contenido nuevo cortado y le faltaba la sección de salida, con la que Filebeat no arranca.
+      # --force-recreate --no-deps filebeat). Un archivo suelto montado puede seguir viéndose con el
+      # tamaño anterior: Filebeat lee el contenido nuevo cortado, sin la sección de salida, y no
+      # arranca.
       - ./filebeat/filebeat.dev.yml:/usr/share/filebeat/filebeat.yml:ro
       - filebeat_data:/usr/share/filebeat/data
       # datos reales bajados del VPS (make pull-logs). Hacen las veces de los volúmenes.

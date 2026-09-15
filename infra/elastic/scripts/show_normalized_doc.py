@@ -1,8 +1,8 @@
-"""Imprime un documento normalizado y el registro crudo del que salió, para las figuras del informe.
+"""Imprime un documento normalizado junto al registro crudo del que salió.
 
 Muestra qué aporta el pipeline ECS: el mismo evento antes y después de normalizar, uno al lado del
-otro. Las credenciales y las direcciones de origen van enmascaradas, porque lo que importa de la
-figura es la forma del documento y no quién estaba atacando.
+otro. Las credenciales y las direcciones de origen van enmascaradas, porque lo que importa es la
+forma del documento y no quién estaba atacando.
 
 Uso:
     python infra/elastic/scripts/show_normalized_doc.py                 # un evento de acceso

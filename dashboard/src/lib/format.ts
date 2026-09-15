@@ -1,8 +1,8 @@
 // El formateo de números de todo el panel.
 //
 // El locale sigue al selector de idioma: en español se escribe 1.854.605 y 1,6, y en inglés
-// 1,854,605 y 1.6. Mezclarlos en una misma pantalla se lee como un error, y dejar es-AR fijo hacía
-// que la vista en inglés mostrara decimales a la española.
+// 1,854,605 y 1.6. Mezclarlos en una misma pantalla se lee como un error, y con es-AR fijo la vista
+// en inglés mostraría decimales a la española.
 //
 // El locale vigente vive en el ámbito del módulo en lugar de ir pasando por cada llamada: hay
 // exactamente uno, lo maneja el proveedor de idioma, y la alternativa es una prop en cada número

@@ -1,22 +1,22 @@
 """Une el bus con el grafo: lo que convierte los nodos sueltos en un motor que corre.
 
-Hasta acá el grafo funcionaba y nadie lo llamaba. `make consumer` leía el bus con
-`manejador_de_registro`, que imprime el evento y lo confirma, y el grafo solo se ejercitaba desde
-las pruebas. Este módulo es la pieza que faltaba, y la única que conoce a los dos lados.
+`make consumer` lee el bus con `manejador_de_registro`, que imprime el evento y lo confirma sin
+triarlo. Este módulo es la pieza que conecta el bus con el grafo, y la única que conoce a los dos
+lados.
 
 Vive aparte, y no dentro del consumidor ni del grafo, porque la dependencia tiene que ir en un solo
 sentido. El grafo importa los nodos, los nodos importan el consumidor para tipar el evento; si el
 consumidor importara el grafo, el círculo se cierra. Acá arriba de los dos no hay ciclo.
 
-Los adaptadores se crean una sola vez y se inyectan en los nodos. Es la diferencia que más se
-nota en operación: creados por evento, el desglose de consumo por modelo arrancaba de cero cada vez
-y "cuántos eventos resolvió el modelo económico" respondía siempre uno, además de releer la
-configuración del disco en cada llamada.
+Los adaptadores se crean una sola vez y se inyectan en los nodos. Creados por evento, el desglose
+de consumo por modelo arrancaría de cero cada vez y "cuántos eventos resolvió el modelo económico"
+respondería siempre uno, además de releer la configuración del disco en cada llamada.
 
-El contrato con el consumidor es el mismo de siempre y no hace falta cambiarlo. Si el ciclo levanta,
-sea porque el índice no responde, porque no se alcanzó al proveedor o porque el almacén rechazó la
-decisión, la excepción sale, el evento no se confirma y otro consumidor lo reclama. Si retorna, la
-decisión ya está guardada.
+El contrato con el consumidor es corto. Si el ciclo levanta, sea porque el índice no responde,
+porque no se alcanzó al proveedor o porque el almacén rechazó la decisión, la excepción sale, el
+evento no se confirma y otro consumidor lo reclama. Si retorna, la decisión ya está guardada. Lo
+único que se traduce es la cuota del proveedor: sale como `DetenerConsumo`, porque afecta a todos
+los eventos que siguen y no solo al que la encontró.
 """
 
 from __future__ import annotations
@@ -24,15 +24,16 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 import redis
 
 from . import consumer as bus
+from . import firma as firma_de_conducta
 from .adapters.almacen import Almacen, AlmacenElastic
 from .adapters.config import MODELO_POR_DEFECTO, CredencialAusenteError
-from .adapters.inferencia import PRECIOS
-from .adapters.repertorio import Repertorio, RepertorioEnRedis
+from .adapters.inferencia import PRECIOS, CuotaAgotadaError
+from .adapters.repertorio import PREFIJO, Repertorio, RepertorioEnRedis
 from .adapters.servicio import AdaptadorDeInferencia, ServicioDeInferencia
 from .graph import INFERENCIA, MEMORIA, PERSISTENCIA, construir_grafo, ejecutar
 from .nodes import inferencia as nodo_inferencia
@@ -44,17 +45,15 @@ from .state import EstadoTriaje, estado_inicial, resultado_del_ciclo
 #
 # Dos mil eventos son unos dos días y medio de tráfico, así que ponerse al día tras un fin de semana
 # no molesta. Por encima de eso ya es reprocesamiento histórico, y ahí conviene que lo diga quien
-# corre el comando: el bus tenía 52.165 mensajes acumulados al 25/08, que a precio de una llamada
-# por evento son entre siete y quince dólares. Un `make triaje` sin argumentos no puede gastar eso
-# por accidente.
+# corre el comando: decenas de miles de mensajes, a una llamada por evento, son decenas de dólares.
+# Un `make triaje` sin argumentos no puede gastar eso por accidente.
 TOPE_SIN_CONFIRMAR = 2000
 
 # Tokens de una llamada típica. Sirven para estimar el gasto antes de arrancar, no para
 # contabilizarlo: lo real lo lleva el adaptador y queda guardado en cada decisión.
 #
-# Salen de la primera corrida contra datos reales, no de una cuenta a ojo. Estaban en (1200, 180) y
-# la estimación daba menos de la mitad de lo que el motor gasta de verdad, que para una guardia
-# pensada justamente para avisar antes de gastar es el error que peor viene.
+# Salen de corridas contra datos reales y no de una cuenta a ojo. Una estimación que se queda corta
+# es el peor error para una guardia pensada justamente para avisar antes de gastar.
 TOKENS_TIPICOS = (2545, 980)
 
 
@@ -117,6 +116,28 @@ def atraso(consumidor: bus.ConsumidorDelBus) -> int:
         return 0
 
 
+def firmas_nuevas(consumidor: bus.ConsumidorDelBus) -> int:
+    """Cuántas conductas del atraso todavía no tienen decisión en el repertorio.
+
+    Con la reutilización encendida es lo que de verdad se paga: el atraso puede tener cien mil
+    mensajes, pero una conducta ya resuelta se copia sin llamar al proveedor. Estimar por mensajes
+    multiplicaría el gasto por las repeticiones de cada conducta, que llegan a miles.
+    """
+    desde = "-"
+    try:
+        for grupo in consumidor.r.xinfo_groups(consumidor.stream):
+            if grupo.get("name") == consumidor.grupo and grupo.get("last-delivered-id"):
+                desde = f"({grupo['last-delivered-id']}"
+    except redis.ResponseError:
+        return 0
+    crudo = consumidor.r.xrange(consumidor.stream, min=desde)
+    firmas = {
+        firma_de_conducta.de_evento(bus.EventoDelBus.desde_mensaje(eid, campos))
+        for eid, campos in cast("list[bus.Mensaje]", crudo or [])
+    }
+    return sum(1 for f in firmas if not consumidor.r.exists(PREFIJO + f))
+
+
 def _linea(evento: bus.EventoDelBus, final: EstadoTriaje) -> str:
     """Una línea por evento, para ver la corrida sin abrir Kibana."""
     if final.get("ya_existia"):
@@ -148,7 +169,13 @@ def manejador(
     compilado = compilar(servicio=servicio, almacen=almacen, repertorio=repertorio)
 
     def triar(evento: bus.EventoDelBus) -> bool:
-        final = ejecutar(compilado, estado_inicial(evento))
+        try:
+            final = ejecutar(compilado, estado_inicial(evento))
+        except CuotaAgotadaError as exc:
+            # El problema no es el evento sino el proveedor, y va a afectar igual a todos los que
+            # siguen. Tomado como una falla común, cada evento fallaría, se reclamaría y a la
+            # tercera entrega terminaría en la cola de muertos.
+            raise bus.DetenerConsumo(str(exc)) from exc
         print(_linea(evento, final))
         # Le avisa al consumidor si la decisión ya existía, para que lo cuente como repetido.
         return bool(final.get("ya_existia"))
@@ -216,9 +243,9 @@ def main() -> int:
         stream=args.stream,
         grupo=args.grupo,
         nombre=args.nombre,
-        # Con `--limite 5` y un lote de diez, el consumidor leía diez y confirmaba cinco: los otros
-        # cinco quedaban entregados sin confirmar y había que esperar la ventana de reclamo para
-        # que otro los tomara. Se ve en la corrida siguiente como cinco huérfanos reclamados.
+        # Con `--limite 5` y un lote de diez, el consumidor leería diez y confirmaría cinco: los
+        # otros cinco quedarían entregados sin confirmar hasta que venza la ventana de reclamo, y
+        # la corrida siguiente los vería como huérfanos.
         lote=min(args.lote, args.limite) if args.limite else args.lote,
     )
 
@@ -231,7 +258,11 @@ def main() -> int:
 
     falta = atraso(consumidor)
     print(f"  atraso del grupo '{args.grupo}': {falta:,} evento(s)".replace(",", "."))
-    if falta:
+    if falta and repertorio is not None:
+        nuevas = firmas_nuevas(consumidor)
+        print(f"  conductas sin decisión en el atraso: {nuevas:,}".replace(",", "."))
+        print(f"  gasto estimado reutilizando: USD {costo_estimado(nuevas):.2f}")
+    elif falta:
         print(f"  gasto estimado si se tría todo: USD {costo_estimado(falta):.2f}")
 
     if args.limite is None and falta > TOPE_SIN_CONFIRMAR and not args.todo:
@@ -245,6 +276,11 @@ def main() -> int:
 
     c = consumidor.correr(limite=args.limite, desde_ahora=args.desde_ahora)
 
+    if consumidor.motivo_de_parada:
+        print(f"\n  La corrida se detuvo: {consumidor.motivo_de_parada}")
+        print("  Los eventos del lote en curso quedaron pendientes sin sumar entregas y se retoman")
+        print("  en la próxima corrida.")
+
     print("\n  resumen del bus")
     print(f"    procesados:  {c.procesados}")
     print(f"    repetidos:   {c.repetidos}   (mismo doc_id ya resuelto)")
@@ -255,7 +291,7 @@ def main() -> int:
     print(inferencia.resumen())
     if repertorio is not None:
         print(repertorio.resumen())
-    return 0
+    return 2 if consumidor.motivo_de_parada else 0
 
 
 if __name__ == "__main__":

@@ -32,10 +32,9 @@ PREFIX_LEN = 5
 
 # Cuántas contraseñas distintas se piden por página.
 #
-# Antes esto era un `terms` con `size` 100.000 y una sola consulta. Funcionó mientras hubo unas
-# 54.000 distintas y se rompió cuando pasamos las 90.000: Elasticsearch corta en 65.536 cubos y
-# devuelve 400, así que el refresh venía fallando entero en este paso. Un `composite` pagina y no
-# tiene ese techo, que es lo que hace falta acá porque la cantidad solo va a seguir creciendo.
+# Se pagina con un `composite` y no con un `terms` de una sola consulta: Elasticsearch corta en
+# 65.536 cubos por agregado y devuelve 400, y la cantidad de contraseñas distintas supera ese techo
+# y solo va a seguir creciendo. Con el `terms`, el refresh entero corta en este paso.
 POR_PAGINA = 10_000
 
 # Cuántas páginas se aceptan antes de cortar. Con el tamaño de arriba son cinco millones de

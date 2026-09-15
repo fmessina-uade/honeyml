@@ -171,9 +171,9 @@ function deltaAngular(desde: number, hasta: number): number {
 /**
  * Qué gobierna la rotación en este momento.
  *
- * Sin esto había una sola pregunta (¿hay país elegido?) y no alcanzaba: en cuanto el arrastre puede
- * mover el globo, hace falta distinguir "nadie lo tocó" de "el usuario lo dejó así". Si no, soltar
- * el mouse con un país elegido devolvía el globo a su posición y el gesto parecía no haber pasado.
+ * Una sola pregunta (¿hay país elegido?) no alcanza: en cuanto el arrastre puede mover el globo,
+ * hace falta distinguir "nadie lo tocó" de "el usuario lo dejó así". Si no, soltar el mouse con un
+ * país elegido devolvería el globo a su posición y el gesto parecería no haber pasado.
  */
 type Modo = 'auto' | 'destino' | 'libre';
 
@@ -228,8 +228,8 @@ export default function Globe({ countries, selected, onSelect }: Props) {
     modoRef.current = 'destino';
 
     // Si la animación no puede correr, se salta directo al destino en lugar de no moverse. Sin
-    // esto, con "reducir movimiento" o con la pestaña de fondo, elegir un país dejaba el marcador
-    // donde estaba y la selección parecía no hacer nada. Centrar el país es la función y el giro es
+    // esto, con "reducir movimiento" o con la pestaña de fondo, elegir un país dejaría el marcador
+    // donde está y la selección parecería no hacer nada. Centrar el país es la función y el giro es
     // la decoración: entre las dos se conserva la función.
     if (sinAnimacion()) {
       rotRef.current = destino;
@@ -269,9 +269,9 @@ export default function Globe({ countries, selected, onSelect }: Props) {
       rafRef.current = undefined;
     };
 
-    // Volver de segundo plano tiene que revivir el giro. La condición solo se miraba al montar, así
-    // que abrir el panel en una pestaña de fondo dejaba el bucle sin arrancar y traerla al frente
-    // después no lo revivía: el globo quedaba muerto para toda la visita.
+    // Volver de segundo plano tiene que revivir el giro. Si la condición se mirara solo al montar,
+    // abrir el panel en una pestaña de fondo dejaría el bucle sin arrancar y traerla al frente
+    // después no lo reviviría: el globo quedaría muerto para toda la visita.
     const alCambiarVisibilidad = () => (document.hidden ? parar() : arrancar());
     document.addEventListener('visibilitychange', alCambiarVisibilidad);
     arrancar();
@@ -295,7 +295,7 @@ export default function Globe({ countries, selected, onSelect }: Props) {
     modoRef.current = 'libre';
     setArrastrando(true);
     // Con captura, el gesto sobrevive a que el puntero se salga del círculo: sin ella, arrastrar
-    // rápido soltaba el globo a mitad de camino.
+    // rápido suelta el globo a mitad de camino.
     e.currentTarget.setPointerCapture(e.pointerId);
   };
 

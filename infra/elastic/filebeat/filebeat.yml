@@ -17,11 +17,10 @@ filebeat.inputs:
     fields_under_root: true
     fields:
       honeypot: cowrie
-    # Identidad por el contenido del primer kilobyte y no por inodo. En desarrollo los inodos del
-    # montaje no eran estables (rsync los cambia al reemplazar un archivo, y en algunos arranques
-    # cambiaron también los de archivos sin tocar), y Filebeat releía como nuevo todo lo que cambiaba
-    # de inodo. En el VPS no se midió, pero Elastic documenta que Docker puede reutilizar inodos, y
-    # dejar las dos configuraciones iguales evita la sorpresa el día que el stack corra ahí.
+    # Identidad por el contenido del primer kilobyte y no por inodo. Filebeat relee como nuevo todo
+    # lo que cambia de inodo, y el inodo no es estable: en desarrollo rsync lo cambia al reemplazar
+    # un archivo, y Elastic documenta que Docker puede reutilizar inodos. Dejar las dos
+    # configuraciones iguales evita la sorpresa el día que el stack corra en el VPS.
     prospector.scanner.fingerprint.enabled: true
     file_identity.fingerprint: ~
 

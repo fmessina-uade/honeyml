@@ -9,8 +9,8 @@ de las observaciones, así que la exactitud premia a un clasificador que ignore 
 macro pesa todas las clases igual, que es lo que necesita un caso de uso de seguridad: la táctica
 rara es justamente la que vale la pena detectar.
 
-La comparación mira con particular atención la clase más débil, exfiltración, cuyo F1 quedaba en
-0,11 con la configuración de partida. Un candidato que la levante importa más que uno que le rasque
+La comparación mira con particular atención la clase más débil, exfiltración, cuyo F1 con la
+configuración de partida es de 0,11. Un candidato que la levante importa más que uno que le rasque
 una décima al agregado.
 
 Uso:

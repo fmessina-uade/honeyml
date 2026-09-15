@@ -15,6 +15,10 @@ Los límites de tasa. Un 429 no es un fallo, es el proveedor pidiendo que se esp
 porque un límite de tasa es transitorio y el evento tiene que volver al bus en vez de persistirse
 como no concluyente.
 
+La excepción es la cuota. Un `retry-after` más largo de lo que conviene esperar, o el bloqueo por
+límite de gasto, no se arreglan reintentando: levantan `CuotaAgotadaError` para que el motor corte
+la corrida en vez de seguir fallando evento por evento.
+
 La contabilidad. Cada respuesta trae cuántos tokens costó, se acumulan y se traducen a dólares con
 los precios de abajo. No es telemetría decorativa: "cuánto sale clasificar un evento" es una métrica
 operativa que hay que reportar, y medirla desde el principio evita reconstruirla después.
@@ -70,7 +74,10 @@ MAX_REINTENTOS = 3
 ESPERA_BASE = 2.0
 
 # Techo de espera. Un `retry-after` de diez minutos es una respuesta válida del proveedor y una
-# pésima idea para un consumidor: mejor devolver el evento al bus y volver a tomarlo después.
+# pésima idea para un consumidor. Una espera así de larga quiere decir que se agotó la cuota, y eso
+# afecta igual a todos los eventos que siguen: devolverlos al bus uno por uno los llevaría, a la
+# tercera entrega, a la cola de muertos. Por encima de este techo no se reintenta, se corta la
+# corrida.
 ESPERA_MAXIMA = 30.0
 
 
@@ -78,26 +85,29 @@ ESPERA_MAXIMA = 30.0
 # borde de Cloudflare que el proveedor tiene adelante lo rechaza con un 403 y el código 1010
 # ("navegador vedado") antes de que el proveedor llegue a ver la petición.
 #
-# El síntoma es cruel, porque la misma petición por `curl` funciona y entonces todo apunta a la
-# credencial cuando la credencial está perfecta. Lo medimos con una clave inválida a propósito: con
-# el agente por defecto da 403/1010, y con este da 401 "Invalid API Key", que es el error honesto de
-# alguien que sí llegó al proveedor.
+# El síntoma confunde, porque la misma petición por `curl` funciona y entonces todo apunta a la
+# credencial cuando la credencial está perfecta. Con una clave inválida se ve la diferencia: con el
+# agente por defecto contesta 403/1010, y con este contesta 401 "Invalid API Key", que es el error
+# honesto de alguien que sí llegó al proveedor.
 AGENTE = "honeyml/0.1 (+https://www.honeyml.com.ar)"
 
 # Código de Cloudflare para "agente bloqueado". Se distingue de un rechazo de credencial porque
 # mandan a revisar cosas distintas.
 CODIGO_AGENTE_BLOQUEADO = "1010"
 
-# El proveedor devuelve este código, con un 400, cuando su decodificación restringida no logró
-# producir una respuesta que cumpla el esquema. Parece un pedido mal armado y no lo es: sobre una
-# tanda de treinta eventos falló en cuatro, y los cuatro pasaron al reintentarlos tal cual, sin
-# cambiarles una coma. Es una falla pasajera del proveedor.
+# El proveedor devuelve este código, con un 400, cuando su decodificación restringida no logra
+# producir una respuesta que cumpla el esquema. Parece un pedido mal armado y no lo es: el mismo
+# pedido, reenviado tal cual, pasa. Es una falla pasajera del proveedor.
 #
-# Importa clasificarlo bien. Como rechazo, el evento salía del grafo sin confirmar y había que
-# esperar los diez minutos de la ventana de reclamo para que otro consumidor lo tomara; a razón de
-# uno de cada ocho eventos, eso convierte una puesta al día en una espera. Como pasajero, se
-# reintenta en el acto y el evento sigue.
+# Importa clasificarlo bien. Como rechazo, el evento sale del grafo sin confirmar y hay que esperar
+# los diez minutos de la ventana de reclamo para que otro consumidor lo tome, y con la frecuencia
+# con que aparece eso convierte una puesta al día en una espera. Como pasajero, se reintenta en el
+# acto y el evento sigue.
 CODIGO_ESQUEMA_NO_CUMPLIDO = "json_validate_failed"
+
+# Lo que devuelve el proveedor, con un 400, cuando la organización llegó a su límite de gasto
+# mensual: bloquea todas las claves hasta el mes siguiente o hasta que se suba el límite.
+CODIGO_GASTO_BLOQUEADO = "blocked_api_access"
 
 AYUDA_CERTIFICADOS = (
     "TLS falló al verificar el certificado del proveedor. No es que el proveedor no responda: "
@@ -145,6 +155,15 @@ class ProveedorInalcanzableError(RuntimeError):
 
 class PedidoRechazadoError(RuntimeError):
     """El proveedor entendió el pedido y lo rechazó. Eso es un defecto de este lado."""
+
+
+class CuotaAgotadaError(RuntimeError):
+    """El proveedor dejó de aceptar pedidos por cuota o por límite de gasto.
+
+    No es un problema del evento ni del pedido, y no se arregla en segundos: afecta igual a todo lo
+    que venga detrás. Por eso no se reintenta y va separado de `ProveedorInalcanzableError`, que sí
+    es pasajero y devuelve el evento al bus.
+    """
 
 
 @dataclass
@@ -282,6 +301,12 @@ class ClienteDeInferencia:
                 raise _TransitorioError(f"HTTP {exc.code}") from exc
             if exc.code == 400 and CODIGO_ESQUEMA_NO_CUMPLIDO in detalle:
                 raise _TransitorioError(f"HTTP 400, {CODIGO_ESQUEMA_NO_CUMPLIDO}") from exc
+            if exc.code == 400 and CODIGO_GASTO_BLOQUEADO in detalle:
+                raise CuotaAgotadaError(
+                    f"El proveedor bloqueó la organización por límite de gasto "
+                    f"({CODIGO_GASTO_BLOQUEADO}). Se reanuda al subir el límite o al empezar "
+                    "el mes."
+                ) from exc
             # Un 403 con el código 1010 no lo emite el proveedor sino el borde que tiene adelante,
             # y culpar a la credencial, que es lo que hacía esta rama antes, manda a revisar algo
             # que está bien. Los dos rechazos se ven casi iguales y se arreglan de forma opuesta.
@@ -318,6 +343,11 @@ class ClienteDeInferencia:
             try:
                 return self._postear(cuerpo)
             except _LimiteDeTasaError as exc:
+                if exc.segundos is not None and exc.segundos > ESPERA_MAXIMA:
+                    raise CuotaAgotadaError(
+                        f"El proveedor pide esperar {exc.segundos:.0f} s antes de volver a "
+                        "pedir: se agotó la cuota, no es una ráfaga."
+                    ) from exc
                 ultimo = exc
                 self.consumo.esperas_por_limite += 1
                 espera = exc.segundos if exc.segundos is not None else ESPERA_BASE * (2**intento)

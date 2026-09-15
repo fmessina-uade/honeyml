@@ -37,21 +37,20 @@ class Decision(BaseModel):
     # que el modelo inventa y que nadie lee es una alucinación que pasa en silencio.
     model_config = ConfigDict(extra="forbid")
 
-    # El `doc_id` no está acá a propósito, y vale explicar por qué: se lo pedía al modelo y se
-    # rechazaba la decisión si no coincidía con el del evento. Pero es un SHA-256 de 64 caracteres
-    # hexadecimales, y copiar eso exacto es justo lo que un modelo hace mal. Cada carácter errado
-    # costaba un reproche y un reintento pago, sobre una severidad que podía estar bien juzgada.
+    # El `doc_id` no está acá a propósito. Es un SHA-256 de 64 caracteres hexadecimales, y copiar
+    # eso exacto es justo lo que un modelo hace mal: exigirlo costaría un reproche y un reintento
+    # pago por cada carácter errado, sobre una severidad que puede estar bien juzgada.
     #
-    # Nadie lo leía, además: persistencia indexa bajo el `doc_id` del evento, que viene del bus. El
-    # campo solo servía para compararse consigo mismo. El anclaje al contexto lo verifica
-    # `evidencia`, que tiene que citar hechos concretos y no puede venir vacía.
+    # Tampoco hace falta: persistencia indexa bajo el `doc_id` del evento, que viene del bus, y el
+    # anclaje al contexto lo verifica `evidencia`, que tiene que citar hechos concretos y no puede
+    # venir vacía.
     #
     # Sigue viajando en el pedido como parte del contexto, para que el prompt reconstruido
-    # identifique su evento. Lo que se saca es la obligación de devolverlo.
+    # identifique su evento. Lo que no se pide es devolverlo.
     #
-    # `concluyente` salió por lo mismo. Describe cómo terminó el ciclo, que el modelo no puede
-    # saber, y el nodo de persistencia lo escribe desde `resultado_del_ciclo`. Pedírselo era
-    # obligarlo a inventar un valor que después se descartaba.
+    # `concluyente` tampoco está, por lo mismo. Describe cómo terminó el ciclo, que el modelo no
+    # puede saber, y el nodo de persistencia lo escribe desde `resultado_del_ciclo`. Pedírselo sería
+    # obligarlo a inventar un valor que después se descarta.
 
     # Enum y no `str`: así el nodo de validación rechaza un nivel inventado sin escribir una sola
     # comprobación. Que el nivel además sea defendible para este evento es otra cosa, y la resuelve
@@ -76,10 +75,9 @@ class Contexto(BaseModel):
     doc_id: str
     resumen: str = Field(description="el evento en una línea")
     # La categoría y el resultado son los dos campos de los que la escala deriva el piso, así que
-    # sin ellos el modelo no lo puede calcular. Faltaban, y se notó midiendo: toda autenticación
-    # exitosa venía como `bajo` y se llevaba un reproche, porque el modelo veía "authentication" sin
-    # saber si había prosperado y elegía el nivel más bajo, que es lo que el propio pedido le pide
-    # ante la duda.
+    # sin ellos el modelo no lo puede calcular: una autenticación exitosa llegaría como `bajo` con
+    # su reproche, porque el modelo vería "authentication" sin saber si prosperó y elegiría el
+    # nivel más bajo, que es lo que el propio pedido le pide ante la duda.
     categoria: str = ""
     resultado: str = ""
     sensor: str = ""
@@ -124,7 +122,8 @@ class EstadoTriaje(TypedDict, total=False):
     reproches: Annotated[list[str], operator.add]
     # Cuántas veces la validación rechazó, que no es lo mismo que cuántos reproches hay: una sola
     # ronda puede dejar cuatro. Existe como contador aparte porque el grafo necesita saber cuántos
-    # intentos se gastaron, y contar reproches daba por agotado el presupuesto en la primera vuelta.
+    # intentos se gastaron, y contar reproches daría por agotado el presupuesto en la primera
+    # vuelta.
     rechazos: Annotated[int, operator.add]
     motivo_de_corte: MotivoDeCorte
     # La firma de conducta del evento, calculada por el primer nodo. Viaja en el estado porque la
@@ -165,9 +164,9 @@ def resultado_del_ciclo(estado: EstadoTriaje) -> MotivoDeCorte | None:
     """Por qué termina este ciclo. `None` significa que terminó con una decisión que vale guardar.
 
     Las dos funciones de acá abajo son predicados sobre el estado, no topología, y por eso viven en
-    este módulo. Estuvieron en `graph.py` hasta que el nodo de persistencia necesitó la segunda: un
-    nodo importando el grafo que lo importa a él es un ciclo, y la dependencia tiene que ir en un
-    solo sentido. Que las lean el grafo y un nodo es justamente la señal de que son del contrato.
+    este módulo y no en `graph.py`: el nodo de persistencia necesita la segunda, y un nodo
+    importando el grafo que lo importa a él es un ciclo. La dependencia tiene que ir en un solo
+    sentido. Que las lean el grafo y un nodo es justamente la señal de que son del contrato.
     """
     declarado = estado.get("motivo_de_corte")
     if declarado:

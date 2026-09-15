@@ -21,10 +21,9 @@ filebeat.inputs:
     prospector.scanner.check_interval: 5s
     # Los archivos se reconocen por el contenido de su primer kilobyte y no por el inodo. Los inodos
     # que ve el contenedor dentro de este montaje no son estables: rsync los cambia cada vez que
-    # reemplaza un archivo, y en al menos dos arranques del stack cambiaron también los de archivos
-    # que nadie había tocado. Con la identidad por inodo, Filebeat tomaba cada cambio como un
-    # archivo nuevo y lo releía desde el principio: el 14/09, 29 de 95 archivos tenían más de una
-    # identidad en el registro y el bus había recibido decenas de miles de eventos ya decididos.
+    # reemplaza un archivo, y algunos arranques del stack cambian también los de archivos sin tocar.
+    # Con la identidad por inodo, Filebeat toma cada cambio como un archivo nuevo, lo relee desde el
+    # principio y el bus recibe otra vez eventos ya decididos.
     # Con la huella, un archivo rotado que llega con otro nombre se reconoce y se sigue desde donde
     # había quedado. Cambiar la identidad provoca una relectura completa, por única vez.
     prospector.scanner.fingerprint.enabled: true

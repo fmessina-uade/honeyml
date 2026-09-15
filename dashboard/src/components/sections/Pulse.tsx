@@ -30,9 +30,9 @@ const SENSOR_COLOR: Record<string, string> = {
 /**
  * Fecha larga para el tooltip: "lunes, 3 de junio". Se lee mejor que una cadena ISO.
  *
- * La vista horaria etiqueta sus puntos como "2026-08-19 14", así que hay que separar la hora antes
- * de parsear la fecha. Partir la etiqueta entera por guiones dejaba el día como "19 14", que parsea
- * como NaN y hacía que todos los tooltips horarios dijeran "Invalid Date".
+ * La vista horaria etiqueta sus puntos como "AAAA-MM-DD HH", así que hay que separar la hora antes
+ * de parsear la fecha. Partir la etiqueta entera por guiones deja el día pegado a la hora, que
+ * parsea como NaN y hace que los tooltips horarios digan "Invalid Date".
  */
 function longDate(etiqueta: string, lang: 'es' | 'en'): string {
   const [fecha, hora] = etiqueta.split(' ');

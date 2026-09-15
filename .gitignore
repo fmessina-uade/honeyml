@@ -271,8 +271,7 @@ reports/figures/
 infra/vps/.env
 
 # =============================================================================
-# Documentación local — notas de trabajo, no entregables del repo
-# El documento académico final se entrega como PDF por fuera del repositorio.
+# Documentación local: notas de trabajo, que no se versionan
 # =============================================================================
 *.md
 docs/

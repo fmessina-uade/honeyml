@@ -20,7 +20,7 @@ services:
       --save ""
     volumes:
       - redis_data:/data
-    # atado a loopback, nunca expuesto en la interfaz pública del VPS (RNF-03)
+    # atado a loopback, nunca expuesto en la interfaz pública del VPS
     ports:
       - "127.0.0.1:6379:6379"
     networks:

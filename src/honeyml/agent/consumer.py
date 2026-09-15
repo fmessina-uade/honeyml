@@ -5,8 +5,10 @@ eventos de acá y nunca habla con el bus.
 
 El contrato del manejador es una sola regla: si levanta una excepción el evento no se confirma y
 vuelve, y si retorna, la decisión es durable y se confirma. Si además devuelve `True`, la decisión
-ya existía de antes y el evento se cuenta como repetido. Eso permitió que el grafo se enchufara
-después sin tocar la lógica de este módulo: quien los une es `motor.py`.
+ya existía de antes y el evento se cuenta como repetido. Y si levanta `DetenerConsumo`, el problema
+no es el evento sino algo que afecta a todos los que siguen: la corrida se corta y los eventos del
+lote quedan pendientes sin cobrarles la entrega. Con ese contrato el grafo se enchufa sin tocar la
+lógica de este módulo: quien los une es `motor.py`.
 
 Hay cuatro problemas resueltos a propósito, y los cuatro son silenciosos si no se los atiende.
 
@@ -44,7 +46,7 @@ from typing import Any, cast
 import redis
 
 # Los valores por defecto coinciden con infra/redis/docker-compose.yml: el bus escucha solo en
-# loopback y no se alcanza desde afuera de la zona de análisis (RNF-03).
+# loopback y no se alcanza desde afuera de la zona de análisis.
 HOST = os.getenv("BUS_HOST", "127.0.0.1")
 PORT = int(os.getenv("BUS_PORT", "6379"))
 STREAM = os.getenv("BUS_STREAM", "honeyml:events")
@@ -60,24 +62,24 @@ STREAM_MUERTOS = os.getenv("BUS_STREAM_MUERTOS", "honeyml:events:muertos")
 #   una llamada    60 s de timeout × 3 reintentos del cliente + 6 s de espera exponencial = 186 s
 #   un ciclo       186 s × 3 intentos correctivos                                         = 558 s
 #
-# Estaba en 60 s, que es menos que una sola llamada lenta. Con ese valor, un ciclo que se demora
-# pierde el evento: otro consumidor lo reclama mientras el primero sigue trabajando, los dos pagan
-# la inferencia, y el contador de entregas sube hasta mandarlo a la cola de muertos sin que haya
-# nada roto. `test_la_ventana_de_reclamo_cubre_el_ciclo_completo` fija la relación, así que cambiar
-# el timeout o MAX_INTENTOS sin revisar esto rompe una prueba en vez de aparecer en producción.
+# Una ventana más corta que una sola llamada lenta, como 60 s, hace perder el evento a un ciclo que
+# se demora: otro consumidor lo reclama mientras el primero sigue trabajando, los dos pagan la
+# inferencia, y el contador de entregas sube hasta mandarlo a la cola de muertos sin que haya nada
+# roto. `test_la_ventana_de_reclamo_cubre_el_ciclo_completo` fija la relación, así que cambiar el
+# timeout o MAX_INTENTOS sin revisar esto rompe una prueba en vez de aparecer en producción.
 #
-# El costo de que sobre es que un consumidor caído deja su evento quieto diez minutos. Para un
-# sistema que recibe 21 eventos por minuto y no tiene requisito de latencia, es barato.
+# El costo de que sobre es que un consumidor caído deja su evento quieto diez minutos, que para el
+# ritmo al que llegan los eventos es barato.
 INACTIVIDAD_MS = int(os.getenv("BUS_INACTIVIDAD_MS", "600000"))
 
 # Marcas de deduplicación. Una clave por documento, así cada una vence por su cuenta en lugar de
 # caerse todo el conjunto junto.
 #
-# Son un ahorro y no la garantía. Se pensaron para los duplicados que deja un reinicio del
-# normalizador, que llegan a los minutos, y para eso un día sobra. Pero el 14/09 se midió que
-# también llegan semanas después: cuando Filebeat relee el corpus, el bus recibe otra vez eventos
-# ya decididos y la marca venció hace rato. Lo que impide pisar una decisión es que el almacén
-# escribe con `_create`; la marca solo evita volver a correr el grafo mientras está viva.
+# Son un ahorro y no la garantía. Cubren los duplicados que deja un reinicio del normalizador, que
+# llegan a los minutos, y para eso un día sobra. Pero un duplicado también puede llegar semanas
+# después: si Filebeat relee el corpus, el bus recibe otra vez eventos ya decididos y la marca
+# venció hace rato. Lo que impide pisar una decisión es que el almacén escribe con `_create`; la
+# marca solo evita volver a correr el grafo mientras está viva.
 PREFIJO_VISTO = "honeyml:visto:"
 TTL_VISTO = int(os.getenv("BUS_TTL_VISTO", "86400"))
 
@@ -86,9 +88,9 @@ TTL_VISTO = int(os.getenv("BUS_TTL_VISTO", "86400"))
 Mensaje = tuple[str, dict[str, str]]
 
 # Prefijos que Cowrie deja en la línea del registro y que no son parte del comando que tipeó el
-# atacante. El pipeline ya los saca antes de indexar, pero el bus retiene mensajes publicados antes
-# de ese arreglo: al 10/09 eran 3.338 de los 71.654 acumulados. Un evento así llega con
-# `CMD: uname -a` y el motor razona sobre el prefijo como si fuera parte de lo ejecutado.
+# atacante. El pipeline los saca antes de indexar, pero el bus puede retener mensajes publicados
+# sin ese recorte. Un evento así llega con `CMD: uname -a`, y el motor razona sobre el prefijo como
+# si fuera parte de lo ejecutado.
 #
 # Se sanea acá y no solo en el pipeline porque son dos poblaciones distintas: lo que ya está en el
 # bus no se vuelve a publicar. Que el mismo recorte viva en los dos lados es a propósito, y la
@@ -164,6 +166,16 @@ class EventoDelBus:
         return f"{self.honeypot}/{self.category} {self.source_ip} {self.protocol} · {que[:60]}"
 
 
+class DetenerConsumo(Exception):  # noqa: N818 - es una señal de control, no un error
+    """Lo levanta el manejador cuando seguir consumiendo haría daño en vez de solo fallar.
+
+    El caso típico es la cuota del proveedor. Una falla común deja el evento pendiente, se
+    reclama y a la tercera entrega va a la cola de muertos, que es lo correcto para un evento que
+    siempre falla. Con la cuota agotada fallan todos por igual, y tratarlos así mandaría a esa cola
+    miles de eventos que no tienen nada malo.
+    """
+
+
 @dataclass
 class Contadores:
     procesados: int = 0
@@ -189,7 +201,8 @@ class ConsumidorDelBus:
     El manejador levanta una excepción cuando falla: levantar significa "no resuelto", así que el
     mensaje queda pendiente y alguien lo va a volver a tomar. Retornar significa que la decisión ya
     es durable y el mensaje se puede confirmar. Retornar `True` agrega un matiz, que la decisión ya
-    existía de antes, y el evento se cuenta como repetido en lugar de procesado.
+    existía de antes, y el evento se cuenta como repetido en lugar de procesado. `DetenerConsumo`
+    corta la corrida entera.
     """
 
     def __init__(
@@ -224,6 +237,8 @@ class ConsumidorDelBus:
         self.inactividad_ms = inactividad_ms
         self.contadores = Contadores()
         self._parar = False
+        # Por qué se cortó la corrida, cuando la cortó el manejador. Vacío si terminó normalmente.
+        self.motivo_de_parada = ""
 
         self.r = redis.Redis(
             host=host, port=puerto, decode_responses=True, socket_timeout=bloqueo_ms / 1000 + 10
@@ -307,6 +322,9 @@ class ConsumidorDelBus:
 
         try:
             ya_estaba = self.manejador(evento)
+        except DetenerConsumo:
+            # No es una falla del evento: la resuelve `correr`, que sabe qué quedó del lote.
+            raise
         except Exception as exc:  # noqa: BLE001 - que falle el manejador no puede cortar el ciclo
             self.contadores.fallados += 1
             print(f"  ! falló ({type(exc).__name__}: {exc}): {evento.resumen()}")
@@ -420,13 +438,37 @@ class ConsumidorDelBus:
                 continue
 
             vacios = 0
-            for evento in eventos:
-                self.procesar(evento)
+            for i, evento in enumerate(eventos):
+                try:
+                    self.procesar(evento)
+                except DetenerConsumo as exc:
+                    self.motivo_de_parada = str(exc)
+                    self._devolver_sin_cobrar(eventos[i:])
+                    self._parar = True
+                    break
                 if limite is not None and self.contadores.atendidos >= limite:
                     self._parar = True
                     break
 
         return self.contadores
+
+    def _devolver_sin_cobrar(self, eventos: list[EventoDelBus]) -> None:
+        """Deja pendientes los eventos que no se atendieron, con la entrega que tenían antes.
+
+        Leerlos ya les sumó una entrega. Sin descontarla, un corte por cuota que se repitiera tres
+        veces mandaría esos mismos eventos a la cola de muertos sin que tengan nada malo.
+        `RETRYCOUNT` fija el contador a mano, y es la única forma que da Redis de descontarla.
+        """
+        for evento in eventos:
+            self.r.xclaim(
+                self.stream,
+                self.grupo,
+                self.nombre,
+                min_idle_time=0,
+                message_ids=[evento.entry_id],
+                retrycount=max(evento.entregas - 1, 0),
+                justid=True,
+            )
 
 
 def manejador_de_registro(evento: EventoDelBus) -> None:
@@ -434,10 +476,8 @@ def manejador_de_registro(evento: EventoDelBus) -> None:
 
     El que tría es el de `motor.py`, que corre el grafo. Este queda porque sigue siendo útil: mira
     qué está llegando al bus sin gastar una sola llamada paga, que es justo lo que uno quiere cuando
-    está revisando el pipeline y no el motor.
-
-    Sirvió además para verificar el ciclo de confirmación entero antes de que existiera un solo
-    nodo, y esa parte no cambió ni una línea de este módulo al enchufar el grafo.
+    está revisando el pipeline y no el motor. Sirve también para probar el ciclo de confirmación
+    sin el grafo de por medio.
     """
     print(f"  · {evento.resumen()}")
 

@@ -233,7 +233,7 @@ es-bootstrap:
 validate-indexing:
 	@python3 infra/elastic/scripts/validate_indexing.py --es-url $${ES_URL:-http://localhost:9200}
 
-# salida compacta para las capturas del informe: sin lista de índices por día ni direcciones
+# salida compacta para capturas de pantalla: sin lista de índices por día ni direcciones
 validate-indexing-resumen:
 	@python3 infra/elastic/scripts/validate_indexing.py --es-url $${ES_URL:-http://localhost:9200} --resumen
 
@@ -267,13 +267,13 @@ consumer:
 # Con LIMITE=N tría N eventos y sale, que es la forma de probarlo sin quedarse escuchando y sin
 # gastar más llamadas pagas de las que uno quería.
 # Antes de arrancar informa el atraso del grupo y lo que costaría triarlo. Si son más de dos mil
-# eventos y no se pidió un límite, no arranca: el bus llegó a tener 52.165 mensajes acumulados, que
-# son entre siete y quince dólares de inferencia, y eso no se gasta sin pedirlo.
+# eventos y no se pidió un límite, no arranca: un reprocesamiento histórico de decenas de miles de
+# mensajes cuesta decenas de dólares de inferencia, y eso no se gasta sin pedirlo.
 #
 # Con REUTILIZAR=1 copia la decisión cuando otro evento ya resolvió la misma conducta (mismo sensor,
-# categoría, acción, resultado, protocolo, usuario y comando). Sobre el bus del 11/09 eran 2.111
-# conductas distintas en 71.654 eventos, o sea que el 97 % se resuelve sin pagar una llamada. Cada
-# documento dice de qué decisión copió, así que la reutilización es auditable y no un atajo.
+# categoría, acción, resultado, protocolo, usuario y comando). Las conductas distintas son muchas
+# menos que los eventos, así que la gran mayoría se resuelve sin pagar una llamada. Cada documento
+# dice de qué decisión copió, así que la reutilización es auditable y no un atajo.
 #
 # Una decisión ya guardada no se pisa nunca: si el evento vuelve a llegar, se confirma y se cuenta
 # como repetido. Con REESCRIBIR=1 se sobrescribe, para triar otra vez a propósito; no se combina

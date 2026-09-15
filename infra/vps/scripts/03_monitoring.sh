@@ -168,7 +168,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 # reporte diario a las 07:00 de Argentina (UTC-3, o 10:00 UTC)
 0 10 * * * root $DAILY_REPORT_SCRIPT >> $HEALTHCHECK_LOG 2>&1
 
-# rotación semanal del registro de actividad de los honeypots, hasta que esté Logstash
+# rotación semanal del registro de actividad de los honeypots
 0 3 * * 0 root find /var/log -name "honeyml_*.log" -mtime +30 -delete 2>/dev/null || true
 CRONEOF
 

@@ -1,7 +1,7 @@
 """Optimización de hiperparámetros del clasificador que ganó la comparación de modelos.
 
-La comparación eligió la familia: potenciación por gradiente con histograma, en valores más o menos
-por defecto. Este módulo responde lo que quedaba pendiente, si esa configuración era buena, y lo
+La comparación elige la familia: potenciación por gradiente con histograma, en valores más o menos
+por defecto. Este módulo responde la pregunta que queda, si esa configuración es buena, y lo
 hace sobre la misma partición, el mismo preprocesamiento y las mismas métricas, así los dos
 resultados se pueden leer uno al lado del otro.
 
@@ -131,9 +131,8 @@ def main() -> None:
     # "exhaust" en lugar de un piso fijo, y no es un detalle.
     #
     # Con un piso elegido a mano, la progresión geométrica casi nunca cae justo sobre el total: con
-    # 200.000 y factor 3 daba 200k → 600k → 1,8M, y como 1,8M excede las 1.423.959 filas
-    # disponibles, sklearn cortaba en 600k. El ganador quedaba elegido sobre el 42 % de los datos
-    # (pasó, y la auditoría de rondas de más abajo fue lo que lo destapó).
+    # 200.000 y factor 3 da 200k → 600k → 1,8M, y como 1,8M excede las 1.423.959 filas
+    # disponibles, sklearn corta en 600k. El ganador queda elegido sobre el 42 % de los datos.
     #
     # Con "exhaust", sklearn calcula el piso hacia atrás desde el total, de modo que la última
     # ronda use todas las filas. Las primeras rondas quedan más chicas y por lo tanto más ruidosas,
@@ -166,8 +165,8 @@ def main() -> None:
 
     # Auditoría de la búsqueda. Lo que importa es la última ronda: si no llegó al total del
     # entrenamiento, el ganador se eligió sobre datos parciales y su ventaja puede no sobrevivir al
-    # conjunto entero. Ya pasó una vez, con un piso fijo la progresión cortaba en el 42 % de las
-    # filas, y esta comprobación es lo que lo destapó.
+    # conjunto entero. Con un piso fijo la progresión puede cortar en el 42 % de las filas, y esta
+    # comprobación es lo que lo pone a la vista.
     rondas = list(zip(busqueda.n_candidates_, busqueda.n_resources_, strict=True))
     print(
         "  rondas (candidatos × filas):",

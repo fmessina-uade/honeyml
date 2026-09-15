@@ -48,7 +48,7 @@ repos:
         # mypy corre en un entorno propio y aislado: no ve el .venv del proyecto, así que las
         # bibliotecas que hay que tipar se declaran acá. `redis` va como paquete real y no como
         # types-redis porque redis-py trae sus propias anotaciones (py.typed) desde la 4.2, y el
-        # paquete de stubs quedó deprecado por eso mismo.
+        # paquete de stubs está deprecado por eso mismo.
         additional_dependencies: [types-requests, fastapi, redis>=5.0]
         pass_filenames: false
         args: [--ignore-missing-imports, src/]

@@ -26,8 +26,8 @@ from honeyml.agent.severidad import (
     techo,
 )
 
-# Reparto real del bus al 25/08/2026, sensor · categoría · resultado · mensajes. Es el mismo cuadro
-# que figura en el encabezado de `severidad.py`.
+# Un reparto real del bus, sensor · categoría · resultado · mensajes, para probar la escala sobre
+# las proporciones que de verdad llegan.
 BUS_REAL = [
     ("cowrie", "process", "unknown", 30_334),
     ("cowrie", "authentication", "success", 11_712),

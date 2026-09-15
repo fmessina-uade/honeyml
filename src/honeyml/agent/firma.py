@@ -1,27 +1,25 @@
 """La firma de conducta de un evento: qué hizo el atacante, sin quién fue ni cuándo.
 
-Dos eventos con la misma firma describen la misma conducta observada. Sobre los 71.654 mensajes
-acumulados al 10/09 hay 2.088 firmas distintas, el 2,9 %: un solo comando, `uname -s -v -n -r -m`,
-aparece 6.588 veces. Pedirle al proveedor una decisión por evento es pagar 6.588 veces la misma
-respuesta.
+Dos eventos con la misma firma describen la misma conducta observada, y en el bus las conductas se
+repiten muchísimo: las firmas distintas son una fracción chica de los mensajes, y un solo comando
+de reconocimiento aparece miles de veces. Pedirle al proveedor una decisión por evento es pagar
+miles de veces la misma respuesta.
 
 Qué entra y qué no. Entran el sensor, la categoría, la acción, el resultado, el protocolo, el
 usuario y el comando, o sea lo que el atacante hizo y contra qué. Quedan afuera la dirección de
 origen, la sesión, la marca temporal y el identificador del documento, que dicen quién y cuándo
 pero no qué.
 
-El protocolo entró después de medirlo, y casi no entra. Sin él son 2.088 firmas y con él 2.111:
-veintitrés llamadas más, un 1,1 %. Pero esas veintitrés estaban juntando conductas que no son la
-misma: fuerza bruta por SSH con la misma por telnet, e intentos contra MSSQL con los de MySQL, que
-son servicios distintos. Entre las dos alcanzaban al 28 % de los eventos. Un centavo por no tener
-que defender esa mezcla es barato.
+El protocolo suma pocas firmas, y aun así entra. Sin él se juntan conductas que no son la misma:
+fuerza bruta por SSH con la misma por telnet, e intentos contra MSSQL con los de MySQL, que son
+servicios distintos, y esas mezclas alcanzan a una parte grande de los eventos. Unas pocas llamadas
+más por no tener que defenderlas es barato.
 
-Dejar la dirección afuera es la decisión discutible, y se midió antes de tomarla. El contexto
-enriquecido difiere en 8 de 8 repeticiones de cada firma, sobre todo en el historial: una dirección
-con 3.962 eventos previos y otra con 1 comparten firma y nada más. Pero al triar los extremos de
-las tres firmas más frecuentes, la severidad salió idéntica en las tres. Tiene sentido, porque la
-escala está anclada al embudo de intrusión: mide qué logró el atacante en este evento, no quién es.
-La táctica sí osciló, y eso queda anotado como límite conocido en lugar de disimulado.
+Dejar la dirección afuera es la decisión discutible. El contexto enriquecido cambia entre
+repeticiones de una firma, sobre todo en el historial: una dirección con miles de eventos previos y
+otra vista por primera vez pueden compartir firma y nada más. Pero la escala está anclada al embudo
+de intrusión y mide qué logró el atacante en este evento, no quién es. La táctica, en cambio, puede
+oscilar entre repeticiones, y eso queda anotado como límite conocido en lugar de disimulado.
 
 Hay además una garantía que no depende de esa medición. El piso de severidad sale de
 `piso_de(categoria, resultado)` y el techo se deriva del piso, así que los dos dependen solo de

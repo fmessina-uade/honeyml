@@ -206,8 +206,9 @@ def test_el_adaptador_se_crea_una_vez_y_no_por_evento(
 ) -> None:
     """De esto depende que el consumo por modelo se pueda medir.
 
-    Creado por evento, el desglose arrancaba de cero cada vez y "cuántos eventos resolvió el modelo
-    económico" respondía siempre uno, además de releer la configuración del disco en cada llamada.
+    Creado por evento, el desglose arrancaría de cero cada vez y "cuántos eventos resolvió el
+    modelo económico" respondería siempre uno, además de releer la configuración del disco en
+    cada llamada.
 
     Se cuenta el camino sin inyección, que es el que corre en producción: con un adaptador inyectado
     compartirlo es trivial y la prueba no probaría nada.
@@ -266,11 +267,67 @@ def test_el_costo_estimado_usa_el_modelo_mas_caro() -> None:
     assert motor.costo_estimado(0) == 0
 
 
-def test_el_atraso_de_los_52165_mensajes_del_bus_supera_el_tope() -> None:
-    """El número que motiva la guardia: es lo que había acumulado al 25/08.
+def test_un_reprocesamiento_historico_supera_el_tope() -> None:
+    """Un atraso de decenas de miles de mensajes no arranca sin pedirlo.
 
     Si alguien sube TOPE_SIN_CONFIRMAR por encima de eso, el `make triaje` sin argumentos vuelve a
-    poder gastar quince dólares de una, que es exactamente lo que la guardia evita.
+    poder gastar decenas de dólares de una, que es exactamente lo que la guardia evita.
     """
-    assert 52_165 > motor.TOPE_SIN_CONFIRMAR
-    assert motor.costo_estimado(52_165) > 10
+    assert 50_000 > motor.TOPE_SIN_CONFIRMAR
+    assert motor.costo_estimado(50_000) > 10
+
+
+# ---- la cuota del proveedor ---------------------------------------------------------------------
+
+
+def test_la_cuota_agotada_corta_la_corrida_y_no_persiste(sin_indice: None) -> None:
+    """El motor traduce la cuota del proveedor a una parada del consumidor.
+
+    Sin la traducción, el consumidor la trataría como una falla común del evento y seguiría con el
+    siguiente, que va a fallar igual.
+    """
+    from honeyml.agent.adapters.inferencia import CuotaAgotadaError
+    from honeyml.agent.consumer import DetenerConsumo
+
+    almacen = _Almacen()
+    servicio = _Servicio(falla=CuotaAgotadaError("sin cuota"))
+    triar = motor.manejador(servicio=servicio, almacen=almacen)
+
+    with pytest.raises(DetenerConsumo, match="sin cuota"):
+        triar(_evento())
+    assert almacen.escrituras == []
+
+
+class _RedisFalso:
+    """Lo mínimo de Redis que usa la estimación: el grupo, los mensajes y el repertorio."""
+
+    def __init__(self, mensajes: list[tuple[str, dict[str, str]]], conocidas: set[str]) -> None:
+        self.mensajes = mensajes
+        self.conocidas = conocidas
+
+    def xinfo_groups(self, _stream: str) -> list[dict[str, Any]]:
+        return [{"name": "triaje", "last-delivered-id": "0-0"}]
+
+    def xrange(self, _stream: str, **_kw: Any) -> list[tuple[str, dict[str, str]]]:
+        return self.mensajes
+
+    def exists(self, clave: str) -> int:
+        return int(clave in self.conocidas)
+
+
+def test_la_estimacion_con_reutilizacion_cuenta_conductas_y_no_mensajes() -> None:
+    """Mil mensajes de la misma conducta son una sola llamada, y una conducta resuelta, ninguna."""
+    from types import SimpleNamespace
+
+    from honeyml.agent import firma
+    from honeyml.agent.adapters.repertorio import PREFIJO
+
+    uname = {"honeypot": "cowrie", "category": "process", "command": "uname -a"}
+    ls = {"doc_id": "resuelto", "honeypot": "cowrie", "category": "process", "command": "ls"}
+    mensajes = [(f"{i}-0", {**uname, "doc_id": str(i)}) for i in range(1000)] + [("2000-0", ls)]
+    conocida = PREFIJO + firma.de_evento(EventoDelBus.desde_mensaje("0-0", ls))
+    consumidor = SimpleNamespace(
+        r=_RedisFalso(mensajes, {conocida}), stream="honeyml:events", grupo="triaje"
+    )
+
+    assert motor.firmas_nuevas(consumidor) == 1  # type: ignore[arg-type]

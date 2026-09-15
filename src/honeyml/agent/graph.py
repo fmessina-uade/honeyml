@@ -123,9 +123,9 @@ def intentos_gastados(estado: EstadoTriaje) -> int:
     el nodo de inferencia, donde se hace la llamada paga. `rechazos` lo incrementa la validación,
     una vez por ronda. Si alguno de los dos se olvidara, el otro igual termina el ciclo.
 
-    Cuenta rondas y no reproches sueltos. Contarlos era el número correcto mientras la validación
-    devolvía uno por vez, pero desde que junta todos los problemas de un borrador en una pasada, un
-    borrador con cuatro problemas daba el presupuesto por agotado sin haber reintentado nunca.
+    Cuenta rondas y no reproches sueltos. La validación junta todos los problemas de un borrador en
+    una pasada, así que contando reproches un borrador con cuatro problemas daría el presupuesto por
+    agotado sin haber reintentado nunca.
     """
     return max(int(estado.get("intentos", 0)), int(estado.get("rechazos", 0)))
 
@@ -135,7 +135,7 @@ def ruta_tras_validar(estado: EstadoTriaje) -> str:
 
     Las dos ramas que no reintentan van a persistencia a propósito: una decisión que no se pudo
     validar igual se guarda, marcada como no concluyente, así el panel la puede mostrar como
-    pendiente (CU-03) en vez de que el evento desaparezca sin dejar rastro.
+    pendiente en vez de que el evento desaparezca sin dejar rastro.
     """
     if decision_utilizable(estado):
         return PERSISTENCIA

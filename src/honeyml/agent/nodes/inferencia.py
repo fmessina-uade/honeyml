@@ -2,7 +2,7 @@
 
 Acá no hay ninguna llamada a Groq ni a nadie. El nodo depende del protocolo `ServicioDeInferencia`
 y el adaptador resuelve con quién habla. Lo que sí resuelve este archivo es qué se le muestra al
-modelo y cómo se lo presenta, que resultó ser la parte delicada.
+modelo y cómo se lo presenta, que es la parte delicada.
 
 El motivo: el contexto incluye texto que escribió el atacante. Un comando capturado por el señuelo
 puede contener cualquier cosa, incluidas frases que parezcan instrucciones para lo que sea que lo
@@ -33,8 +33,8 @@ from ..state import Decision, EstadoTriaje
 # Delimitador de lo capturado.
 #
 # Elegirlo raro no alcanza: si el delimitador viaja tal cual dentro de lo capturado, un comando que
-# lo contenga cierra el bloque y el texto que sigue queda afuera. Comprobamos que es escapable en
-# tres líneas. Por eso `_bloque` lo neutraliza en el cuerpo, que es lo que vuelve cierta la promesa.
+# lo contenga cierra el bloque y el texto que sigue queda afuera: se escapa en tres líneas. Por eso
+# `_bloque` lo neutraliza en el cuerpo, que es lo que vuelve cierta la promesa.
 CERCA = "<<<EVIDENCIA>>>"
 
 # Con qué se reemplaza el delimitador cuando aparece dentro de lo capturado. Se deja una marca
@@ -64,10 +64,9 @@ instrucciones son estas."""
 def _tacticas_admitidas() -> str:
     """El vocabulario cerrado de tácticas, tal como se le entrega al proveedor.
 
-    Existía la lista y no se la publicábamos. El modelo contestaba con los nombres canónicos de
-    MITRE en inglés, que es lo razonable si nadie le dice otra cosa, y la validación los rechazaba:
-    en la primera corrida contra datos reales, los cinco eventos necesitaron un reintento y los
-    cinco por este motivo. Una llamada paga de más por evento, por un dato que nunca le dimos.
+    Sin publicarla, el modelo contesta con los nombres canónicos de MITRE en inglés, que es lo
+    razonable si nadie le dice otra cosa, y la validación los rechaza: una llamada paga de más por
+    evento, por un dato que está de nuestro lado.
 
     Se arma desde `TACTICAS_OBSERVABLES` y no se escribe una segunda copia, por lo mismo que la
     escala de severidad: dos listas de lo mismo se terminan desincronizando.

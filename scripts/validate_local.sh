@@ -107,7 +107,7 @@ echo "[ 5 ] Validación de cowrie.cfg (paths internos correctos)"
 
 COWRIE_CFG="infra/honeypots/cowrie/cowrie.cfg"
 
-# rutas que tienen que estar; lo aprendimos depurando la imagen
+# rutas que la imagen de Cowrie espera encontrar
 if grep -q "^contents_path = honeyfs" "$COWRIE_CFG"; then
     ok "cowrie.cfg: contents_path = honeyfs (directorio real en la imagen)"
 else

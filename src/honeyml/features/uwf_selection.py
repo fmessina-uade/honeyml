@@ -99,7 +99,7 @@ def main() -> None:
     for name, fila in zip(labels, cm):
         print(f"{str(name):<{ancho}}" + "".join(f"{v:>12,}".replace(",", ".") for v in fila))
 
-    # se persiste para que el informe cite los números sin rehacer toda la selección
+    # se persiste para poder citar los números sin rehacer toda la selección
     metrics = {
         "accuracy": float(accuracy_score(y_te, y_pred)),
         "report": classification_report(y_te, y_pred, zero_division=0, output_dict=True),

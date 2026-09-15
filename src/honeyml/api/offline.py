@@ -1,8 +1,8 @@
 """Congela la telemetría del panel en un archivo, para que funcione sin Elasticsearch.
 
 El stack es pesado y solo se levanta cuando hace falta. Hay dos momentos en los que necesitamos los
-datos sin él: sacar las capturas para el informe, y mostrar el panel en una máquina que no es la de
-desarrollo. Los dos son malos momentos para descubrir que el tablero necesita un clúster arriba.
+datos sin él: sacar capturas del panel, y mostrarlo en una máquina que no es la de desarrollo. Los
+dos son malos momentos para descubrir que el tablero necesita un clúster arriba.
 
 La API lee este archivo sola cuando no alcanza a Elasticsearch, y avisa en qué modo está sirviendo,
 así el panel lo dice en pantalla en lugar de pasar números viejos por datos en vivo.
@@ -111,9 +111,9 @@ def timeline(
     que se genera aparte porque el respaldo no la puede reconstruir.
 
     Que devuelva None cuando falta el archivo horario, en lugar de una aproximación, es a propósito.
-    Sin esa distinción el pedido fallaba, el panel se comía el error y el gráfico seguía mostrando
-    la serie sin filtrar debajo de unos controles que decían "último día", que es una respuesta
-    equivocada disfrazada de correcta.
+    Sin esa distinción el pedido fallaría, el panel se comería el error y el gráfico seguiría
+    mostrando la serie sin filtrar debajo de unos controles que dicen "último día", que es una
+    respuesta equivocada disfrazada de correcta.
     """
     datos = load()
     if datos is None:
@@ -138,12 +138,12 @@ def _acotar(
 ) -> list[dict[str, Any]]:
     """Acota una serie por rango de fechas y sensor. `corte` es cuánto de la etiqueta se conserva.
 
-    Diez para la vista diaria y trece para la horaria ("2026-08-25 14"), que es el mismo largo con
+    Diez para la vista diaria y trece para la horaria ("AAAA-MM-DD HH"), que es el mismo largo con
     que Elasticsearch etiqueta cada intervalo. El panel parte esa etiqueta por el espacio para
     separar el día de la hora, así que el largo es parte del contrato y no una preferencia.
 
     El recorte del rango siempre compara solo la fecha: el panel manda el fin de día como
-    "2026-08-25T23:59:59", y contra una etiqueta horaria una comparación de cadenas completa
+    "AAAA-MM-DDT23:59:59", y contra una etiqueta horaria una comparación de cadenas completa
     dejaría fuera las horas de ese último día.
     """
     d0 = (desde or "")[:10]

@@ -1,8 +1,8 @@
 """
 Tests unitarios para la validación de userdb.txt de Cowrie.
 
-Estos tests documentan las restricciones del formato que aprendimos
-debuggeando la imagen cowrie/cowrie:latest (auth.py, pwd.py):
+Estos tests documentan las restricciones del formato que impone
+la imagen cowrie/cowrie:latest (auth.py, pwd.py):
   - El archivo se abre con codec ASCII implícito → solo bytes 0x00-0x7F
   - El campo 2 debe ser 'x' (no UID numérico) → auth.py lo ignora pero espera 3 campos
   - Las contraseñas vacías causan IndexError en auth.py:115 (passwd[0])

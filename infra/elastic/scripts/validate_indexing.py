@@ -53,7 +53,7 @@ def main() -> int:
     ap.add_argument(
         "--resumen",
         action="store_true",
-        help="salida compacta para capturas del informe: colapsa la lista de indices y "
+        help="salida compacta para capturas de pantalla: colapsa la lista de indices y "
         "omite las direcciones de origen",
     )
     args = ap.parse_args()

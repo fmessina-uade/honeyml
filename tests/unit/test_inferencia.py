@@ -52,9 +52,8 @@ def test_sin_variable_de_entorno_no_arranca_y_dice_como_arreglarlo(
 def test_el_entorno_le_gana_al_archivo(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
     """Poner la variable a mano para probar otra clave tiene que funcionar.
 
-    Con la precedencia invertida, que es como estaba mientras esto vivía en el Makefile, una
-    corrida con `GROQ_API_KEY=… make …` usaba en silencio la clave del archivo. Lo destapó una
-    prueba con una clave inválida a propósito que devolvió éxito.
+    Con la precedencia invertida, una corrida con `GROQ_API_KEY=… make …` usaría en silencio la
+    clave del archivo, y una prueba con una clave inválida a propósito daría éxito.
     """
     env = tmp_path / ".env"
     env.write_text("GROQ_API_KEY=del_archivo\n", encoding="utf-8")
@@ -278,9 +277,9 @@ def test_un_agente_bloqueado_no_se_confunde_con_una_credencial_mala(
 ) -> None:
     """Los dos son 4xx y se ven casi iguales, pero se arreglan de forma opuesta.
 
-    Pasó de verdad: `urllib` manda `Python-urllib/3.12`, el borde de Cloudflare del proveedor lo
-    rechaza con 403/1010 antes de que el proveedor vea nada, y el mensaje mandaba a revisar una
-    credencial que estaba perfecta.
+    `urllib` manda `Python-urllib/3.12`, el borde de Cloudflare del proveedor lo rechaza con
+    403/1010 antes de que el proveedor vea nada, y un mensaje que culpe a la credencial manda a
+    revisar algo que está perfecto.
     """
     cliente = inferencia.ClienteDeInferencia(_config())
     monkeypatch.setattr(inferencia.urllib.request, "urlopen", _rechazo(403, b"error code: 1010"))
@@ -319,9 +318,8 @@ def test_el_esquema_no_cumplido_es_pasajero_y_se_reintenta(
 ) -> None:
     """Un 400 con `json_validate_failed` se reintenta en el acto, no se devuelve el evento al bus.
 
-    Lo medimos: sobre treinta eventos falló en cuatro, y los cuatro pasaron al reintentarlos sin
-    cambiarles nada. Clasificado como rechazo, cada uno costaba los diez minutos de la ventana de
-    reclamo antes de que otro consumidor lo tomara.
+    El mismo pedido reenviado sin cambios pasa. Clasificado como rechazo, cada uno costaría los diez
+    minutos de la ventana de reclamo antes de que otro consumidor lo tome.
     """
     cli = inferencia.ClienteDeInferencia(
         config=ConfigInferencia(api_key="k", modelo="m", base_url="http://x", timeout=1)
@@ -380,3 +378,44 @@ def test_un_400_cualquiera_sigue_siendo_un_rechazo(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(inferencia.urllib.request, "urlopen", rechaza)
     with pytest.raises(inferencia.PedidoRechazadoError):
         cli._postear({})
+
+
+def test_una_espera_mas_larga_que_el_techo_es_cuota_y_no_se_reintenta(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Un `retry-after` de una hora no es una ráfaga: se corta sin esperar ni reintentar.
+
+    Reintentarlo devolvería el evento al bus, y con la cuota agotada eso le pasa a todos los que
+    siguen: a la tercera entrega terminarían en la cola de muertos sin tener nada malo.
+    """
+    esperas: list[float] = []
+    monkeypatch.setattr(inferencia.time, "sleep", esperas.append)
+    cliente, enviados = _cliente_con([inferencia._LimiteDeTasaError("3600"), _ok()])
+
+    with pytest.raises(inferencia.CuotaAgotadaError):
+        cliente.completar("s", "u", {"type": "object"})
+
+    assert len(enviados) == 1
+    assert esperas == []
+
+
+def test_el_bloqueo_por_limite_de_gasto_es_cuota(monkeypatch: pytest.MonkeyPatch) -> None:
+    """El 400 `blocked_api_access` llega cuando la organización tocó su límite mensual de gasto."""
+    cliente = inferencia.ClienteDeInferencia(_config())
+    intentos = {"n": 0}
+    cuerpo = b'{"error":{"code":"' + inferencia.CODIGO_GASTO_BLOQUEADO.encode() + b'"}}'
+
+    def bloqueado(*_a: Any, **_k: Any) -> Any:
+        intentos["n"] += 1
+        raise urllib.error.HTTPError(
+            "http://x",
+            400,
+            "Bad Request",
+            {},  # type: ignore[arg-type]
+            io.BytesIO(cuerpo),
+        )
+
+    monkeypatch.setattr(inferencia.urllib.request, "urlopen", bloqueado)
+    with pytest.raises(inferencia.CuotaAgotadaError):
+        cliente.completar("s", "u", {"type": "object"})
+    assert intentos["n"] == 1

@@ -1,7 +1,7 @@
 """Umbral de decisión para la clase más débil, como punto de operación explícito.
 
-Ajustar los hiperparámetros no movió este modelo: los valores por defecto ya eran los adecuados, y
-la búsqueda cerró esa pregunta con un resultado negativo. Lo que sí lo mueve es dónde se corta la
+Ajustar los hiperparámetros no mueve este modelo: los valores por defecto son los adecuados, y la
+búsqueda cierra esa pregunta con un resultado negativo. Lo que sí lo mueve es dónde se corta la
 decisión.
 
 Un clasificador predice la clase de mayor puntaje. Esa regla no es neutral: minimiza el error

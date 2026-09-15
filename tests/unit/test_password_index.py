@@ -1,8 +1,8 @@
-"""La recolección de contraseñas del índice, que se rompió cuando el corpus creció.
+"""La recolección de contraseñas del índice, que tiene que aguantar el crecimiento del corpus.
 
-La consulta original traía todo de una con un `terms` de tamaño 100.000. Anduvo hasta que pasamos
-las 90.000 contraseñas distintas: Elasticsearch no crea más de 65.536 cubos en un agregado y a
-partir de ahí devolvió 400, con lo que `make refresh` cortaba entero en este paso.
+Un `terms` de una sola consulta no alcanza: Elasticsearch no crea más de 65.536 cubos en un
+agregado y a partir de ahí devuelve 400, con lo que `make refresh` corta entero en este paso, y
+las contraseñas distintas ya superan ese techo.
 
 Lo que se fija acá es que la recolección pagine de verdad, porque es lo único que la vuelve inmune
 al crecimiento. Un `terms` de una sola consulta vuelve a pasar las dos primeras pruebas si alguien

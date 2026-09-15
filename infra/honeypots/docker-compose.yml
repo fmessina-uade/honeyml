@@ -34,7 +34,7 @@ services:
     cap_add:
       - NET_BIND_SERVICE
     read_only: false
-    # con 512m quedaba al 88 % después de cuatro semanas de captura, muy cerca de un OOM kill
+    # con 512m, unas semanas de captura continua lo dejan muy cerca de un OOM kill
     mem_limit: 1g
     cpus: "0.5"
     logging:
@@ -76,7 +76,7 @@ services:
       #    rechaza.
       #  - Bajo carga sostenida clava un núcleo y tarda más de dos minutos en completar un
       #    handshake, incluso contra su propia dirección, mientras sigue capturando perfecto.
-      # Además la falla que observamos es otra: el proceso sigue vivo y el puerto sigue aceptando
+      # Además la falla a detectar es otra: el proceso sigue vivo y el puerto sigue aceptando
       # (eso es docker-proxy, no Dionaea) mientras deja de procesar en silencio. La única señal que
       # lo agarra es que el registro se queda callado.
       test:
