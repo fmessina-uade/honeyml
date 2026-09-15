@@ -35,12 +35,13 @@ class _AlmacenFalso:
     def __init__(self) -> None:
         self.escrituras: list[tuple[str, dict[str, Any]]] = []
 
-    def guardar(self, doc_id: str, documento: dict[str, Any]) -> None:
+    def guardar(self, doc_id: str, documento: dict[str, Any]) -> bool:
         self.escrituras.append((doc_id, documento))
+        return True
 
 
 class _AlmacenCaido:
-    def guardar(self, doc_id: str, documento: dict[str, Any]) -> None:
+    def guardar(self, doc_id: str, documento: dict[str, Any]) -> bool:
         raise AlmacenNoDisponibleError("Elasticsearch no responde")
 
 
@@ -302,12 +303,13 @@ class _Transporte:
         self.fallas = fallas
         self.viajes = 0
 
-    def __call__(self, doc_id: str, documento: dict[str, Any]) -> None:
+    def __call__(self, doc_id: str, documento: dict[str, Any]) -> bool:
         i = self.viajes
         self.viajes += 1
         falla = self.fallas[i] if i < len(self.fallas) else None
         if falla is not None:
             raise falla
+        return True
 
 
 @pytest.fixture(autouse=True)

@@ -134,6 +134,9 @@ class EstadoTriaje(TypedDict, total=False):
     # ausente quiere decir que esta decisión se razonó. Es lo que separa una cosa de la otra en el
     # registro, así que se guarda en el documento y no solo en el estado.
     reutilizada_de: str
+    # Que la decisión de este evento ya estaba guardada y no se tocó. Lo pone la persistencia, y el
+    # motor lo usa para que el consumidor cuente el evento como repetido y no como procesado.
+    ya_existia: bool
 
 
 def estado_inicial(evento: EventoDelBus) -> EstadoTriaje:

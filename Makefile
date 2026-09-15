@@ -271,14 +271,19 @@ consumer:
 # son entre siete y quince dólares de inferencia, y eso no se gasta sin pedirlo.
 #
 # Con REUTILIZAR=1 copia la decisión cuando otro evento ya resolvió la misma conducta (mismo sensor,
-# categoría, acción, resultado, usuario y comando). Sobre el atraso acumulado son 2.088 conductas
-# distintas en 71.654 eventos, o sea que el 97 % se resuelve sin pagar una llamada. Cada documento
-# dice de qué decisión copió, así que la reutilización es auditable y no un atajo escondido.
+# categoría, acción, resultado, protocolo, usuario y comando). Sobre el bus del 11/09 eran 2.111
+# conductas distintas en 71.654 eventos, o sea que el 97 % se resuelve sin pagar una llamada. Cada
+# documento dice de qué decisión copió, así que la reutilización es auditable y no un atajo.
+#
+# Una decisión ya guardada no se pisa nunca: si el evento vuelve a llegar, se confirma y se cuenta
+# como repetido. Con REESCRIBIR=1 se sobrescribe, para triar otra vez a propósito; no se combina
+# con REUTILIZAR, que copiaría justamente las decisiones que se quieren rehacer.
 #   make triaje LIMITE=5                prueba con cinco eventos
 #   make triaje LIMITE=200 REUTILIZAR=1 pone a prueba la reutilización sobre una tanda
 #   make triaje TODO=1 REUTILIZAR=1     tría el atraso completo
+#   make triaje LIMITE=20 REESCRIBIR=1  vuelve a decidir veinte eventos, pisando lo guardado
 triaje:
-	@./.venv/bin/python -m honeyml.agent.motor $(if $(LIMITE),--limite $(LIMITE),) $(if $(TODO),--todo,) $(if $(REUTILIZAR),--reutilizar,)
+	@./.venv/bin/python -m honeyml.agent.motor $(if $(LIMITE),--limite $(LIMITE),) $(if $(TODO),--todo,) $(if $(REUTILIZAR),--reutilizar,) $(if $(REESCRIBIR),--reescribir,)
 
 # Topología del motor de triaje y qué nodo tiene implementación hoy.
 grafo:

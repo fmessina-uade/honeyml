@@ -200,8 +200,9 @@ class AlmacenFalso:
     def __init__(self) -> None:
         self.escrito: list[tuple[str, dict[str, Any]]] = []
 
-    def guardar(self, doc_id: str, documento: dict[str, Any]) -> None:
+    def guardar(self, doc_id: str, documento: dict[str, Any]) -> bool:
         self.escrito.append((doc_id, documento))
+        return True
 
 
 def test_registra_la_firma_despues_de_guardar() -> None:

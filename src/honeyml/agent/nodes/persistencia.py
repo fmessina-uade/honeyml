@@ -125,7 +125,20 @@ def guardar(
         return {}
 
     destino = almacen or AlmacenElastic()
-    destino.guardar(evento.doc_id, documento(estado))
+
+    # Un documento que dice haberse copiado de sí mismo no se escribe nunca. El repertorio registra
+    # una firma recién después de que su decisión quedó guardada, así que si el origen es este mismo
+    # evento, la decisión ya está en el índice y lo que llegó es una repetición.
+    origen = estado.get("reutilizada_de")
+    if origen and origen == evento.doc_id:
+        return {"ya_existia": True}
+
+    if not destino.guardar(evento.doc_id, documento(estado)):
+        # Ya había una decisión para este evento y no se tocó. La firma tampoco se registra: lo
+        # guardado puede no coincidir con lo que trae este estado, y el repertorio quedaría
+        # apuntando a un documento que dice otra cosa.
+        return {"ya_existia": True}
+
     _registrar_la_firma(estado, repertorio)
     return {}
 

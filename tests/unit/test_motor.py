@@ -77,10 +77,11 @@ class _Almacen:
         self.falla = falla
         self.escrituras: list[tuple[str, dict[str, Any]]] = []
 
-    def guardar(self, doc_id: str, documento: dict[str, Any]) -> None:
+    def guardar(self, doc_id: str, documento: dict[str, Any]) -> bool:
         if self.falla is not None:
             raise self.falla
         self.escrituras.append((doc_id, documento))
+        return True
 
 
 def _evento(**kw: Any) -> EventoDelBus:

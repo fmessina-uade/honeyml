@@ -4,8 +4,9 @@ Todo lo que viene después (contexto, recuperación, inferencia, validación, pe
 eventos de acá y nunca habla con el bus.
 
 El contrato del manejador es una sola regla: si levanta una excepción el evento no se confirma y
-vuelve, y si retorna, la decisión es durable y se confirma. Nada más. Eso permitió que el grafo se
-enchufara después sin tocar una línea de este módulo: quien los une es `motor.py`.
+vuelve, y si retorna, la decisión es durable y se confirma. Si además devuelve `True`, la decisión
+ya existía de antes y el evento se cuenta como repetido. Eso permitió que el grafo se enchufara
+después sin tocar la lógica de este módulo: quien los une es `motor.py`.
 
 Hay cuatro problemas resueltos a propósito, y los cuatro son silenciosos si no se los atiende.
 
@@ -70,8 +71,13 @@ STREAM_MUERTOS = os.getenv("BUS_STREAM_MUERTOS", "honeyml:events:muertos")
 INACTIVIDAD_MS = int(os.getenv("BUS_INACTIVIDAD_MS", "600000"))
 
 # Marcas de deduplicación. Una clave por documento, así cada una vence por su cuenta en lugar de
-# caerse todo el conjunto junto. Un día sobra para la ventana de reenvío: los duplicados llegan a
-# los minutos de un reinicio, nunca un día después.
+# caerse todo el conjunto junto.
+#
+# Son un ahorro y no la garantía. Se pensaron para los duplicados que deja un reinicio del
+# normalizador, que llegan a los minutos, y para eso un día sobra. Pero el 14/09 se midió que
+# también llegan semanas después: cuando Filebeat relee el corpus, el bus recibe otra vez eventos
+# ya decididos y la marca venció hace rato. Lo que impide pisar una decisión es que el almacén
+# escribe con `_create`; la marca solo evita volver a correr el grafo mientras está viva.
 PREFIJO_VISTO = "honeyml:visto:"
 TTL_VISTO = int(os.getenv("BUS_TTL_VISTO", "86400"))
 
@@ -180,14 +186,15 @@ class Contadores:
 class ConsumidorDelBus:
     """Lee el stream como parte de un grupo de consumidores y le pasa los eventos a un manejador.
 
-    El manejador levanta una excepción cuando falla. Ese es todo el contrato: levantar significa
-    "no resuelto", así que el mensaje queda pendiente y alguien lo va a volver a tomar. Retornar
-    significa que la decisión ya es durable y el mensaje se puede confirmar.
+    El manejador levanta una excepción cuando falla: levantar significa "no resuelto", así que el
+    mensaje queda pendiente y alguien lo va a volver a tomar. Retornar significa que la decisión ya
+    es durable y el mensaje se puede confirmar. Retornar `True` agrega un matiz, que la decisión ya
+    existía de antes, y el evento se cuenta como repetido en lugar de procesado.
     """
 
     def __init__(
         self,
-        manejador: Callable[[EventoDelBus], None],
+        manejador: Callable[[EventoDelBus], bool | None],
         *,
         host: str = HOST,
         puerto: int = PORT,
@@ -299,7 +306,7 @@ class ConsumidorDelBus:
             return
 
         try:
-            self.manejador(evento)
+            ya_estaba = self.manejador(evento)
         except Exception as exc:  # noqa: BLE001 - que falle el manejador no puede cortar el ciclo
             self.contadores.fallados += 1
             print(f"  ! falló ({type(exc).__name__}: {exc}): {evento.resumen()}")
@@ -311,7 +318,14 @@ class ConsumidorDelBus:
         # evento cuya finalización nunca quedó anotada.
         self._marcar_procesado(evento.doc_id)
         self.r.xack(self.stream, self.grupo, evento.entry_id)
-        self.contadores.procesados += 1
+
+        # `True` es la forma que tiene el manejador de decir que la decisión ya existía de antes. Se
+        # confirma igual, porque el trabajo está hecho, pero se cuenta como repetido: sumarlo a
+        # procesados haría pasar una relectura del corpus por una tanda de triaje.
+        if ya_estaba is True:
+            self.contadores.repetidos += 1
+        else:
+            self.contadores.procesados += 1
 
     # ---------------------------------------------------------------- lectura
 

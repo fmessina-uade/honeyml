@@ -135,6 +135,29 @@ def test_repetido_se_saltea_sin_volver_a_procesar(bus, stream):
     _limpiar_marcas(bus, doc_id)
 
 
+def test_un_manejador_que_avisa_repeticion_cuenta_como_repetido(bus, stream):
+    """Si la decisión ya existía, el evento se confirma igual pero no se cuenta como procesado.
+
+    Es lo que separa una relectura del corpus de una tanda de triaje en el resumen de la corrida.
+    El 14/09 el bus recibió decenas de miles de eventos ya decididos, y contados como procesados
+    habrían parecido trabajo nuevo.
+    """
+    doc_id = uuid.uuid4().hex
+    _limpiar_marcas(bus, doc_id)
+    _publicar(bus, stream, doc_id)
+
+    c = _consumidor(stream, lambda _evento: True, nombre="agente-1")
+    c.correr(limite=1)
+
+    assert c.contadores.repetidos == 1
+    assert c.contadores.procesados == 0
+    # Resuelto y marcado, igual que un evento procesado: el trabajo está hecho.
+    assert bus.xpending(stream, "triaje-prueba")["pending"] == 0
+    assert bus.exists(PREFIJO_VISTO + doc_id)
+
+    _limpiar_marcas(bus, doc_id)
+
+
 def test_fallo_del_manejador_deja_el_evento_pendiente(bus, stream):
     """Una decisión fallada tiene que seguir siendo recuperable, no comida por la confirmación."""
     doc_id = uuid.uuid4().hex

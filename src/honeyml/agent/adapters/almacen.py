@@ -10,7 +10,7 @@ unos 40.000 eventos por día y el corte diario tiene sentido; acá son unas 800,
 día serían 365 fragmentos al año para un volumen que entra en uno.
 
 Pero el argumento que decide es la idempotencia. El identificador del documento es el `doc_id` del
-evento, así que reescribir la decisión de un evento la sobrescribe en lugar de duplicarla. Con
+evento, así que escribir dos veces el mismo evento choca con la primera en vez de duplicarla. Con
 índices por fecha eso se rompe: un reenvío que cruce la medianoche escribiría el mismo evento en dos
 índices distintos, y el duplicado es justamente lo que el identificador determinístico evita.
 
@@ -65,31 +65,52 @@ class AlmacenNoDisponibleError(RuntimeError):
         self.pasajero = pasajero
 
 
-class Almacen(Protocol):
-    """Lo único que el nodo de persistencia necesita pedir."""
+# Lo que contesta Elasticsearch a un `_create` sobre un documento que ya existe.
+YA_EXISTE = 409
 
-    def guardar(self, doc_id: str, documento: dict[str, Any]) -> None: ...
+
+class Almacen(Protocol):
+    """Lo único que el nodo de persistencia necesita pedir.
+
+    `guardar` devuelve si escribió. `False` quiere decir que ya había una decisión para ese evento y
+    no se tocó, y no es una falla: es la respuesta correcta cuando llega una repetición.
+    """
+
+    def guardar(self, doc_id: str, documento: dict[str, Any]) -> bool: ...
 
 
 class AlmacenElastic:
     """Escribe en Elasticsearch por `urllib`, sin cliente, igual que el resto del proyecto."""
 
-    def __init__(self, es_url: str = ES_URL_POR_DEFECTO, indice: str = INDICE) -> None:
+    def __init__(
+        self, es_url: str = ES_URL_POR_DEFECTO, indice: str = INDICE, *, reescribir: bool = False
+    ) -> None:
         self.es_url = es_url.rstrip("/")
         self.indice = indice
+        self.reescribir = reescribir
 
-    def guardar(self, doc_id: str, documento: dict[str, Any]) -> None:
-        """Indexa la decisión bajo el `doc_id` del evento, reintentando si la falla es pasajera.
+    def guardar(self, doc_id: str, documento: dict[str, Any]) -> bool:
+        """Indexa la decisión bajo el `doc_id` del evento, sin pisar una que ya esté.
 
-        Usa `PUT /_doc/<id>`, que sobrescribe. Es lo que hace idempotente al reintento, tanto al de
-        acá como al del bus: el consumidor marca el evento como procesado recién después de que esto
-        retorna, así que una caída entre ambos pasos deja el evento pendiente y la vuelta siguiente
-        reescribe el mismo documento en lugar de agregar otro.
+        Escribe con `_create`, que contesta 409 si el documento existe. Hasta el 14/09 era un `PUT`
+        a `_doc`, que sobrescribe, y alcanzaba mientras las repeticiones llegaran a los minutos de
+        un reinicio. Ese día se midió lo contrario: Filebeat releyó el corpus, el bus recibió otra
+        vez eventos decididos semanas antes, y la marca de deduplicación del consumidor, que vence
+        a las 24 horas, ya no los reconocía. Con la reutilización encendida, el evento de origen de
+        una firma se copiaba de sí mismo y pisaba la decisión razonada.
+
+        El reintento sigue siendo idempotente. Si un viaje falla pero la escritura llegó igual, el
+        siguiente recibe 409 y se informa como ya existente: el documento es el nuestro de todos
+        modos, y lo único que se pierde es registrar la firma, que cuesta a lo sumo una llamada más
+        adelante. Tratarlo como escrito sería peor, porque ese mismo 409 también lo produce una
+        repetición, y ahí se registraría una decisión distinta de la guardada.
+
+        Con `reescribir` vuelve a sobrescribir, para triar otra vez a propósito.
         """
         if not doc_id:
             # No debería llegar: el consumidor aparta los eventos sin identificador. Igual se
-            # comprueba, porque sin esto la URL queda en `/_doc/` y Elasticsearch contesta un 405
-            # que no dice nada del problema real.
+            # comprueba, porque sin esto la URL queda sin identificador y Elasticsearch contesta un
+            # 405 que no dice nada del problema real.
             raise AlmacenNoDisponibleError(
                 "La decisión no trae doc_id y no hay bajo qué indexarla."
             )
@@ -97,8 +118,7 @@ class AlmacenElastic:
         ultimo: Exception | None = None
         for intento in range(MAX_REINTENTOS):
             try:
-                self._escribir(doc_id, documento)
-                return
+                return self._escribir(doc_id, documento)
             except AlmacenNoDisponibleError as exc:
                 if not exc.pasajero:
                     raise
@@ -110,10 +130,11 @@ class AlmacenElastic:
             pasajero=True,
         ) from ultimo
 
-    def _escribir(self, doc_id: str, documento: dict[str, Any]) -> None:
-        """Un solo viaje. Marca la excepción como pasajera cuando vale la pena reintentar."""
+    def _escribir(self, doc_id: str, documento: dict[str, Any]) -> bool:
+        """Un solo viaje. `False` si el documento ya estaba; levanta si vale la pena reintentar."""
+        operacion = "_doc" if self.reescribir else "_create"
         pedido = urllib.request.Request(
-            f"{self.es_url}/{self.indice}/_doc/{urllib.parse.quote(doc_id, safe='')}",
+            f"{self.es_url}/{self.indice}/{operacion}/{urllib.parse.quote(doc_id, safe='')}",
             data=json.dumps(documento, ensure_ascii=False).encode("utf-8"),
             headers={"Content-Type": "application/json"},
             method="PUT",
@@ -125,6 +146,8 @@ class AlmacenElastic:
                         f"Elasticsearch respondió {resp.status} al guardar {doc_id}."
                     )
         except urllib.error.HTTPError as exc:
+            if exc.code == YA_EXISTE and not self.reescribir:
+                return False
             # El cuerpo del 400 dice qué campo rechazó el mapeo estricto, y sin eso el diagnóstico
             # es adivinar. Se lee una sola vez porque el flujo no se puede releer.
             detalle = exc.read().decode("utf-8", "replace")[:400]
@@ -136,3 +159,4 @@ class AlmacenElastic:
             raise AlmacenNoDisponibleError(
                 f"No se pudo alcanzar Elasticsearch para guardar {doc_id}: {exc}", pasajero=True
             ) from exc
+        return True

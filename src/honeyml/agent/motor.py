@@ -119,6 +119,9 @@ def atraso(consumidor: bus.ConsumidorDelBus) -> int:
 
 def _linea(evento: bus.EventoDelBus, final: EstadoTriaje) -> str:
     """Una línea por evento, para ver la corrida sin abrir Kibana."""
+    if final.get("ya_existia"):
+        return f"  ~ ya estaba decidido, no se reescribió: {evento.resumen()}"
+
     decision = final.get("decision")
     if decision is None:
         return f"  ? {resultado_del_ciclo(final)}: {evento.resumen()}"
@@ -136,7 +139,7 @@ def manejador(
     servicio: ServicioDeInferencia | None = None,
     almacen: Almacen | None = None,
     repertorio: Repertorio | None = None,
-) -> Callable[[bus.EventoDelBus], None]:
+) -> Callable[[bus.EventoDelBus], bool]:
     """El manejador que reemplaza a `manejador_de_registro`: corre un evento por el grafo.
 
     Devuelve una función y no una clase porque el consumidor solo pide eso. El grafo compilado queda
@@ -144,9 +147,11 @@ def manejador(
     """
     compilado = compilar(servicio=servicio, almacen=almacen, repertorio=repertorio)
 
-    def triar(evento: bus.EventoDelBus) -> None:
+    def triar(evento: bus.EventoDelBus) -> bool:
         final = ejecutar(compilado, estado_inicial(evento))
         print(_linea(evento, final))
+        # Le avisa al consumidor si la decisión ya existía, para que lo cuente como repetido.
+        return bool(final.get("ya_existia"))
 
     return triar
 
@@ -175,7 +180,24 @@ def main() -> int:
         action="store_true",
         help="copiar la decisión cuando otra conducta idéntica ya se resolvió",
     )
+    ap.add_argument(
+        "--reescribir",
+        action="store_true",
+        help="volver a decidir eventos ya decididos, pisando lo guardado",
+    )
     args = ap.parse_args()
+
+    if args.reescribir and args.reutilizar:
+        # Reescribir es decidir de nuevo, casi siempre porque cambió la escala o el pedido, y el
+        # repertorio guarda justamente las decisiones tomadas con las reglas anteriores. Juntas, la
+        # corrida pisaría el índice con copias de lo que se quería rehacer.
+        print(
+            "  --reescribir y --reutilizar no se combinan: se copiarían las decisiones que se "
+            "quieren rehacer.\n"
+            "  Para rehacer con reutilización, primero hay que vaciar las claves "
+            "honeyml:firma:* de Redis."
+        )
+        return 1
 
     # El adaptador se crea acá y no dentro del manejador para poder pedirle el resumen al final.
     try:
@@ -185,9 +207,10 @@ def main() -> int:
         return 1
 
     repertorio = RepertorioEnRedis() if args.reutilizar else None
+    almacen = AlmacenElastic(reescribir=args.reescribir)
 
     consumidor = bus.ConsumidorDelBus(
-        manejador(servicio=inferencia, repertorio=repertorio),
+        manejador(servicio=inferencia, almacen=almacen, repertorio=repertorio),
         host=args.host,
         puerto=args.puerto,
         stream=args.stream,
