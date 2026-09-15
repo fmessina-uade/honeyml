@@ -19,12 +19,14 @@ filebeat.inputs:
     # en desarrollo queremos leer los archivos históricos desde el principio
     ignore_older: 0
     prospector.scanner.check_interval: 5s
-    # Los archivos se reconocen por el contenido de su primer kilobyte y no por el inodo. Docker
-    # Desktop renumera los inodos de este montaje cada vez que se reinicia, y con la identidad por
-    # inodo Filebeat creía que todos los archivos eran nuevos y releía el corpus entero. Lo medimos
-    # el 14/09: 29 de 95 archivos tenían más de una identidad en el registro, y cada reinicio mandaba
-    # al bus decenas de miles de eventos ya decididos. Cambiar la identidad provoca una relectura
-    # completa, por única vez.
+    # Los archivos se reconocen por el contenido de su primer kilobyte y no por el inodo. Los inodos
+    # que ve el contenedor dentro de este montaje no son estables: rsync los cambia cada vez que
+    # reemplaza un archivo, y en al menos dos arranques del stack cambiaron también los de archivos
+    # que nadie había tocado. Con la identidad por inodo, Filebeat tomaba cada cambio como un
+    # archivo nuevo y lo releía desde el principio: el 14/09, 29 de 95 archivos tenían más de una
+    # identidad en el registro y el bus había recibido decenas de miles de eventos ya decididos.
+    # Con la huella, un archivo rotado que llega con otro nombre se reconoce y se sigue desde donde
+    # había quedado. Cambiar la identidad provoca una relectura completa, por única vez.
     prospector.scanner.fingerprint.enabled: true
     file_identity.fingerprint: ~
 

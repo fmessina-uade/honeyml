@@ -78,7 +78,7 @@ services:
       timeout: 10s
       retries: 10
       start_period: 60s
-    mem_limit: ${LS_MEM_LIMIT:-1g}
+    mem_limit: ${LS_MEM_LIMIT:-1536m}
     logging:
       driver: "json-file"
       options:
