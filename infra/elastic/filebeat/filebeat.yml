@@ -17,6 +17,12 @@ filebeat.inputs:
     fields_under_root: true
     fields:
       honeypot: cowrie
+    # Identidad por el contenido del primer kilobyte y no por inodo. En desarrollo, Docker Desktop
+    # renumeraba los inodos al reiniciarse y Filebeat releía el corpus entero (medido el 14/09). En
+    # el VPS no se midió, pero Elastic documenta que Docker puede reutilizar inodos, y dejar las dos
+    # configuraciones iguales evita la sorpresa el día que el stack corra ahí.
+    prospector.scanner.fingerprint.enabled: true
+    file_identity.fingerprint: ~
 
   # Dionaea, multiprotocolo. El ihandler log_json viene cocinado en la imagen (Dockerfile).
   # Si el archivo todavía no existe, esta entrada simplemente no encuentra nada, no falla.
@@ -41,6 +47,9 @@ filebeat.inputs:
     fields_under_root: true
     fields:
       honeypot: dionaea
+    # misma identidad por contenido que Cowrie, por el mismo motivo
+    prospector.scanner.fingerprint.enabled: true
+    file_identity.fingerprint: ~
 
 # Filebeat solo transporta; la normalización ECS ocurre en Logstash.
 output.logstash:

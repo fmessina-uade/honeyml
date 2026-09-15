@@ -19,6 +19,14 @@ filebeat.inputs:
     # en desarrollo queremos leer los archivos históricos desde el principio
     ignore_older: 0
     prospector.scanner.check_interval: 5s
+    # Los archivos se reconocen por el contenido de su primer kilobyte y no por el inodo. Docker
+    # Desktop renumera los inodos de este montaje cada vez que se reinicia, y con la identidad por
+    # inodo Filebeat creía que todos los archivos eran nuevos y releía el corpus entero. Lo medimos
+    # el 14/09: 29 de 95 archivos tenían más de una identidad en el registro, y cada reinicio mandaba
+    # al bus decenas de miles de eventos ya decididos. Cambiar la identidad provoca una relectura
+    # completa, por única vez.
+    prospector.scanner.fingerprint.enabled: true
+    file_identity.fingerprint: ~
 
   # Dionaea (una muestra real bajada del contenedor) para validar la normalización ECS.
   - type: filestream
@@ -38,6 +46,9 @@ filebeat.inputs:
     fields:
       honeypot: dionaea
     ignore_older: 0
+    # misma identidad por contenido que Cowrie, por el mismo motivo
+    prospector.scanner.fingerprint.enabled: true
+    file_identity.fingerprint: ~
 
 output.logstash:
   hosts: ["logstash:5044"]
