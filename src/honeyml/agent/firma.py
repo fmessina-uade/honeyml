@@ -1,36 +1,34 @@
-"""La firma de conducta de un evento: qué hizo el atacante, sin quién fue ni cuándo.
+r"""La firma de conducta de un evento: qué hizo el atacante, sin quién fue ni cuándo.
 
 Dos eventos con la misma firma describen la misma conducta observada, y en el bus las conductas se
-repiten muchísimo: las firmas distintas son una fracción chica de los mensajes, y un solo comando
-de reconocimiento aparece miles de veces. Pedirle al proveedor una decisión por evento es pagar
-miles de veces la misma respuesta.
+repiten muchísimo: las firmas distintas son una fracción chica de los mensajes. Pedirle al
+proveedor una decisión por evento es pagar muchas veces la misma respuesta.
 
-Qué entra y qué no. Entran el sensor, la categoría, la acción, el resultado, el protocolo, el
-usuario y el comando, o sea lo que el atacante hizo y contra qué. Quedan afuera la dirección de
-origen, la sesión, la marca temporal y el identificador del documento, que dicen quién y cuándo
-pero no qué.
+Entran el sensor, la categoría, la acción, el resultado, el protocolo, el usuario y el comando.
+Quedan afuera la dirección de origen, la sesión, la marca temporal y el identificador del
+documento, que dicen quién y cuándo pero no qué. El protocolo entra aunque sume firmas, porque sin
+él se juntan conductas que no son la misma: fuerza bruta por SSH con la misma por telnet, o
+intentos contra MSSQL con los de MySQL.
 
-El protocolo suma pocas firmas, y aun así entra. Sin él se juntan conductas que no son la misma:
-fuerza bruta por SSH con la misma por telnet, e intentos contra MSSQL con los de MySQL, que son
-servicios distintos, y esas mezclas alcanzan a una parte grande de los eventos. Unas pocas llamadas
-más por no tener que defenderlas es barato.
+Dejar la dirección afuera es la decisión discutible, porque el historial cambia entre repeticiones
+de una firma. Pero la escala mide qué logró el atacante en este evento y no quién es, y hay una
+garantía que no depende de medir nada: el piso sale de `piso_de(categoria, resultado)` y el techo se
+deriva del piso, así que una severidad defendible para el evento triado lo es por construcción para
+cualquier otro de la misma firma. La táctica sí puede oscilar entre repeticiones, y queda declarada
+como límite conocido.
 
-Dejar la dirección afuera es la decisión discutible. El contexto enriquecido cambia entre
-repeticiones de una firma, sobre todo en el historial: una dirección con miles de eventos previos y
-otra vista por primera vez pueden compartir firma y nada más. Pero la escala está anclada al embudo
-de intrusión y mide qué logró el atacante en este evento, no quién es. La táctica, en cambio, puede
-oscilar entre repeticiones, y eso queda anotado como límite conocido en lugar de disimulado.
-
-Hay además una garantía que no depende de esa medición. El piso de severidad sale de
-`piso_de(categoria, resultado)` y el techo se deriva del piso, así que los dos dependen solo de
-campos que la firma incluye. Una severidad defendible para el evento que se trió es defendible por
-construcción para cualquier otro de la misma firma; no hace falta confiar en que el modelo sea
-consistente.
+El comando entra con los bytes escritos como escapes reemplazados por una marca. Un dropper que no
+logra descargar su binario lo escribe de a trozos, con `echo -ne '\x7f\x45\x4c...' >> archivo`, y
+cada trozo es un comando distinto: sin la marca, una sola descarga son cientos de firmas y cientos
+de llamadas para decidir lo mismo. Los bytes no cambian la conducta, que es escribir un binario en
+el señuelo. El archivo y la redirección se conservan, y un comando sin escapes firma igual que si
+la marca no existiera, así que el repertorio ya guardado sigue valiendo.
 """
 
 from __future__ import annotations
 
 import hashlib
+import re
 
 from .consumer import EventoDelBus
 
@@ -44,18 +42,31 @@ CAMPOS = ("honeypot", "category", "action", "outcome", "protocol", "user", "comm
 # inverso.
 SEPARADOR = "\x1f"
 
-# Cuántos caracteres del resumen se conservan. Dieciséis hexadecimales son 64 bits: para 2.088
-# firmas, y aun para varios órdenes de magnitud más, la probabilidad de colisión es despreciable, y
+# Una tira seguida de escapes se vuelve una sola marca, sea del largo que sea: el último trozo de
+# un binario casi nunca mide lo mismo que los anteriores y tiene que caer en la misma firma.
+ESCAPES_HEX = re.compile(r"(?:\\x[0-9a-fA-F]{2})+")
+MARCA_DE_BYTES = "<bytes>"
+
+# Cuántos caracteres del resumen se conservan. Dieciséis hexadecimales son 64 bits: con miles de
+# firmas, y aun con varios órdenes de magnitud más, la probabilidad de colisión es despreciable, y
 # la clave entra cómoda en un registro y en una consulta.
 LARGO = 16
+
+
+def comando_firmado(comando: str) -> str:
+    """El comando como entra en la firma: los bytes escritos a mano quedan como una marca."""
+    return ESCAPES_HEX.sub(MARCA_DE_BYTES, comando)
 
 
 def de_evento(evento: EventoDelBus) -> str:
     """El resumen de la conducta de este evento.
 
     Se devuelve un hash y no la concatenación por una razón práctica: el comando puede tener miles
-    de caracteres (el más largo del corpus pasa los 3.000) y termina siendo clave de Redis y valor
-    de un campo indexado.
+    de caracteres y termina siendo clave de Redis y valor de un campo indexado.
     """
-    crudo = SEPARADOR.join(str(getattr(evento, campo, "") or "") for campo in CAMPOS)
+    valores = []
+    for campo in CAMPOS:
+        valor = str(getattr(evento, campo, "") or "")
+        valores.append(comando_firmado(valor) if campo == "command" else valor)
+    crudo = SEPARADOR.join(valores)
     return hashlib.sha256(crudo.encode("utf-8", "replace")).hexdigest()[:LARGO]
