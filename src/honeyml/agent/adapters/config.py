@@ -33,7 +33,18 @@ MODELO_POR_DEFECTO = "openai/gpt-oss-120b"
 MODELO_ALTERNATIVO = "openai/gpt-oss-20b"
 
 BASE_URL_POR_DEFECTO = "https://api.groq.com/openai/v1"
-VARIABLE_DE_CLAVE = "GROQ_API_KEY"
+
+# La clave va con un nombre que no nombra a ningún proveedor: cambiar de proveedor es cambiar la
+# dirección y la clave, no el código. `GROQ_API_KEY` se sigue aceptando, pero solo cuando la
+# dirección es la de Groq, porque mandarle a otro proveedor una clave que no es suya se la entrega a
+# un tercero.
+VARIABLE_DE_CLAVE = "HONEYML_INFERENCIA_CLAVE"
+VARIABLE_DE_CLAVE_GROQ = "GROQ_API_KEY"
+HOST_GROQ = "api.groq.com"
+
+# Un enrutador reparte el mismo modelo entre varios proveedores, y al pedido hay que decirle a
+# cuáles puede ir. Ver `preferencias_de_ruteo` en `inferencia.py`.
+HOST_OPENROUTER = "openrouter.ai"
 
 # Holgado para un contexto de unos pocos miles de tokens, y corto para un proveedor colgado: pasado
 # ese punto conviene devolver el evento al bus antes que retener un consumidor esperando.
@@ -48,8 +59,8 @@ def _del_archivo(clave: str) -> str | None:
     """Lee una variable de `.env`, o None. Nunca pisa lo que ya está en el entorno.
 
     El orden importa: el entorno le gana al archivo. Con la precedencia invertida, poner
-    `GROQ_API_KEY=… make lo-que-sea` para probar otra clave usaría la del archivo sin avisar, y
-    una prueba con una clave inválida a propósito daría éxito.
+    `HONEYML_INFERENCIA_CLAVE=… make lo-que-sea` para probar otra clave usaría la del archivo sin
+    avisar, y una prueba con una clave inválida a propósito daría éxito.
     """
     if not ARCHIVO_ENV.exists():
         return None
@@ -77,24 +88,44 @@ class ConfigInferencia:
     modelo: str = MODELO_POR_DEFECTO
     base_url: str = BASE_URL_POR_DEFECTO
     timeout: int = TIMEOUT_SEGUNDOS
+    # A qué proveedores puede ir el pedido, en orden, cuando del otro lado hay un enrutador. Vacío
+    # deja que el enrutador elija entre los que cumplen las preferencias fijas.
+    proveedores: tuple[str, ...] = ()
+
+    @property
+    def es_enrutador(self) -> bool:
+        """Si del otro lado hay un enrutador que elige proveedor, y no un proveedor directo."""
+        return HOST_OPENROUTER in self.base_url
 
     @classmethod
     def desde_entorno(cls, modelo: str | None = None) -> ConfigInferencia:
-        """Lee la configuración del entorno, o falla diciendo qué hay que exportar."""
+        """Lee la configuración del entorno, o falla diciendo qué hay que definir."""
+        url = _variable("HONEYML_INFERENCIA_URL") or BASE_URL_POR_DEFECTO
         clave = _variable(VARIABLE_DE_CLAVE)
+        if not clave and HOST_GROQ in url:
+            clave = _variable(VARIABLE_DE_CLAVE_GROQ)
         if not clave:
             raise CredencialAusenteError(
-                f"{VARIABLE_DE_CLAVE} no está definida en el entorno. "
-                f"Obtené una clave en https://console.groq.com y exportala:\n"
-                f'    export {VARIABLE_DE_CLAVE}="gsk_…"\n'
+                f"{VARIABLE_DE_CLAVE} no está definida. Obtené una clave del proveedor de "
+                f"inferencia y definila en .env o exportala:\n"
+                f'    export {VARIABLE_DE_CLAVE}="…"\n'
+                f"Con Groq directo también sirve {VARIABLE_DE_CLAVE_GROQ}. "
                 f"Nunca la escribas en un archivo del repositorio."
             )
         # Cuatro orígenes en orden de precedencia: lo que pide el llamador, el entorno, el archivo
         # `.env` y el valor por defecto. `_variable` resuelve los dos del medio.
         elegido = modelo or _variable("HONEYML_MODELO") or MODELO_POR_DEFECTO
-        url = _variable("HONEYML_INFERENCIA_URL") or BASE_URL_POR_DEFECTO
         espera = _variable("HONEYML_INFERENCIA_TIMEOUT") or str(TIMEOUT_SEGUNDOS)
-        return cls(api_key=clave, modelo=elegido, base_url=url, timeout=int(espera))
+        proveedores = tuple(
+            p.strip() for p in _variable("HONEYML_INFERENCIA_PROVEEDORES").split(",") if p.strip()
+        )
+        return cls(
+            api_key=clave,
+            modelo=elegido,
+            base_url=url,
+            timeout=int(espera),
+            proveedores=proveedores,
+        )
 
     def enmascarada(self) -> str:
         """Alcanza para distinguir dos claves, nunca para usar una."""

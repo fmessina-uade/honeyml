@@ -176,5 +176,8 @@ def consultar(estado: EstadoTriaje, servicio: ServicioDeInferencia | None = None
         "tokens_salida": respuesta.tokens_salida,
         "segundos": round(respuesta.segundos, 3),
         "costo_usd": costo_de(respuesta),
+        # Qué proveedor atendió, cuando un enrutador reparte el modelo entre varios. Dos decisiones
+        # del mismo modelo servidas por proveedores distintos no son del todo comparables.
+        "proveedor": respuesta.proveedor,
     }
     return {"borrador": borrador, "intentos": intento + 1, "consumo": consumo}

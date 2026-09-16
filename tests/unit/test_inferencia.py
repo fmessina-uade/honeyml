@@ -1,11 +1,12 @@
 """Las credenciales y el cliente de inferencia, sin tocar la red ni una clave de verdad.
 
-Lo que se fija acá son las tres propiedades que, si se rompen, se rompen en silencio:
+Lo que se fija acá son las propiedades que, si se rompen, se rompen en silencio:
 
-- la clave no aparece en ninguna representación del objeto que la guarda
+- la clave no aparece en ninguna representación del objeto que la guarda, ni viaja a quien no es
 - el esquema que se le manda al proveedor cumple lo que el modo estricto exige
 - un límite de tasa y una caída se distinguen de un pedido mal formado, porque el motor los trata
   distinto: los dos primeros devuelven el evento al bus, el tercero es un defecto nuestro
+- con un enrutador, el pedido solo puede ir a proveedores que respeten el esquema
 """
 
 from __future__ import annotations
@@ -28,6 +29,14 @@ from honeyml.agent.state import Decision
 
 CLAVE = "gsk_1234567890abcdefGHIJ"
 
+VARIABLES = (
+    "HONEYML_INFERENCIA_CLAVE",
+    "GROQ_API_KEY",
+    "HONEYML_INFERENCIA_URL",
+    "HONEYML_INFERENCIA_PROVEEDORES",
+    "HONEYML_MODELO",
+)
+
 
 def _config() -> ConfigInferencia:
     return ConfigInferencia(
@@ -35,53 +44,80 @@ def _config() -> ConfigInferencia:
     )
 
 
+@pytest.fixture
+def entorno_limpio(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> pytest.MonkeyPatch:
+    """Sin variables del proveedor ni `.env`: cada prueba define solo lo que usa."""
+    for nombre in VARIABLES:
+        monkeypatch.delenv(nombre, raising=False)
+    monkeypatch.setattr(config, "ARCHIVO_ENV", tmp_path / "no-existe")
+    return monkeypatch
+
+
 # ---- credenciales ----------------------------------------------------------------------------
 
 
-def test_sin_variable_de_entorno_no_arranca_y_dice_como_arreglarlo(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
-) -> None:
-    monkeypatch.delenv("GROQ_API_KEY", raising=False)
-    monkeypatch.setattr(config, "ARCHIVO_ENV", tmp_path / "no-existe")
+def test_sin_clave_no_arranca_y_dice_como_arreglarlo(entorno_limpio: pytest.MonkeyPatch) -> None:
     with pytest.raises(CredencialAusenteError) as exc:
         ConfigInferencia.desde_entorno()
-    assert "GROQ_API_KEY" in str(exc.value)
+    assert config.VARIABLE_DE_CLAVE in str(exc.value)
     assert "export" in str(exc.value)  # el mensaje trae el arreglo, no solo el hecho
 
 
-def test_el_entorno_le_gana_al_archivo(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
+def test_el_entorno_le_gana_al_archivo(entorno_limpio: pytest.MonkeyPatch, tmp_path: Any) -> None:
     """Poner la variable a mano para probar otra clave tiene que funcionar.
 
-    Con la precedencia invertida, una corrida con `GROQ_API_KEY=… make …` usaría en silencio la
-    clave del archivo, y una prueba con una clave inválida a propósito daría éxito.
+    Con la precedencia invertida, una corrida con `HONEYML_INFERENCIA_CLAVE=… make …` usaría en
+    silencio la clave del archivo, y una prueba con una clave inválida a propósito daría éxito.
     """
     env = tmp_path / ".env"
-    env.write_text("GROQ_API_KEY=del_archivo\n", encoding="utf-8")
-    monkeypatch.setattr(config, "ARCHIVO_ENV", env)
+    env.write_text("HONEYML_INFERENCIA_CLAVE=del_archivo\n", encoding="utf-8")
+    entorno_limpio.setattr(config, "ARCHIVO_ENV", env)
 
-    monkeypatch.setenv("GROQ_API_KEY", "del_entorno")
+    entorno_limpio.setenv("HONEYML_INFERENCIA_CLAVE", "del_entorno")
     assert ConfigInferencia.desde_entorno().api_key == "del_entorno"
 
-    monkeypatch.delenv("GROQ_API_KEY")
+    entorno_limpio.delenv("HONEYML_INFERENCIA_CLAVE")
     assert ConfigInferencia.desde_entorno().api_key == "del_archivo"
 
 
 def test_el_archivo_admite_comentarios_comillas_y_lineas_vacias(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+    entorno_limpio: pytest.MonkeyPatch, tmp_path: Any
 ) -> None:
     """Lo escribe una persona a mano: tiene que tolerar cómo escribe una persona."""
     env = tmp_path / ".env"
     env.write_text(
-        '\n# un comentario\n\nGROQ_API_KEY="con_comillas"\nHONEYML_MODELO = otro/modelo \n',
+        '\n# un comentario\n\nHONEYML_INFERENCIA_CLAVE="con_comillas"\n'
+        "HONEYML_MODELO = otro/modelo \n"
+        "HONEYML_INFERENCIA_PROVEEDORES = groq, cerebras ,\n",
         encoding="utf-8",
     )
-    monkeypatch.setattr(config, "ARCHIVO_ENV", env)
-    monkeypatch.delenv("GROQ_API_KEY", raising=False)
-    monkeypatch.delenv("HONEYML_MODELO", raising=False)
+    entorno_limpio.setattr(config, "ARCHIVO_ENV", env)
 
     c = ConfigInferencia.desde_entorno()
     assert c.api_key == "con_comillas"
     assert c.modelo == "otro/modelo"
+    assert c.proveedores == ("groq", "cerebras")
+
+
+def test_la_clave_de_groq_solo_viaja_a_groq(entorno_limpio: pytest.MonkeyPatch) -> None:
+    """Mandarle a otro proveedor una clave que no es suya se la entrega a un tercero."""
+    entorno_limpio.setenv("GROQ_API_KEY", "gsk_de_groq")
+    assert ConfigInferencia.desde_entorno().api_key == "gsk_de_groq"
+
+    entorno_limpio.setenv("HONEYML_INFERENCIA_URL", "https://openrouter.ai/api/v1")
+    with pytest.raises(CredencialAusenteError):
+        ConfigInferencia.desde_entorno()
+
+
+def test_la_clave_neutral_le_gana_a_la_de_groq(entorno_limpio: pytest.MonkeyPatch) -> None:
+    entorno_limpio.setenv("GROQ_API_KEY", "gsk_de_groq")
+    entorno_limpio.setenv("HONEYML_INFERENCIA_CLAVE", "la_neutral")
+    assert ConfigInferencia.desde_entorno().api_key == "la_neutral"
+
+
+def test_solo_un_enrutador_cuenta_como_enrutador() -> None:
+    assert ConfigInferencia(api_key=CLAVE, base_url="https://openrouter.ai/api/v1").es_enrutador
+    assert not _config().es_enrutador
 
 
 def test_la_clave_no_aparece_en_la_representacion() -> None:
@@ -153,9 +189,19 @@ def test_un_modelo_sin_precio_conocido_no_inventa_uno() -> None:
     assert "USD" not in c.resumen("modelo/que-no-existe")
 
 
-def _cliente_con(respuestas: list[Any]) -> tuple[inferencia.ClienteDeInferencia, list[dict]]:
+def test_un_costo_informado_a_medias_no_se_usa() -> None:
+    """Si una llamada no lo informó, el total informado quedaría por debajo de lo que se gastó."""
+    c = inferencia.Consumo()
+    c.sumar(entrada=1_000_000, salida=1_000_000, segundos=1.0, costo=0.01)
+    c.sumar(entrada=0, salida=0, segundos=1.0)
+    assert c.costo_estimado(MODELO_POR_DEFECTO) == pytest.approx(0.75)
+
+
+def _cliente_con(
+    respuestas: list[Any], configuracion: ConfigInferencia | None = None
+) -> tuple[inferencia.ClienteDeInferencia, list[dict]]:
     """Cliente cuyo transporte devuelve, o levanta, lo que se le indique, en orden."""
-    cliente = inferencia.ClienteDeInferencia(_config())
+    cliente = inferencia.ClienteDeInferencia(configuracion or _config())
     enviados: list[dict] = []
 
     def falso(cuerpo: dict[str, Any]) -> dict[str, Any]:
@@ -221,6 +267,61 @@ def test_un_pedido_mal_formado_no_se_reintenta(monkeypatch: pytest.MonkeyPatch) 
     assert intentos["n"] == 1
 
 
+# ---- enrutador -------------------------------------------------------------------------------
+
+
+def test_con_un_enrutador_el_pedido_exige_esquema_y_privacidad() -> None:
+    """El pedido a un enrutador pide proveedores que cumplan el esquema y no guarden datos.
+
+    Sin `require_parameters`, el enrutador puede elegir un proveedor que tome el esquema como
+    sugerencia. Sin `data_collection`, uno que guarde telemetría de ataques.
+    """
+    enrutado = ConfigInferencia(
+        api_key=CLAVE, base_url="https://openrouter.ai/api/v1", proveedores=("groq", "cerebras")
+    )
+    cliente, enviados = _cliente_con([_ok()], enrutado)
+    cliente.completar("s", "u", {"type": "object"})
+
+    assert enviados[0]["provider"] == {
+        "require_parameters": True,
+        "data_collection": "deny",
+        "order": ["groq", "cerebras"],
+        "allow_fallbacks": False,
+    }
+    assert enviados[0]["usage"] == {"include": True}
+
+
+def test_sin_lista_elige_el_enrutador_entre_los_que_cumplen() -> None:
+    enrutado = ConfigInferencia(api_key=CLAVE, base_url="https://openrouter.ai/api/v1")
+    cliente, enviados = _cliente_con([_ok()], enrutado)
+    cliente.completar("s", "u", {"type": "object"})
+
+    assert enviados[0]["provider"] == {"require_parameters": True, "data_collection": "deny"}
+
+
+def test_un_proveedor_directo_no_recibe_preferencias_de_ruteo() -> None:
+    """Un proveedor directo no conoce esos campos, y mandarlos igual es exponerse a un 400."""
+    cliente, enviados = _cliente_con([_ok()])
+    cliente.completar("s", "u", {"type": "object"})
+
+    assert "provider" not in enviados[0]
+    assert "usage" not in enviados[0]
+
+
+def test_el_costo_informado_le_gana_a_la_tabla() -> None:
+    """Un enrutador cobra lo que cobra el proveedor que eligió, que no es el precio de la tabla."""
+    respuesta = _ok()
+    respuesta["usage"]["cost"] = 0.00042
+    respuesta["provider"] = "Groq"
+    cliente, _ = _cliente_con([respuesta])
+    r = cliente.completar("s", "u", {"type": "object"})
+
+    assert r.proveedor == "Groq"
+    assert r.costo_informado == pytest.approx(0.00042)
+    assert inferencia.costo_de(r) == pytest.approx(0.00042)
+    assert cliente.consumo.costo_estimado(MODELO_POR_DEFECTO) == pytest.approx(0.00042)
+
+
 # ---- verificación TLS -----------------------------------------------------------------------
 
 
@@ -253,7 +354,6 @@ def test_un_fallo_de_certificado_explica_como_arreglarlo(monkeypatch: pytest.Mon
 
 def _rechazo(codigo: int, cuerpo: bytes) -> Any:
     """Un HTTPError con cuerpo legible, como el que devuelve el proveedor de verdad."""
-    import io
 
     def cae(*_: Any, **__: Any) -> Any:
         raise urllib.error.HTTPError("u", codigo, "no", {}, io.BytesIO(cuerpo))  # type: ignore[arg-type]
@@ -269,7 +369,7 @@ def test_una_credencial_invalida_apunta_a_la_credencial(monkeypatch: pytest.Monk
     with pytest.raises(inferencia.PedidoRechazadoError) as exc:
         cliente.completar("s", "u", {"type": "object"})
 
-    assert "GROQ_API_KEY" in str(exc.value)
+    assert config.VARIABLE_DE_CLAVE in str(exc.value)
 
 
 def test_un_agente_bloqueado_no_se_confunde_con_una_credencial_mala(
@@ -287,7 +387,7 @@ def test_un_agente_bloqueado_no_se_confunde_con_una_credencial_mala(
         cliente.completar("s", "u", {"type": "object"})
 
     assert "User-Agent" in str(exc.value)
-    assert "GROQ_API_KEY" not in str(exc.value)  # no manda a revisar lo que está bien
+    assert config.VARIABLE_DE_CLAVE not in str(exc.value)  # no manda a revisar lo que está bien
 
 
 def test_el_cliente_se_identifica(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -360,6 +460,64 @@ def test_el_esquema_no_cumplido_es_pasajero_y_se_reintenta(
     assert len(llamadas) == 2
 
 
+class _RespuestaHTTP:
+    """Lo mínimo que `urlopen` devuelve: un objeto de contexto con `read`."""
+
+    def __init__(self, datos: dict[str, Any]) -> None:
+        self._datos = datos
+
+    def read(self) -> bytes:
+        return json.dumps(self._datos).encode()
+
+    def __enter__(self) -> _RespuestaHTTP:
+        return self
+
+    def __exit__(self, *_a: Any) -> None:
+        return None
+
+
+def test_un_contenido_nulo_se_reintenta_en_vez_de_romper(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Un modelo que razona puede devolver la elección con el razonamiento y `content` en nulo.
+
+    Sin esta guarda, ese nulo llega al nodo, que lo parsea como JSON y revienta con un error de tipo
+    en vez de una falla clasificada.
+    """
+    cliente = inferencia.ClienteDeInferencia(_config())
+    vacia = {"choices": [{"finish_reason": "stop", "message": {"content": None}}], "usage": {}}
+    buena = {
+        "choices": [{"finish_reason": "stop", "message": {"content": "{}"}}],
+        "usage": {"prompt_tokens": 10, "completion_tokens": 2},
+    }
+    pendientes = [vacia, buena]
+
+    def responde(*_a: Any, **_k: Any) -> Any:
+        return _RespuestaHTTP(pendientes.pop(0))
+
+    monkeypatch.setattr(inferencia.urllib.request, "urlopen", responde)
+    monkeypatch.setattr(inferencia.time, "sleep", lambda _s: None)
+
+    assert cliente.completar("s", "u", {"type": "object"}).contenido == "{}"
+    assert pendientes == []
+
+
+def test_una_respuesta_cortada_por_tamano_es_un_rechazo(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Si no entró en el presupuesto de salida, reintentar vuelve al mismo lugar tres veces."""
+    cliente = inferencia.ClienteDeInferencia(_config())
+    cortada = {"choices": [{"finish_reason": "length", "message": {"content": None}}], "usage": {}}
+    intentos = {"n": 0}
+
+    def responde(*_a: Any, **_k: Any) -> Any:
+        intentos["n"] += 1
+        return _RespuestaHTTP(cortada)
+
+    monkeypatch.setattr(inferencia.urllib.request, "urlopen", responde)
+    with pytest.raises(inferencia.PedidoRechazadoError) as exc:
+        cliente.completar("s", "u", {"type": "object"})
+
+    assert intentos["n"] == 1
+    assert "tamaño" in str(exc.value)
+
+
 def test_un_400_cualquiera_sigue_siendo_un_rechazo(monkeypatch: pytest.MonkeyPatch) -> None:
     """Solo ese código es pasajero. Un pedido mal armado de verdad no se reintenta tres veces."""
     cli = inferencia.ClienteDeInferencia(
@@ -378,6 +536,9 @@ def test_un_400_cualquiera_sigue_siendo_un_rechazo(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(inferencia.urllib.request, "urlopen", rechaza)
     with pytest.raises(inferencia.PedidoRechazadoError):
         cli._postear({})
+
+
+# ---- cuota -----------------------------------------------------------------------------------
 
 
 def test_una_espera_mas_larga_que_el_techo_es_cuota_y_no_se_reintenta(
@@ -416,6 +577,27 @@ def test_el_bloqueo_por_limite_de_gasto_es_cuota(monkeypatch: pytest.MonkeyPatch
         )
 
     monkeypatch.setattr(inferencia.urllib.request, "urlopen", bloqueado)
+    with pytest.raises(inferencia.CuotaAgotadaError):
+        cliente.completar("s", "u", {"type": "object"})
+    assert intentos["n"] == 1
+
+
+def test_sin_credito_es_cuota(monkeypatch: pytest.MonkeyPatch) -> None:
+    """El 402 llega cuando se acabó el saldo o el tope de la clave: reintentar no lo arregla."""
+    cliente = inferencia.ClienteDeInferencia(_config())
+    intentos = {"n": 0}
+
+    def sin_saldo(*_a: Any, **_k: Any) -> Any:
+        intentos["n"] += 1
+        raise urllib.error.HTTPError(
+            "http://x",
+            inferencia.CODIGO_SIN_CREDITO,
+            "Payment Required",
+            {},  # type: ignore[arg-type]
+            io.BytesIO(b'{"error":{"code":402}}'),
+        )
+
+    monkeypatch.setattr(inferencia.urllib.request, "urlopen", sin_saldo)
     with pytest.raises(inferencia.CuotaAgotadaError):
         cliente.completar("s", "u", {"type": "object"})
     assert intentos["n"] == 1

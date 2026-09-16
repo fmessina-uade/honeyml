@@ -16,6 +16,10 @@ HEALTHCHECK_LOG="/var/log/honeyml_health.log"
 THRESHOLD_CPU=85
 THRESHOLD_MEM=90
 THRESHOLD_DISK=80
+# el watchdog y su imagen viven en el repositorio, un nivel arriba de este script
+REPO_VPS="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+WATCHDOG_SCRIPT="/usr/local/bin/honeyml_watchdog.sh"
+WATCHDOG_LOG="/var/log/honeyml_watchdog.log"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"
@@ -26,7 +30,7 @@ log() {
 log "=== HoneyML - Configuración de Monitoreo de Salud ==="
 
 # 1. el script principal de chequeo de salud
-log "[1/3] Creando script de health check en $HEALTHCHECK_SCRIPT..."
+log "[1/4] Creando script de health check en $HEALTHCHECK_SCRIPT..."
 cat > "$HEALTHCHECK_SCRIPT" << HEALTH_SCRIPT
 #!/usr/bin/env bash
 # honeyml_health.sh: chequeo periódico de métricas del VPS, lo corre cron cada 5 minutos.
@@ -113,6 +117,7 @@ chmod +x "$HEALTHCHECK_SCRIPT"
 log "  Script creado."
 
 # 2. el script del reporte diario
+log "[2/4] Creando el reporte diario..."
 DAILY_REPORT_SCRIPT="/usr/local/bin/honeyml_daily_report.sh"
 cat > "$DAILY_REPORT_SCRIPT" << 'DAILY_SCRIPT'
 #!/usr/bin/env bash
@@ -153,8 +158,18 @@ DAILY_SCRIPT
 
 chmod +x "$DAILY_REPORT_SCRIPT"
 
-# 3. se registran las tareas de cron
-log "[3/3] Registrando tareas en cron..."
+# 3. el watchdog de los sensores, y la imagen con la que lee la pila de un proceso colgado
+log "[3/4] Instalando el watchdog de los sensores..."
+install -m 755 "$REPO_VPS/honeyml_watchdog.sh" "$WATCHDOG_SCRIPT"
+if command -v docker >/dev/null 2>&1; then
+    docker build -q -t honeyml-pyspy "$REPO_VPS/pyspy" >/dev/null
+    log "  Imagen honeyml-pyspy construida."
+else
+    log "  AVISO: sin Docker el watchdog no puede leer la pila de un sensor colgado."
+fi
+
+# 4. se registran las tareas de cron
+log "[4/4] Registrando tareas en cron..."
 
 CRON_FILE="/etc/cron.d/honeyml-monitoring"
 cat > "$CRON_FILE" << CRONEOF
@@ -167,6 +182,9 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 
 # reporte diario a las 07:00 de Argentina (UTC-3, o 10:00 UTC)
 0 10 * * * root $DAILY_REPORT_SCRIPT >> $HEALTHCHECK_LOG 2>&1
+
+# watchdog de los sensores cada 5 minutos
+*/5 * * * * root $WATCHDOG_SCRIPT >> $WATCHDOG_LOG 2>&1
 
 # rotación semanal del registro de actividad de los honeypots
 0 3 * * 0 root find /var/log -name "honeyml_*.log" -mtime +30 -delete 2>/dev/null || true
@@ -181,6 +199,7 @@ log ""
 log "Scripts instalados:"
 log "  Health check (c/5 min) : $HEALTHCHECK_SCRIPT"
 log "  Reporte diario (07:00) : $DAILY_REPORT_SCRIPT"
+log "  Watchdog (c/5 min)     : $WATCHDOG_SCRIPT"
 log "  Log de monitoreo       : $HEALTHCHECK_LOG"
 log ""
 log "Para probar manualmente: bash $HEALTHCHECK_SCRIPT"

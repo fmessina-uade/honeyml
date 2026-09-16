@@ -2,10 +2,8 @@
 
 El nodo de inferencia del grafo depende de `ServicioDeInferencia` y de nada más. No sabe qué
 proveedor hay del otro lado, no importa su cliente, y no elige modelo: pide una respuesta y recibe
-una. Todo lo específico de Groq vive de este lado de la frontera.
-
-No es prolijidad arquitectónica. El proyecto ya tuvo que sustituir un proveedor a mitad de
-desarrollo, y cuando vuelva a pasar lo que se reescribe es este archivo.
+una. Todo lo específico del proveedor vive de este lado de la frontera, así cambiarlo es tocar este
+paquete y no el motor.
 
 La política de selección es barato primero, capaz al reintentar:
 
@@ -38,6 +36,7 @@ from .config import (
 from .inferencia import (
     ClienteDeInferencia,
     Consumo,
+    CuotaAgotadaError,
     PedidoRechazadoError,
     ProveedorInalcanzableError,
     Respuesta,
@@ -71,10 +70,10 @@ def elegir_modelo(intento: int, fijado: str | None = None) -> str:
 
 
 class AdaptadorDeInferencia:
-    """La implementación por defecto de la frontera, apoyada en el cliente compatible con Groq.
+    """La implementación por defecto de la frontera, apoyada en el cliente compatible con OpenAI.
 
-    Se llama por lo que hace y no por el proveedor que usa hoy: si mañana hay que cambiarlo, el
-    nombre sigue siendo cierto y el motor no se entera.
+    Se llama por lo que hace y no por el proveedor que usa: si hay que cambiarlo, el nombre sigue
+    siendo cierto y el motor no se entera.
     """
 
     def __init__(
@@ -116,7 +115,10 @@ class AdaptadorDeInferencia:
             modelo=modelo,
         )
         self.por_modelo.setdefault(modelo, Consumo()).sumar(
-            respuesta.tokens_entrada, respuesta.tokens_salida, respuesta.segundos
+            respuesta.tokens_entrada,
+            respuesta.tokens_salida,
+            respuesta.segundos,
+            respuesta.costo_informado,
         )
         return respuesta
 
@@ -153,6 +155,8 @@ def comprobar() -> int:
     adaptador = AdaptadorDeInferencia(config=config)
     fijado = adaptador.modelo_fijado
     print(f"Proveedor : {config.base_url}")
+    if config.es_enrutador:
+        print(f"Ruteo     : {', '.join(config.proveedores) or 'lo elige el enrutador'}")
     print(f"Modelo    : {fijado or f'por política, intento 0 usa {MODELO_ALTERNATIVO}'}")
     print(f"Clave     : {config.enmascarada()}")
 
@@ -171,18 +175,19 @@ def comprobar() -> int:
             intento=0,
             nombre_esquema="comprobacion",
         )
-    except (ProveedorInalcanzableError, PedidoRechazadoError) as exc:
+    except (ProveedorInalcanzableError, PedidoRechazadoError, CuotaAgotadaError) as exc:
         print(f"\n✗ {type(exc).__name__}: {exc}")
         return 1
 
-    print(f"\n✓ Respondió en {r.segundos:.2f}s con {r.modelo}")
+    atendio = f" vía {r.proveedor}" if r.proveedor else ""
+    print(f"\n✓ Respondió en {r.segundos:.2f}s con {r.modelo}{atendio}")
     print(f"  {r.contenido.strip()[:200]}")
     print(adaptador.resumen())
 
-    # El costo por evento multiplicado por los mensajes del bus da la factura de una corrida
-    # completa. Es una de las métricas operativas a reportar, y conviene tenerla desde el día uno.
+    # Mil eventos es la escala con la que se lee la factura de una corrida. Es una de las métricas
+    # operativas a reportar, y conviene tenerla a mano antes de lanzar una.
     costo = adaptador.por_modelo[r.modelo].costo_estimado(r.modelo)
     if costo is not None:
-        print(f"\n  A este precio, los 52.165 mensajes del bus salen ≈ USD {costo * 52165:.2f}")
+        print(f"\n  A este precio, mil eventos salen ≈ USD {costo * 1000:.2f}")
         print("  (la comprobación usa un contexto mínimo; el real es bastante mayor)")
     return 0

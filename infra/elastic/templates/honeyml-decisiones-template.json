@@ -57,7 +57,8 @@
             "tokens_entrada": { "type": "long" },
             "tokens_salida": { "type": "long" },
             "costo_usd": { "type": "float" },
-            "segundos": { "type": "float" }
+            "segundos": { "type": "float" },
+            "proveedor": { "type": "keyword" }
           }
         }
       }

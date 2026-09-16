@@ -1,8 +1,9 @@
 """Cliente del proveedor de inferencia, con límites de tasa y contabilidad de consumo.
 
-Habla el dialecto compatible con OpenAI que expone Groq, por HTTP y con `urllib`, que es el mismo
-camino por el que el proyecto ya consulta Elasticsearch. No trae ningún cliente HTTP: el proveedor
-se alcanza por un adaptador, así que esa dependencia pertenece al adaptador y no al motor.
+Habla el dialecto compatible con OpenAI, que exponen tanto Groq como OpenRouter, por HTTP y con
+`urllib`, que es el mismo camino por el que el proyecto ya consulta Elasticsearch. No trae ningún
+cliente HTTP: el proveedor se alcanza por un adaptador, así que esa dependencia pertenece al
+adaptador y no al motor.
 
 La única dependencia que sí agrega es `certifi`, y no es un cliente sino el paquete de certificados
 raíz. Ver `_contexto_tls`: se usa como respaldo cuando el intérprete no tiene almacén propio, que es
@@ -15,13 +16,14 @@ Los límites de tasa. Un 429 no es un fallo, es el proveedor pidiendo que se esp
 porque un límite de tasa es transitorio y el evento tiene que volver al bus en vez de persistirse
 como no concluyente.
 
-La excepción es la cuota. Un `retry-after` más largo de lo que conviene esperar, o el bloqueo por
-límite de gasto, no se arreglan reintentando: levantan `CuotaAgotadaError` para que el motor corte
-la corrida en vez de seguir fallando evento por evento.
+La excepción es la cuota. Un `retry-after` más largo de lo que conviene esperar, el bloqueo por
+límite de gasto o la falta de crédito no se arreglan reintentando: levantan `CuotaAgotadaError`
+para que el motor corte la corrida en vez de seguir fallando evento por evento.
 
-La contabilidad. Cada respuesta trae cuántos tokens costó, se acumulan y se traducen a dólares con
-los precios de abajo. No es telemetría decorativa: "cuánto sale clasificar un evento" es una métrica
-operativa que hay que reportar, y medirla desde el principio evita reconstruirla después.
+La contabilidad. Cada respuesta trae cuántos tokens costó, se acumulan y se traducen a dólares.
+Cuando el proveedor informa el costo de la llamada se usa ese, y si no, la tabla de abajo. No es
+telemetría decorativa: "cuánto sale clasificar un evento" es una métrica operativa que hay que
+reportar, y medirla desde el principio evita reconstruirla después.
 
 Y la distinción que el grafo necesita. El grafo separa "el proveedor contestó mal" de "el proveedor
 no contestó" y las trata distinto (una persiste, la otra reintenta). Esa distinción se sostiene en
@@ -29,11 +31,12 @@ la taxonomía de excepciones de este módulo: una red caída, un timeout o un 5x
 `ProveedorInalcanzableError` y el motor no confirma el evento; un 4xx que no es 429 da
 `PedidoRechazadoError`, que es un defecto nuestro y tiene que verse.
 
-Sobre la salida estructurada: se pide `json_schema` con `strict: true`, que en Groq usa
-decodificación restringida, así que la respuesta cumple el esquema o no se emite. Tiene dos
-requisitos que `esquema_estricto` se encarga de cumplir (todas las propiedades obligatorias y
-objetos cerrados) y una limitación que este diseño ya respetaba: no admite herramientas ni
-streaming. El motor arma el contexto por su cuenta en los nodos anteriores, así que no las necesita.
+Sobre la salida estructurada: se pide `json_schema` con `strict: true`, que con decodificación
+restringida garantiza que la respuesta cumpla el esquema. Tiene dos requisitos que
+`esquema_estricto` se encarga de cumplir (todas las propiedades obligatorias y objetos cerrados) y
+una limitación que este diseño ya respetaba: no admite herramientas ni streaming. Con un enrutador,
+el mismo modelo lo sirven varios proveedores y no todos respetan el modo estricto: de eso se ocupa
+`preferencias_de_ruteo`.
 """
 
 from __future__ import annotations
@@ -56,9 +59,10 @@ from .config import (
     ConfigInferencia,
 )
 
-# Precio por millón de tokens, en dólares, al 01/09/2026. Está acá y no en un cálculo suelto para
-# que actualizarlo sea una línea. Un modelo que no figure se contabiliza en tokens y no en dinero:
-# preferible a inventar un precio.
+# Precio por millón de tokens, en dólares, según la lista de Groq. Solo se usa cuando el proveedor
+# no informa el costo de la llamada. Está acá y no en un cálculo suelto para que actualizarlo sea
+# una línea, y un modelo que no figure se contabiliza en tokens y no en dinero: preferible a
+# inventar un precio.
 PRECIOS: dict[str, tuple[float, float]] = {
     MODELO_POR_DEFECTO: (0.15, 0.60),
     MODELO_ALTERNATIVO: (0.075, 0.30),
@@ -109,6 +113,10 @@ CODIGO_ESQUEMA_NO_CUMPLIDO = "json_validate_failed"
 # mensual: bloquea todas las claves hasta el mes siguiente o hasta que se suba el límite.
 CODIGO_GASTO_BLOQUEADO = "blocked_api_access"
 
+# Lo que devuelve un enrutador cuando no hay saldo o la clave llegó a su tope de gasto. Igual que el
+# bloqueo por gasto, esperar unos segundos no lo arregla.
+CODIGO_SIN_CREDITO = 402
+
 AYUDA_CERTIFICADOS = (
     "TLS falló al verificar el certificado del proveedor. No es que el proveedor no responda: "
     "este intérprete de Python no tiene instalado su paquete de certificados raíz.\n"
@@ -158,7 +166,7 @@ class PedidoRechazadoError(RuntimeError):
 
 
 class CuotaAgotadaError(RuntimeError):
-    """El proveedor dejó de aceptar pedidos por cuota o por límite de gasto.
+    """El proveedor dejó de aceptar pedidos por cuota, por límite de gasto o por falta de crédito.
 
     No es un problema del evento ni del pedido, y no se arregla en segundos: afecta igual a todo lo
     que venga detrás. Por eso no se reintenta y va separado de `ProveedorInalcanzableError`, que sí
@@ -175,15 +183,24 @@ class Consumo:
     tokens_salida: int = 0
     segundos: float = 0.0
     esperas_por_limite: int = 0
+    # Lo que el proveedor informó que costaron las llamadas, y cuántas lo informaron. Solo se usa si
+    # lo informaron todas: un total a medias se leería como más barato de lo que fue.
+    costo_informado: float = 0.0
+    con_costo_informado: int = 0
 
-    def sumar(self, entrada: int, salida: int, segundos: float) -> None:
+    def sumar(self, entrada: int, salida: int, segundos: float, costo: float | None = None) -> None:
         self.llamadas += 1
         self.tokens_entrada += entrada
         self.tokens_salida += salida
         self.segundos += segundos
+        if costo is not None:
+            self.costo_informado += costo
+            self.con_costo_informado += 1
 
     def costo_estimado(self, modelo: str) -> float | None:
-        """Costo en dólares, o None si el modelo no tiene precio registrado."""
+        """Costo en dólares: el que informó el proveedor, o el de la tabla, o None si no hay."""
+        if self.llamadas and self.con_costo_informado == self.llamadas:
+            return self.costo_informado
         precios = PRECIOS.get(modelo)
         if precios is None:
             return None
@@ -212,16 +229,24 @@ class Respuesta:
     tokens_salida: int
     segundos: float
     modelo: str
+    # Qué proveedor atendió, cuando un enrutador reparte el modelo entre varios.
+    proveedor: str = ""
+    # Lo que el proveedor dice que costó la llamada, en dólares, cuando lo informa.
+    costo_informado: float | None = None
     # Lo que devolvió el proveedor sin tocar, para poder auditar una decisión después.
     crudo: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
 def costo_de(respuesta: Respuesta) -> float | None:
-    """Cuánto costó una respuesta, o None si su modelo no tiene precio registrado.
+    """Cuánto costó una respuesta: lo que informó el proveedor, o la tabla, o None.
 
     `Consumo.costo_estimado` responde lo mismo sobre un acumulado. Esto existe para el nodo de
-    persistencia, que guarda el costo de la llamada que produjo cada decisión.
+    persistencia, que guarda el costo de la llamada que produjo cada decisión. Lo informado le gana
+    a la tabla porque un enrutador cobra lo que cobra el proveedor que eligió, y eso no es un precio
+    fijo.
     """
+    if respuesta.costo_informado is not None:
+        return respuesta.costo_informado
     precios = PRECIOS.get(respuesta.modelo)
     if precios is None:
         return None
@@ -265,6 +290,42 @@ def esquema_estricto(esquema: dict[str, Any]) -> dict[str, Any]:
     return copia
 
 
+def preferencias_de_ruteo(proveedores: tuple[str, ...]) -> dict[str, Any]:
+    """Lo que se le pide a un enrutador sobre a quién mandar el pedido.
+
+    `require_parameters` descarta a los proveedores que no aceptan todo lo que el pedido lleva,
+    esquema estricto incluido: sin eso, el enrutador puede elegir uno que trate el esquema como una
+    sugerencia. `data_collection: deny` descarta a los que guardan los pedidos, que acá llevan
+    telemetría de ataques. Con una lista de proveedores se va solo a esos y en ese orden, así una
+    campaña de medición no mezcla servidores sin saberlo.
+    """
+    preferencias: dict[str, Any] = {"require_parameters": True, "data_collection": "deny"}
+    if proveedores:
+        preferencias["order"] = list(proveedores)
+        preferencias["allow_fallbacks"] = False
+    return preferencias
+
+
+def _exigir_contenido(datos: dict[str, Any]) -> None:
+    """Levanta si la respuesta vino bien formada pero sin nada que parsear.
+
+    Pasa con los modelos que razonan: la elección trae el razonamiento y `content` en nulo. Si el
+    motivo es que se agotó el presupuesto de salida, reintentar gasta tres llamadas para volver al
+    mismo lugar, así que se corta con un rechazo que nombra la causa. Con cualquier otro motivo se
+    trata como pasajero, igual que el resto de las respuestas inservibles.
+    """
+    eleccion = (datos.get("choices") or [{}])[0]
+    if (eleccion.get("message") or {}).get("content"):
+        return
+    motivo = str(eleccion.get("finish_reason") or eleccion.get("native_finish_reason") or "")
+    if motivo == "length":
+        raise PedidoRechazadoError(
+            "El proveedor cortó la respuesta por tamaño y no devolvió contenido: el contexto del "
+            "evento no entra en el presupuesto de salida del modelo."
+        )
+    raise _TransitorioError(f"respuesta sin contenido (motivo: {motivo or 'sin declarar'})")
+
+
 class ClienteDeInferencia:
     """Habla con el proveedor. Una instancia por consumidor: la contabilidad es por instancia."""
 
@@ -292,6 +353,7 @@ class ClienteDeInferencia:
                 pedido, timeout=self.config.timeout, context=_contexto_tls()
             ) as r:
                 datos: dict[str, Any] = json.loads(r.read())
+                _exigir_contenido(datos)
                 return datos
         except urllib.error.HTTPError as exc:
             detalle = exc.read().decode("utf-8", "replace")[:400]
@@ -307,9 +369,15 @@ class ClienteDeInferencia:
                     f"({CODIGO_GASTO_BLOQUEADO}). Se reanuda al subir el límite o al empezar "
                     "el mes."
                 ) from exc
+            if exc.code == CODIGO_SIN_CREDITO:
+                raise CuotaAgotadaError(
+                    f"El proveedor no tiene crédito para este pedido (HTTP {CODIGO_SIN_CREDITO}): "
+                    "se agotó el saldo o el tope de gasto de la clave. Se reanuda al cargar "
+                    "crédito o cuando el tope se reinicie."
+                ) from exc
             # Un 403 con el código 1010 no lo emite el proveedor sino el borde que tiene adelante,
-            # y culpar a la credencial, que es lo que hacía esta rama antes, manda a revisar algo
-            # que está bien. Los dos rechazos se ven casi iguales y se arreglan de forma opuesta.
+            # y culpar a la credencial manda a revisar algo que está bien. Los dos rechazos se ven
+            # casi iguales y se arreglan de forma opuesta.
             if exc.code == 403 and CODIGO_AGENTE_BLOQUEADO in detalle:
                 raise PedidoRechazadoError(
                     f"El borde del proveedor rechazó al cliente, no a la credencial "
@@ -381,7 +449,7 @@ class ClienteDeInferencia:
         o la campaña de validación estaría midiendo el azar además del motor.
         """
         elegido = modelo or self.config.modelo
-        cuerpo = {
+        cuerpo: dict[str, Any] = {
             "model": elegido,
             "temperature": temperatura,
             "messages": [
@@ -397,6 +465,11 @@ class ClienteDeInferencia:
                 },
             },
         }
+        if self.config.es_enrutador:
+            # Un proveedor directo no conoce estos campos. A un enrutador se le pide además que
+            # informe el costo real de la llamada, que depende del proveedor que eligió.
+            cuerpo["provider"] = preferencias_de_ruteo(self.config.proveedores)
+            cuerpo["usage"] = {"include": True}
 
         comenzado = time.monotonic()
         datos = self._con_reintentos(cuerpo)
@@ -412,7 +485,9 @@ class ClienteDeInferencia:
         uso = datos.get("usage") or {}
         entrada = int(uso.get("prompt_tokens", 0))
         salida = int(uso.get("completion_tokens", 0))
-        self.consumo.sumar(entrada, salida, segundos)
+        informado = uso.get("cost")
+        costo = float(informado) if isinstance(informado, int | float) else None
+        self.consumo.sumar(entrada, salida, segundos, costo)
 
         return Respuesta(
             contenido=contenido,
@@ -420,6 +495,8 @@ class ClienteDeInferencia:
             tokens_salida=salida,
             segundos=segundos,
             modelo=elegido,
+            proveedor=str(datos.get("provider") or ""),
+            costo_informado=costo,
             crudo=datos,
         )
 

@@ -111,8 +111,8 @@ def test_el_grupo_se_crea_una_sola_vez(bus, stream):
 def test_repetido_se_saltea_sin_volver_a_procesar(bus, stream):
     """El mismo doc_id entregado dos veces tiene que correr el manejador una sola.
 
-    No es hipotético: el stream real llevó 52.165 mensajes con 52.156 identificadores de documento
-    distintos, porque un reinicio del normalizador reproduce lo que había entre puntos de control.
+    No es hipotético: un reinicio del normalizador reproduce lo que había entre puntos de control,
+    así que el stream trae identificadores de documento repetidos.
     """
     doc_id = uuid.uuid4().hex
     _limpiar_marcas(bus, doc_id)

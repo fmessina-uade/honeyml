@@ -370,6 +370,6 @@ api:
 dash:
 	@cd dashboard && npm run dev
 
-# Comprobación en vivo del proveedor de inferencia. Necesita GROQ_API_KEY exportada.
+# Comprobación en vivo del proveedor de inferencia. Necesita la clave en .env o en el entorno.
 inferencia-ok:
 	@./.venv/bin/python -c "import sys; from honeyml.agent.adapters.servicio import comprobar; sys.exit(comprobar())"

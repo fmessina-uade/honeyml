@@ -1,22 +1,36 @@
 #!/usr/bin/env bash
-# honeyml_watchdog.sh: detecta y corrige el cuelgue conocido de Dionaea.
-# Ejecutado por cron cada 10 minutos.
+# honeyml_watchdog.sh: detecta el cuelgue de un sensor, guarda con qué estaba ocupado y lo reinicia.
+# Lo corre cron cada 5 minutos.
 #
-# El fallo, observado dos veces: bajo carga sostenida Dionaea entra en un bucle que satura un
-# núcleo y deja de procesar conexiones. El contenedor NO muere y su puerto sigue aceptando TCP
-# (lo hace el proxy de Docker), así que ni la política de reinicio ni una sonda de puerto lo
-# detectan. Lo único que lo delata es que el registro deja de crecer.
+# En el cuelgue el contenedor sigue vivo y su puerto sigue aceptando TCP (lo hace el proxy de
+# Docker), así que ni la política de reinicio ni una sonda de puerto lo ven. Lo que lo delata es que
+# el registro deja de crecer.
 #
-# Por eso la señal es la antigüedad del archivo de registro y no el estado del proceso. Con
-# ~30.000 eventos diarios, media hora sin escribir no es un período tranquilo: es un cuelgue.
+# Hay dos umbrales. Con la CPU clavada, diez minutos sin escribir ya son un cuelgue: el proceso
+# trabaja al máximo y no produce nada. Con la CPU tranquila se espera media hora, porque puede ser
+# una pausa del tráfico. La cuenta arranca, como mucho, cuando arrancó el contenedor: un reinicio
+# reciente no hereda la antigüedad del registro y no se encadenan reinicios.
+#
+# Antes de reiniciar se guarda la pila del proceso y el uso de CPU por hilo, porque el reinicio borra
+# esa evidencia y sin ella no hay forma de saber dónde quedó trabado. La pila la lee py-spy desde un
+# contenedor que comparte el espacio de procesos del sensor, así no se instala nada en el anfitrión.
+#
+# Para comprobar que la captura funciona sin reiniciar nada:
+#     honeyml_watchdog.sh --diagnosticar dionaea
 
 set -euo pipefail
 
 DIONAEA_LOG="/var/lib/docker/volumes/honeypots_dionaea_var/_data/lib/dionaea/dionaea.json"
 COWRIE_LOG="/var/lib/docker/volumes/honeypots_cowrie_logs/_data/cowrie.json"
 LOG="/var/log/honeyml_watchdog.log"
-# margen amplio: por debajo de esto habría falsos positivos en pausas legítimas del tráfico
-STALE_SECONDS=1800
+DIAGNOSTICOS="/var/log/honeyml_diagnosticos"
+IMAGEN_PYSPY="honeyml-pyspy"
+
+# segundos sin escribir que alcanzan cuando la CPU supera LIMITE_CPU (en porcentaje)
+UMBRAL_CON_CPU=600
+LIMITE_CPU=90
+# segundos sin escribir que alcanzan con cualquier CPU
+UMBRAL_SIN_CPU=1800
 
 TS=$(date -u '+%Y-%m-%d %H:%M:%S')
 log() { echo "[$TS] $*" >> "$LOG"; }
@@ -27,35 +41,92 @@ edad_registro() {
     echo $(( $(date +%s) - $(stat -c %Y "$archivo") ))
 }
 
+desde_arranque() {
+    local inicio
+    inicio=$(docker inspect -f '{{.State.StartedAt}}' "$1" 2>/dev/null) || { echo -1; return; }
+    echo $(( $(date +%s) - $(date -d "$inicio" +%s) ))
+}
+
+cpu_de() {
+    # la parte entera del porcentaje, o vacío si Docker no contesta
+    docker stats "$1" --no-stream --format '{{.CPUPerc}}' 2>/dev/null | tr -d '%' | cut -d. -f1 || true
+}
+
+diagnosticar() {
+    local nombre="$1" destino pid
+    mkdir -p "$DIAGNOSTICOS"
+    destino="${DIAGNOSTICOS}/${nombre}-$(date -u '+%Y%m%dT%H%M%SZ').txt"
+    pid=$(docker inspect -f '{{.State.Pid}}' "$nombre" 2>/dev/null || true)
+    (
+        # un paso que falle no puede dejar la captura a medias ni frenar el reinicio
+        set +e
+        echo "== contenedor"
+        docker stats "$nombre" --no-stream
+        if [[ -n "$pid" && "$pid" != "0" ]]; then
+            echo "== cpu por hilo"
+            top -H -b -n 1 -p "$pid" | head -40
+            echo "== hilo, estado, espera y nombre"
+            for tarea in /proc/"$pid"/task/*; do
+                echo "$(basename "$tarea") $(cut -d' ' -f3 "$tarea/stat") $(cat "$tarea/wchan") $(cat "$tarea/comm")"
+            done
+            echo "== conexiones"
+            nsenter -t "$pid" -n ss -tanp | head -60
+        fi
+        # dos lecturas separadas: si la pila se repite, el proceso está girando en ese lugar
+        for vuelta in 1 2; do
+            echo "== pila, lectura ${vuelta}"
+            # sin --native: con el intérprete embebido en el binario del sensor, esa opción falla
+            # al resolver el hilo del sistema y no devuelve ninguna pila
+            timeout 60 docker run --rm --network none --pid="container:${nombre}" \
+                --cap-add SYS_PTRACE "$IMAGEN_PYSPY" dump --pid 1
+            if [[ "$vuelta" -eq 1 ]]; then
+                sleep 5
+            fi
+        done
+    ) > "$destino" 2>&1
+    # un mes de capturas alcanza para comparar varios cuelgues entre sí
+    find "$DIAGNOSTICOS" -name '*.txt' -mtime +30 -delete 2>/dev/null || true
+    log "DIAGNOSTICO: ${nombre} en ${destino}"
+}
+
 revisar() {
     local nombre="$1" archivo="$2"
-    local edad
+    local edad arranque cpu pids
     edad=$(edad_registro "$archivo")
-
     if [[ "$edad" -lt 0 ]]; then
         log "AVISO: no existe el registro de ${nombre} (${archivo})"
         return
     fi
-    if [[ "$edad" -le "$STALE_SECONDS" ]]; then
+    arranque=$(desde_arranque "$nombre")
+    if [[ "$arranque" -ge 0 && "$arranque" -lt "$edad" ]]; then
+        edad=$arranque
+    fi
+    if [[ "$edad" -le "$UMBRAL_CON_CPU" ]]; then
         return
     fi
 
-    local pids cpu
+    cpu=$(cpu_de "$nombre")
+    if [[ "$edad" -le "$UMBRAL_SIN_CPU" && "${cpu:-0}" -lt "$LIMITE_CPU" ]]; then
+        return
+    fi
+
     pids=$(docker stats "$nombre" --no-stream --format '{{.PIDs}}' 2>/dev/null || echo '?')
-    cpu=$(docker stats "$nombre" --no-stream --format '{{.CPUPerc}}' 2>/dev/null || echo '?')
-    log "ALERTA: ${nombre} sin escribir hace ${edad}s (pids=${pids} cpu=${cpu}). Reiniciando."
+    log "ALERTA: ${nombre} sin escribir hace ${edad}s (pids=${pids} cpu=${cpu:-?}%). Reiniciando."
+    diagnosticar "$nombre"
 
     if docker restart "$nombre" >/dev/null 2>&1; then
         sleep 20
-        local nueva
-        nueva=$(edad_registro "$archivo")
-        log "OK: ${nombre} reiniciado; antigüedad del registro ahora ${nueva}s"
+        log "OK: ${nombre} reiniciado; antigüedad del registro ahora $(edad_registro "$archivo")s"
     else
         log "ERROR: falló el reinicio de ${nombre}"
     fi
 }
 
 main() {
+    if [[ "${1:-}" == "--diagnosticar" ]]; then
+        diagnosticar "${2:-dionaea}"
+        return
+    fi
     revisar dionaea "$DIONAEA_LOG"
     revisar cowrie "$COWRIE_LOG"
 }
