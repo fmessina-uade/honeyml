@@ -240,8 +240,8 @@ EOF
 
 if [[ -f "$SSHD_CONFIG_SRC" ]]; then
     cp "$SSHD_CONFIG_SRC" /etc/ssh/sshd_config
-    # AllowUsers tiene que apuntar al usuario admin real
-    sed -i "s/^AllowUsers.*/AllowUsers $ADMIN_USER/" /etc/ssh/sshd_config
+    # AllowUsers y el bloque del túnel tienen que apuntar al usuario admin real
+    sed -i "s/^AllowUsers.*/AllowUsers $ADMIN_USER/; s/^Match User .*/Match User $ADMIN_USER/" /etc/ssh/sshd_config
     mkdir -p /run/sshd  # sshd -t lo necesita en un sistema recién instalado
     sshd -t || die "sshd_config inválido - verificar $SSHD_CONFIG_SRC"
     log "  sshd_config hardened aplicado (Port 2200, AllowUsers $ADMIN_USER)."

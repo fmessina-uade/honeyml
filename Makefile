@@ -48,7 +48,7 @@ help:
 	@echo "    make logs      Ver logs en tiempo real"
 	@echo "    make ps        Estado de contenedores"
 	@echo "    make status    Resumen de estado del sistema"
-	@echo "    make deploy-vps  Copiar scripts de infraestructura al VPS"
+	@echo "    make deploy-vps  Llevar el último commit al VPS (SECO=1 muestra qué cambiaría)"
 	@echo "    make analisis-up Levantar el motor de triaje y la API en contenedores"
 	@echo "    make publicar-artefactos  Subir los artefactos derivados al VPS"
 	@echo "    make tunel     Kibana y la API del VPS en esta máquina, por túnel SSH"
@@ -162,16 +162,27 @@ clean:
 	docker compose -f $(COMPOSE_FILE) down -v
 	@echo "Contenedores y volúmenes eliminados."
 
+# Lleva al servidor el último commit. El servidor no guarda credenciales de GitHub: la máquina que
+# recibe ataques no tiene con qué leer el repositorio. Se despliega lo commiteado y nada más, así lo
+# que corre allá siempre corresponde a un commit. --delete saca lo que ya no está en el repositorio,
+# salvo lo que solo existe en el servidor: las claves en los .env y los artefactos de data/.
 deploy-vps:
 ifndef VPS_IP
 	$(error VPS_IP no definido. Crear archivo .vps_ip o exportar: export VPS_IP=<ip>)
 endif
-	rsync -avz --progress \
-		-e "ssh -p $(SSH_PORT) -o StrictHostKeyChecking=accept-new" \
-		infra/ \
-		$(SSH_USER)@$(VPS_IP):/home/$(SSH_USER)/honeyml/infra/
-	@echo "Archivos de infraestructura copiados al VPS $(VPS_IP)"
-	@echo "Siguiente paso: ssh -p $(SSH_PORT) $(SSH_USER)@$(VPS_IP)"
+	@if [ -n "$$(git status --porcelain)" ]; then \
+		echo "Aviso: hay cambios sin commitear, y no se despliegan."; \
+	fi
+	@# mktemp crea el directorio con 700, y rsync le copiaría ese permiso a la raíz del repositorio en
+	@# el servidor: el usuario de administración dejaría de poder leerlo.
+	@tmp=$$(mktemp -d) && trap 'rm -rf "$$tmp"' EXIT && chmod 755 "$$tmp" && \
+		git archive HEAD | tar -x -C "$$tmp" && \
+		rsync -rlptz --delete $(if $(SECO),--dry-run --itemize-changes,) \
+			--exclude='/.env' --exclude='/data/' --exclude='/infra/*/.env' \
+			--rsync-path="sudo rsync" \
+			-e "ssh -p $(SSH_PORT) -i $(SSH_KEY) -o IdentitiesOnly=yes" \
+			"$$tmp/" $(SSH_USER)@$(VPS_IP):/opt/honeyml/honeyml/ && \
+		echo "$(if $(SECO),Simulado,Desplegado) $$(git rev-parse --short HEAD) en /opt/honeyml/honeyml"
 
 # pipeline de datos: Elastic Stack + ECS
 
@@ -283,7 +294,7 @@ publicar-artefactos:
 ifndef VPS_IP
 	$(error VPS_IP no definido. Crear archivo .vps_ip o exportar: export VPS_IP=<ip>)
 endif
-	rsync -avz --include='*.json' --exclude='*' \
+	rsync -rlptvz --include='*.json' --exclude='*' \
 		--rsync-path="sudo mkdir -p /opt/honeyml/honeyml/data/processed && sudo rsync" \
 		-e "ssh -p $(SSH_PORT) -i $(SSH_KEY) -o IdentitiesOnly=yes" \
 		data/processed/ $(SSH_USER)@$(VPS_IP):/opt/honeyml/honeyml/data/processed/

@@ -1,8 +1,8 @@
-# sshd_config hardened - HoneyML VPS
-# Apply with: cp sshd_config /etc/ssh/sshd_config && systemctl restart ssh
-# Check syntax with: sshd -t
+# sshd_config endurecido del VPS de HoneyML
+# Se aplica con 01_hardening.sh, o a mano: cp sshd_config /etc/ssh/sshd_config && systemctl restart ssh
+# Verificar la sintaxis antes con: sshd -t
 
-# non-standard port to cut bot noise (22 goes to Cowrie)
+# Puerto no estándar: el 22 es de Cowrie, y así el ruido de bots no llega a la administración
 Port 2200
 
 Protocol 2
@@ -10,7 +10,7 @@ Protocol 2
 # Solo IPv4, IPv6 deshabilitado en sysctl
 AddressFamily inet
 
-# public-key auth only
+# Autenticación solo por clave pública
 PermitRootLogin no
 PasswordAuthentication no
 ChallengeResponseAuthentication no
@@ -25,10 +25,10 @@ LoginGraceTime 30
 MaxAuthTries 3
 MaxSessions 5
 
-# only the project's admin user
+# Solo el usuario administrador del proyecto
 AllowUsers honeyml
 
-# no port forwarding or tunneling
+# Sin reenvío de puertos ni túneles, salvo la excepción del final
 AllowTcpForwarding no
 AllowStreamLocalForwarding no
 GatewayPorts no
@@ -36,7 +36,7 @@ X11Forwarding no
 PermitTunnel no
 PermitUserEnvironment no
 
-# app-level keepalive (not TCP, to avoid false positives)
+# Keepalive a nivel de aplicación y no de TCP, para evitar falsos positivos
 ClientAliveInterval 300
 ClientAliveCountMax 2
 TCPKeepAlive no
@@ -56,3 +56,11 @@ AcceptEnv LANG LC_*
 
 # SFTP deshabilitado
 # Subsystem sftp /usr/lib/openssh/sftp-server
+
+# La excepción: el túnel con que la estación de administración alcanza Kibana y la API, que escuchan
+# solo en loopback. Reenvío local (-L, nunca -R), solo para el usuario del proyecto y solo hacia esos
+# dos puertos. Ese usuario ya tiene sudo, así que el túnel no le abre nada que no tuviera.
+# Un bloque Match vale hasta el final del archivo: tiene que quedar último.
+Match User honeyml
+    AllowTcpForwarding local
+    PermitOpen 127.0.0.1:5601 127.0.0.1:8000
