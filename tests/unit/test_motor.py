@@ -83,6 +83,9 @@ class _Almacen:
         self.escrituras.append((doc_id, documento))
         return True
 
+    def existe(self, doc_id: str) -> bool:
+        return False
+
 
 def _evento(**kw: Any) -> EventoDelBus:
     base = {

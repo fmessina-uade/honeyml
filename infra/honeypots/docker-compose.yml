@@ -107,7 +107,9 @@ services:
 
 # red bridge interna de los honeypots.
 # entrada permitida (reciben ataques de internet), salida bloqueada con iptables en DOCKER-USER
-# (02_firewall.sh)
+# (02_firewall.sh). Los sensores no se hablan entre sí: un atacante que gane ejecución en uno no
+# puede usarlo para llegar al otro. DOCKER-USER repite ese descarte, porque se evalúa antes que las
+# reglas con que Docker implementa enable_icc.
 networks:
   honeypot_net:
     name: honeypot_net
@@ -119,7 +121,7 @@ networks:
           gateway: 172.20.0.1
     driver_opts:
       com.docker.network.bridge.name: br-honeypot
-      com.docker.network.bridge.enable_icc: "true"
+      com.docker.network.bridge.enable_icc: "false"
       com.docker.network.bridge.enable_ip_masquerade: "true"
 
 # IMPORTANTE: estos volúmenes pueden contener malware capturado, nunca se versionan

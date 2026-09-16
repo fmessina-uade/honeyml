@@ -1,0 +1,7 @@
+# La imagen de análisis se construye desde la raíz del repositorio, y acá hay gigas que no tienen que
+# viajar a Docker: registros con material capturado, el entorno virtual, las dependencias del panel.
+# Por eso se excluye todo y se deja pasar solo lo que la imagen instala.
+*
+!pyproject.toml
+!src/
+**/__pycache__

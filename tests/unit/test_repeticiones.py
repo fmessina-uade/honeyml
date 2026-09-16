@@ -6,10 +6,10 @@ marcas de deduplicación del consumidor vencen a las 24 horas y ya no los recono
 reutilización encendida el evento de origen de una firma se copiaría de sí mismo y pisaría la
 decisión razonada.
 
-Se fija la protección en las tres capas que la sostienen: el almacén no sobrescribe, la persistencia
-no escribe una copia de sí misma, y el motor le avisa al consumidor que el evento ya estaba
-decidido. El conteo del lado del consumidor necesita un Redis de verdad y vive en las pruebas de
-integración.
+Se fija la protección en las capas que la sostienen: el motor no vuelve a triar lo que ya tiene
+decisión, el almacén no sobrescribe, la persistencia no escribe una copia de sí misma, y el motor le
+avisa al consumidor que el evento ya estaba decidido. El conteo del lado del consumidor necesita un
+Redis de verdad y vive en las pruebas de integración.
 """
 
 from __future__ import annotations
@@ -64,14 +64,18 @@ def _estado(**kw: Any) -> Any:
 class _Almacen:
     """Un almacén en memoria que contesta lo que se le indique: escribió, o ya estaba."""
 
-    def __init__(self, escribe: bool = True) -> None:
+    def __init__(self, escribe: bool = True, ya_decidido: bool = False) -> None:
         self.escribe = escribe
+        self.ya_decidido = ya_decidido
         self.escrituras: list[str] = []
 
     def guardar(self, doc_id: str, documento: dict[str, Any]) -> bool:
         if self.escribe:
             self.escrituras.append(doc_id)
         return self.escribe
+
+    def existe(self, doc_id: str) -> bool:
+        return self.ya_decidido
 
 
 class _Repertorio:
@@ -104,9 +108,11 @@ class _Red:
     def __init__(self, respuestas: list[Any]) -> None:
         self.respuestas = respuestas
         self.urls: list[str] = []
+        self.metodos: list[str] = []
 
     def __call__(self, pedido: Any, timeout: float = 0) -> Any:
         self.urls.append(pedido.full_url)
+        self.metodos.append(pedido.get_method())
         siguiente = self.respuestas.pop(0)
         if isinstance(siguiente, BaseException):
             raise siguiente
@@ -173,6 +179,28 @@ def test_reescribiendo_un_409_no_se_disimula(red: Any) -> None:
         AlmacenElastic(reescribir=True).guardar(DOC_ID, {"a": 1})
 
 
+def test_saber_si_existe_no_trae_el_documento(red: Any) -> None:
+    transporte = red([_Respuesta()])
+    assert AlmacenElastic().existe(DOC_ID) is True
+    assert transporte.metodos == ["HEAD"]
+    assert transporte.urls[0].endswith(f"/honeyml-decisiones/_doc/{DOC_ID}")
+
+
+def test_un_404_es_que_no_hay_decision(red: Any) -> None:
+    """También lo contesta un índice que todavía no se creó, y la respuesta es la misma."""
+    red([_http(404)])
+    assert AlmacenElastic().existe(DOC_ID) is False
+
+
+def test_si_la_consulta_falla_levanta_sin_reintentar(red: Any) -> None:
+    """Todavía no se gastó ninguna llamada, así que el evento puede volver al bus sin costo."""
+    transporte = red([TimeoutError("se cortó")])
+    with pytest.raises(AlmacenNoDisponibleError) as exc:
+        AlmacenElastic().existe(DOC_ID)
+    assert exc.value.pasajero is True
+    assert len(transporte.urls) == 1
+
+
 # ---- la persistencia ---------------------------------------------------------------------------
 
 
@@ -221,6 +249,9 @@ def test_una_escritura_nueva_si_registra_la_firma() -> None:
 
 
 class _Servicio:
+    def __init__(self) -> None:
+        self.llamadas = 0
+
     def completar(
         self,
         sistema: str,
@@ -230,6 +261,7 @@ class _Servicio:
         intento: int = 0,
         nombre_esquema: str = "decision",
     ) -> Respuesta:
+        self.llamadas += 1
         return Respuesta(
             contenido=json.dumps(DECISION),
             tokens_entrada=1200,
@@ -253,3 +285,18 @@ def test_el_manejador_avisa_cuando_ya_estaba_decidido(sin_indice: None) -> None:
     """Es lo que usa el consumidor para contar el evento como repetido y no como procesado."""
     assert motor.manejador(servicio=_Servicio(), almacen=_Almacen(escribe=False))(_evento()) is True
     assert motor.manejador(servicio=_Servicio(), almacen=_Almacen())(_evento()) is False
+
+
+def test_lo_ya_decidido_no_vuelve_a_pasar_por_el_grafo(sin_indice: None) -> None:
+    """Se confirma como repetido sin gastar una llamada ni intentar escribir."""
+    servicio, almacen = _Servicio(), _Almacen(ya_decidido=True)
+    assert motor.manejador(servicio=servicio, almacen=almacen)(_evento()) is True
+    assert servicio.llamadas == 0
+    assert almacen.escrituras == []
+
+
+def test_reescribiendo_se_decide_aunque_ya_exista(sin_indice: None) -> None:
+    servicio, almacen = _Servicio(), _Almacen(ya_decidido=True)
+    motor.manejador(servicio=servicio, almacen=almacen, saltear_decididos=False)(_evento())
+    assert servicio.llamadas == 1
+    assert almacen.escrituras == [DOC_ID]

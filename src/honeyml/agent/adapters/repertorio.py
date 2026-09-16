@@ -21,6 +21,8 @@ from typing import Any, Protocol
 
 import redis
 
+from .. import consumer as bus
+
 # Una clave por firma. El prefijo es el mismo estilo que `honeyml:visto:` del consumidor, así todo
 # lo que el motor deja en Redis se lista con un solo patrón.
 PREFIJO = "honeyml:firma:"
@@ -47,7 +49,7 @@ class RepertorioEnRedis:
 
     def __init__(self, cliente: redis.Redis | None = None, ttl: int = TTL) -> None:
         self.r = cliente or redis.Redis(
-            host="127.0.0.1", port=6379, decode_responses=True, socket_timeout=3
+            host=bus.HOST, port=bus.PORT, decode_responses=True, socket_timeout=3
         )
         self.ttl = ttl
         self.aciertos = 0

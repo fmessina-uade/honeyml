@@ -8,10 +8,13 @@ from __future__ import annotations
 
 import datetime
 import json
+import os
 import urllib.request
 from typing import Any
 
-ES_URL = "http://localhost:9200"
+# En desarrollo Elasticsearch escucha en loopback. En el servidor, la API y el motor corren en
+# contenedores y lo alcanzan por el nombre del servicio dentro de la red de análisis.
+ES_URL = os.environ.get("ES_URL", "http://localhost:9200")
 INDEX = "honeypot-*"
 LOCAL_IP = "127.0.0.1"
 

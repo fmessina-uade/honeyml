@@ -23,6 +23,7 @@ algo raro.
 from __future__ import annotations
 
 import json
+import os
 import time
 import urllib.error
 import urllib.parse
@@ -30,7 +31,7 @@ import urllib.request
 from typing import Any, Protocol
 
 INDICE = "honeyml-decisiones"
-ES_URL_POR_DEFECTO = "http://localhost:9200"
+ES_URL_POR_DEFECTO = os.environ.get("ES_URL", "http://localhost:9200")
 
 # Suficiente para una escritura de un documento chico. Si tarda más que esto, el problema no es la
 # latencia: el índice no está sano y conviene devolver el evento al bus.
@@ -67,6 +68,8 @@ class AlmacenNoDisponibleError(RuntimeError):
 
 # Lo que contesta Elasticsearch a un `_create` sobre un documento que ya existe.
 YA_EXISTE = 409
+# Y a una consulta por un documento que no está, o sobre un índice que todavía no se creó.
+NO_EXISTE = 404
 
 
 class Almacen(Protocol):
@@ -77,6 +80,16 @@ class Almacen(Protocol):
     """
 
     def guardar(self, doc_id: str, documento: dict[str, Any]) -> bool: ...
+
+
+class AlmacenConsultable(Almacen, Protocol):
+    """El almacén que además sabe si un evento ya tiene decisión, que es lo que pregunta el motor.
+
+    Va aparte de `Almacen` porque el nodo de persistencia no hace esa pregunta, y así sus pruebas no
+    tienen que implementar una consulta que nunca usan.
+    """
+
+    def existe(self, doc_id: str) -> bool: ...
 
 
 class AlmacenElastic:
@@ -129,6 +142,31 @@ class AlmacenElastic:
             f"Elasticsearch no respondió en {MAX_REINTENTOS} intentos ({doc_id}): {ultimo}",
             pasajero=True,
         ) from ultimo
+
+    def existe(self, doc_id: str) -> bool:
+        """Si ya hay una decisión guardada para este evento, sin traer el documento.
+
+        Una falla levanta como pasajera y, a diferencia de `guardar`, no se reintenta acá: todavía
+        no se gastó ninguna llamada, así que devolver el evento al bus no cuesta nada.
+        """
+        pedido = urllib.request.Request(
+            f"{self.es_url}/{self.indice}/_doc/{urllib.parse.quote(doc_id, safe='')}",
+            method="HEAD",
+        )
+        try:
+            with urllib.request.urlopen(pedido, timeout=TIMEOUT_SEGUNDOS):
+                return True
+        except urllib.error.HTTPError as exc:
+            if exc.code == NO_EXISTE:
+                return False
+            raise AlmacenNoDisponibleError(
+                f"Elasticsearch respondió {exc.code} al consultar {doc_id}.",
+                pasajero=exc.code >= PRIMER_CODIGO_DEL_SERVIDOR,
+            ) from exc
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
+            raise AlmacenNoDisponibleError(
+                f"No se pudo alcanzar Elasticsearch para consultar {doc_id}: {exc}", pasajero=True
+            ) from exc
 
     def _escribir(self, doc_id: str, documento: dict[str, Any]) -> bool:
         """Un solo viaje. `False` si el documento ya estaba; levanta si vale la pena reintentar."""

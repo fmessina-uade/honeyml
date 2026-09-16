@@ -1,0 +1,78 @@
+# Motor de triaje y API del panel, en la zona de análisis.
+#
+# Se unen a la red de Elasticsearch y del bus, y a ninguna otra: los sensores viven en honeypot_net y
+# no tienen ruta hasta acá. Ninguno de los dos publica un puerto hacia afuera; la API escucha solo
+# en loopback y se alcanza por túnel SSH.
+#
+# Necesita el stack de Elastic y el bus levantados, y la clave del proveedor en el .env de la raíz.
+
+x-analisis: &analisis
+  build:
+    context: ../..
+    dockerfile: infra/analisis/Dockerfile
+  image: honeyml-analisis
+  restart: unless-stopped
+  networks:
+    - elastic_net
+  volumes:
+    # los artefactos derivados se generan en la estación de trabajo y se publican al servidor
+    - ../../data/processed:/app/data/processed:ro
+  read_only: true
+  tmpfs:
+    - /tmp
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+
+  # Consume el bus, razona cada conducta nueva y guarda la decisión.
+  #
+  # Va con --todo porque después de un corte largo el atraso puede superar el tope que frena a una
+  # corrida manual, y un servicio no puede quedarse esperando que alguien confirme. Lo que acota el
+  # gasto acá es el tope de la clave en el proveedor. El nombre es fijo para que cada reinicio no
+  # sume un consumidor nuevo al grupo.
+  motor:
+    <<: *analisis
+    container_name: motor
+    hostname: motor
+    command: ["python", "-m", "honeyml.agent.motor", "--reutilizar", "--todo", "--nombre", "motor"]
+    env_file:
+      - ../../.env
+    environment:
+      - ES_URL=http://elasticsearch:9200
+      - BUS_HOST=redis
+    mem_limit: ${MOTOR_MEM_LIMIT:-1g}
+    cpus: "1.0"
+
+  # La única puerta del navegador a Elasticsearch.
+  api:
+    <<: *analisis
+    container_name: api
+    hostname: api
+    command: ["uvicorn", "honeyml.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      - ES_URL=http://elasticsearch:9200
+    ports:
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      # una conexión y nada más: /api/health consulta Elasticsearch, y una sonda cada medio minuto
+      # no tiene por qué agregarle carga
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.settimeout(3); s.connect(('127.0.0.1', 8000)); s.close()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    mem_limit: ${API_MEM_LIMIT:-768m}
+    cpus: "0.5"
+
+networks:
+  elastic_net:
+    external: true
+    name: elastic_net

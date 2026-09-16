@@ -20,12 +20,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import urllib.request
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-ES_URL = "http://localhost:9200"
+ES_URL = os.environ.get("ES_URL", "http://localhost:9200")
 INDEX = "honeypot-*"
 OUT_FILE = Path("data/processed/password_index.json")
 PREFIX_LEN = 5

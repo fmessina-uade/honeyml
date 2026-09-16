@@ -40,6 +40,11 @@ ufw default deny routed
 
 # 2. reglas de acceso administrativo
 log "[2/5] Configurando acceso administrativo..."
+# Lo que entra al anfitrión desde la red de honeypots se descarta antes que cualquier otra regla. Sin
+# esto, un atacante con ejecución en un sensor alcanza el sshd de administración por la puerta de
+# enlace del bridge. Las respuestas a conexiones que abre el anfitrión pasan igual, porque UFW acepta
+# el tráfico establecido antes de mirar las reglas de usuario.
+ufw deny in on br-honeypot comment 'Sensores hacia el anfitrion'
 ufw limit "${SSH_ADMIN_PORT}/tcp" comment 'SSH Admin - rate limited'
 
 # 3. puertos de los honeypots (tráfico de atacantes)
@@ -71,30 +76,11 @@ ufw status verbose | tee -a "$LOG_FILE"
 # 5. reglas de iptables para aislar los contenedores de los honeypots
 log "[5/5] Aplicando reglas de aislamiento Docker..."
 
-# DOCKER-USER se evalúa antes que las reglas propias de Docker y sobrevive a un reinicio del
-# demonio. Se bloquea la salida de la red de honeypots, así un atacante no puede usar el contenedor
-# como pivote.
-if ! iptables -C DOCKER-USER -s "$HONEYPOT_NET" -o eth0 -j DROP 2>/dev/null; then
-    iptables -I DOCKER-USER 3 -s "$HONEYPOT_NET" -o eth0 -j DROP
-    log "  Regla de egress honeypot aplicada."
-fi
-
-# excepción: se permite el tráfico dentro de la red (honeypot <-> sidecar de filebeat en fase 2)
-if ! iptables -C DOCKER-USER -s "$HONEYPOT_NET" -d "$HONEYPOT_NET" -j ACCEPT 2>/dev/null; then
-    iptables -I DOCKER-USER 1 -s "$HONEYPOT_NET" -d "$HONEYPOT_NET" -j ACCEPT
-    log "  Tráfico intra-honeypot habilitado."
-fi
-
-# se permite el tráfico de VUELTA (ESTABLISHED/RELATED) hacia internet.
-# sin esto se descartan los SYN-ACK de respuesta y el handshake TCP nunca se completa.
-if ! iptables -C DOCKER-USER -s "$HONEYPOT_NET" -o eth0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null; then
-    iptables -I DOCKER-USER 2 -s "$HONEYPOT_NET" -o eth0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-    log "  Tráfico de retorno ESTABLISHED/RELATED habilitado."
-fi
-
-# script propio: aplica solo nuestras reglas de DOCKER-USER y no toca las de Docker.
-# un iptables-save/restore completo entra en conflicto al reiniciar, porque Docker regenera sus
-# propias reglas y terminan duplicadas o en el orden equivocado respecto de las restauradas.
+# DOCKER-USER se evalúa antes que las reglas propias de Docker y sobrevive a un reinicio del demonio.
+# Las reglas viven en un script propio, que se corre ahora y en cada arranque, y aplica solo lo
+# nuestro sin tocar lo de Docker. Un iptables-save/restore completo entra en conflicto al reiniciar,
+# porque Docker regenera sus propias reglas y terminan duplicadas o en el orden equivocado respecto
+# de las restauradas.
 cat > /usr/local/bin/honeyml-docker-rules.sh << RULES_EOF
 #!/bin/bash
 HONEYPOT_NET="${HONEYPOT_NET}"
@@ -110,9 +96,11 @@ if ! iptables -L DOCKER-USER -n &>/dev/null; then
     exit 1
 fi
 
-# se permite el tráfico entre honeypots, que lo necesita el sidecar de la fase 2
-if ! iptables -C DOCKER-USER -s "\$HONEYPOT_NET" -d "\$HONEYPOT_NET" -j ACCEPT 2>/dev/null; then
-    iptables -I DOCKER-USER 1 -s "\$HONEYPOT_NET" -d "\$HONEYPOT_NET" -j ACCEPT
+# Los sensores no se hablan entre sí: uno comprometido no puede usar al otro de trampolín. Es lo
+# mismo que enable_icc: false en el compose, repetido acá porque esta cadena se evalúa antes que las
+# reglas con que Docker lo implementa, y un ACCEPT en ella lo anularía.
+if ! iptables -C DOCKER-USER -i br-honeypot -o br-honeypot -j DROP 2>/dev/null; then
+    iptables -I DOCKER-USER 1 -i br-honeypot -o br-honeypot -j DROP
 fi
 
 # se permite el tráfico de VUELTA (ESTABLISHED/RELATED) de la red de honeypots hacia internet.
@@ -157,7 +145,7 @@ log "=== Configuración de firewall completada ==="
 log ""
 log "Resumen de configuración:"
 log "  Puerto SSH admin : $SSH_ADMIN_PORT (rate limited)"
-log "  Red honeypots    : $HONEYPOT_NET (egress bloqueado)"
+log "  Red honeypots    : $HONEYPOT_NET (salida y tráfico entre sensores bloqueados)"
 log "  Honeypots expuestos en: 22, 23, 21, 80, 443, 445, 135, 3306, 5060, 1433"
 log ""
 log "Próximo paso: bash 03_monitoring.sh"

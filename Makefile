@@ -2,7 +2,8 @@
         test-integration consumer triaje grafo arquetipos modelo evaluacion \
         api dash replays \
         elastic-up elastic-down elastic-logs elastic-dev-up elastic-dev-down elastic-dev-logs \
-        es-bootstrap validate-indexing pull-logs
+        es-bootstrap validate-indexing pull-logs \
+        analisis-up analisis-down analisis-logs publicar-artefactos tunel
 
 COMPOSE_FILE = infra/honeypots/docker-compose.yml
 COMPOSE_DEV  = infra/honeypots/docker-compose.dev.yml
@@ -48,6 +49,9 @@ help:
 	@echo "    make ps        Estado de contenedores"
 	@echo "    make status    Resumen de estado del sistema"
 	@echo "    make deploy-vps  Copiar scripts de infraestructura al VPS"
+	@echo "    make analisis-up Levantar el motor de triaje y la API en contenedores"
+	@echo "    make publicar-artefactos  Subir los artefactos derivados al VPS"
+	@echo "    make tunel     Kibana y la API del VPS en esta máquina, por túnel SSH"
 	@echo ""
 	@echo "  Variables:"
 	@echo "    VPS_IP    IP del VPS de DigitalOcean (o definir en .vps_ip)"
@@ -73,7 +77,8 @@ lint:
 	fi
 	@echo "--- yamllint ---"
 	@if command -v yamllint >/dev/null 2>&1; then \
-		yamllint infra/honeypots/docker-compose.yml infra/honeypots/docker-compose.dev.yml && echo "  yamllint OK"; \
+		yamllint infra/honeypots/docker-compose.yml infra/honeypots/docker-compose.dev.yml \
+			infra/analisis/docker-compose.yml && echo "  yamllint OK"; \
 	else \
 		echo "  yamllint no instalado (pip install yamllint)"; \
 	fi
@@ -215,11 +220,15 @@ elastic-dev-logs:
 
 elastic-up:
 	@if [ ! -f infra/elastic/.env ]; then cp infra/elastic/.env.example infra/elastic/.env; fi
-	docker compose --env-file infra/elastic/.env -f $(ELASTIC_FILE) up -d elasticsearch logstash kibana
+	@# El orden importa. La plantilla ECS va antes que Filebeat, así los índices salen con los tipos
+	@# correctos. Y el bus va antes que Logstash: un evento que no se logra publicar se indexa igual,
+	@# marcado con _bus_publish_failed, pero el motor no lo recibe nunca.
+	docker compose --env-file infra/elastic/.env -f $(ELASTIC_FILE) up -d elasticsearch kibana
 	@ES_URL=http://localhost:9200 bash infra/elastic/scripts/es_bootstrap.sh
+	@$(MAKE) --no-print-directory bus-up
+	docker compose --env-file infra/elastic/.env -f $(ELASTIC_FILE) up -d logstash
 	docker compose --env-file infra/elastic/.env -f $(ELASTIC_FILE) up -d filebeat
-	@echo "Elastic Stack iniciado en el VPS. Acceso privado por túnel SSH:"
-	@echo "  ssh -L 5601:localhost:5601 -L 9200:localhost:9200 -p $(SSH_PORT) $(SSH_USER)@$(VPS_IP)"
+	@echo "Elastic Stack iniciado en el servidor. Acceso privado desde la estación: make tunel"
 
 elastic-down:
 	docker compose -f $(ELASTIC_FILE) down
@@ -254,6 +263,40 @@ bus-down:
 
 bus-status:
 	@./.venv/bin/python scripts/bus_status.py
+
+ANALISIS_FILE = infra/analisis/docker-compose.yml
+
+# Motor de triaje y API del panel en contenedores, sobre la red de análisis. Es como corren en el
+# servidor; en la estación de trabajo siguen estando `make triaje` y `make api`.
+analisis-up:
+	docker compose -f $(ANALISIS_FILE) up -d --build
+
+analisis-down:
+	docker compose -f $(ANALISIS_FILE) down
+
+analisis-logs:
+	docker compose -f $(ANALISIS_FILE) logs -f --tail=100
+
+# El motor y la API del servidor leen los artefactos derivados (familias de comandos, arquetipos,
+# replays, índice de contraseñas) de solo lectura. Se generan acá con `make artifacts` y se publican.
+publicar-artefactos:
+ifndef VPS_IP
+	$(error VPS_IP no definido. Crear archivo .vps_ip o exportar: export VPS_IP=<ip>)
+endif
+	rsync -avz --include='*.json' --exclude='*' \
+		--rsync-path="sudo mkdir -p /opt/honeyml/honeyml/data/processed && sudo rsync" \
+		-e "ssh -p $(SSH_PORT) -i $(SSH_KEY) -o IdentitiesOnly=yes" \
+		data/processed/ $(SSH_USER)@$(VPS_IP):/opt/honeyml/honeyml/data/processed/
+
+# Kibana y la API del servidor en esta máquina. Usan los mismos puertos que el stack local, así que
+# va con ese stack apagado.
+tunel:
+ifndef VPS_IP
+	$(error VPS_IP no definido. Crear archivo .vps_ip o exportar: export VPS_IP=<ip>)
+endif
+	@echo "Kibana en http://localhost:5601 y la API en http://localhost:8000. Ctrl+C para cerrar."
+	@ssh -N -L 5601:127.0.0.1:5601 -L 8000:127.0.0.1:8000 \
+		-p $(SSH_PORT) -i $(SSH_KEY) -o IdentitiesOnly=yes $(SSH_USER)@$(VPS_IP)
 
 # Consumidor del bus. Sigue el stream hasta que se lo interrumpe; con LIMITE=N atiende N eventos
 # y sale, que es la forma de inspeccionar sin quedarse escuchando.

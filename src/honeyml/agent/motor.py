@@ -30,7 +30,7 @@ import redis
 
 from . import consumer as bus
 from . import firma as firma_de_conducta
-from .adapters.almacen import Almacen, AlmacenElastic
+from .adapters.almacen import Almacen, AlmacenConsultable, AlmacenElastic
 from .adapters.config import MODELO_POR_DEFECTO, CredencialAusenteError
 from .adapters.inferencia import PRECIOS, CuotaAgotadaError
 from .adapters.repertorio import PREFIJO, Repertorio, RepertorioEnRedis
@@ -158,17 +158,29 @@ def _linea(evento: bus.EventoDelBus, final: EstadoTriaje) -> str:
 
 def manejador(
     servicio: ServicioDeInferencia | None = None,
-    almacen: Almacen | None = None,
+    almacen: AlmacenConsultable | None = None,
     repertorio: Repertorio | None = None,
+    *,
+    saltear_decididos: bool = True,
 ) -> Callable[[bus.EventoDelBus], bool]:
     """El manejador que reemplaza a `manejador_de_registro`: corre un evento por el grafo.
 
     Devuelve una función y no una clase porque el consumidor solo pide eso. El grafo compilado queda
     capturado en la clausura, así se arma una vez y no por evento.
+
+    Antes del grafo se pregunta si el evento ya tiene decisión. Reingerir el corpus desde los
+    registros crudos, o una relectura de Filebeat, trae de vuelta eventos decididos hace semanas:
+    sin la pregunta, cada uno recorre el grafo entero y el que no acierta el repertorio paga una
+    llamada que después choca contra la decisión guardada. Con `saltear_decididos` en falso se
+    vuelve a decidir, que es lo que pide una corrida que reescribe a propósito.
     """
-    compilado = compilar(servicio=servicio, almacen=almacen, repertorio=repertorio)
+    destino = almacen or AlmacenElastic()
+    compilado = compilar(servicio=servicio, almacen=destino, repertorio=repertorio)
 
     def triar(evento: bus.EventoDelBus) -> bool:
+        if saltear_decididos and destino.existe(evento.doc_id):
+            print(f"  ~ ya estaba decidido: {evento.resumen()}")
+            return True
         try:
             final = ejecutar(compilado, estado_inicial(evento))
         except CuotaAgotadaError as exc:
@@ -237,7 +249,12 @@ def main() -> int:
     almacen = AlmacenElastic(reescribir=args.reescribir)
 
     consumidor = bus.ConsumidorDelBus(
-        manejador(servicio=inferencia, almacen=almacen, repertorio=repertorio),
+        manejador(
+            servicio=inferencia,
+            almacen=almacen,
+            repertorio=repertorio,
+            saltear_decididos=not args.reescribir,
+        ),
         host=args.host,
         puerto=args.puerto,
         stream=args.stream,
