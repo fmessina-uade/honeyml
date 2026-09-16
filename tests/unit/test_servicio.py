@@ -43,7 +43,7 @@ class _ClienteFalso:
         )
 
 
-def _adaptador(modelo: str = MODELO_POR_DEFECTO) -> tuple[AdaptadorDeInferencia, _ClienteFalso]:
+def _adaptador(modelo: str | None = None) -> tuple[AdaptadorDeInferencia, _ClienteFalso]:
     config = ConfigInferencia(api_key=CLAVE, modelo=modelo)
     cliente = _ClienteFalso(config)
     return AdaptadorDeInferencia(cliente=cliente, config=config), cliente  # type: ignore[arg-type]
@@ -68,16 +68,20 @@ def test_un_modelo_fijado_desactiva_la_politica() -> None:
     assert elegir_modelo(intento=5, fijado="otro/modelo") == "otro/modelo"
 
 
-def test_el_valor_por_defecto_no_cuenta_como_fijado() -> None:
-    """Si contara, arrancar sin HONEYML_MODELO clavaría el modelo capaz y la política moriría.
-
-    Y moriría en silencio, que es la peor forma: todo seguiría funcionando, más caro.
-    """
-    adaptador, _ = _adaptador(MODELO_POR_DEFECTO)
+def test_sin_modelo_configurado_decide_la_politica() -> None:
+    """Si arrancar sin HONEYML_MODELO fijara algo, la política moriría en silencio y más cara."""
+    adaptador, _ = _adaptador()
     assert adaptador.modelo_fijado is None
 
-    fijado, _ = _adaptador("otro/modelo")
-    assert fijado.modelo_fijado == "otro/modelo"
+
+def test_fijar_el_modelo_capaz_tambien_desactiva_la_politica() -> None:
+    """Medir el modelo capaz solo sobre el corpus exige fijarlo, aunque la política escale a él."""
+    adaptador, cliente = _adaptador(MODELO_POR_DEFECTO)
+    assert adaptador.modelo_fijado == MODELO_POR_DEFECTO
+
+    for intento in range(3):
+        adaptador.completar("s", "u", {"type": "object"}, intento=intento)
+    assert cliente.modelos == [MODELO_POR_DEFECTO] * 3
 
 
 # ---- el adaptador ---------------------------------------------------------------------------

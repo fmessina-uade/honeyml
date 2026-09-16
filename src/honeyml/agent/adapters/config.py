@@ -85,7 +85,10 @@ class ConfigInferencia:
     # `repr=False` es lo que impide que la clave salga en un `print`, en un `logging.debug(config)`
     # o en el rastro de una excepción que arrastre el objeto.
     api_key: str = field(repr=False)
-    modelo: str = MODELO_POR_DEFECTO
+    # El modelo que se pidió por configuración, o None para que elija la política de `servicio.py`.
+    # Lo que la desactiva es haberlo pedido y no el valor, así que fijar el modelo capaz, que es al
+    # que la política escala, también cuenta.
+    modelo: str | None = None
     base_url: str = BASE_URL_POR_DEFECTO
     timeout: int = TIMEOUT_SEGUNDOS
     # A qué proveedores puede ir el pedido, en orden, cuando del otro lado hay un enrutador. Vacío
@@ -112,9 +115,9 @@ class ConfigInferencia:
                 f"Con Groq directo también sirve {VARIABLE_DE_CLAVE_GROQ}. "
                 f"Nunca la escribas en un archivo del repositorio."
             )
-        # Cuatro orígenes en orden de precedencia: lo que pide el llamador, el entorno, el archivo
-        # `.env` y el valor por defecto. `_variable` resuelve los dos del medio.
-        elegido = modelo or _variable("HONEYML_MODELO") or MODELO_POR_DEFECTO
+        # Lo que pide el llamador le gana al entorno, y el entorno al archivo `.env`, que es lo que
+        # resuelve `_variable`. Si ninguno lo define, no hay modelo fijado.
+        elegido = modelo or _variable("HONEYML_MODELO") or None
         espera = _variable("HONEYML_INFERENCIA_TIMEOUT") or str(TIMEOUT_SEGUNDOS)
         proveedores = tuple(
             p.strip() for p in _variable("HONEYML_INFERENCIA_PROVEEDORES").split(",") if p.strip()

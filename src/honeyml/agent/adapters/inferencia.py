@@ -448,7 +448,7 @@ class ClienteDeInferencia:
         `temperatura` en 0 por defecto: dos corridas sobre el mismo evento tienen que dar lo mismo,
         o la campaña de validación estaría midiendo el azar además del motor.
         """
-        elegido = modelo or self.config.modelo
+        elegido = modelo or self.config.modelo or MODELO_POR_DEFECTO
         cuerpo: dict[str, Any] = {
             "model": elegido,
             "temperature": temperatura,

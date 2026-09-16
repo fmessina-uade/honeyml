@@ -132,8 +132,23 @@ def test_enmascarada_distingue_dos_claves_sin_revelar_ninguna() -> None:
     assert m.startswith("gsk_")
 
 
-def test_el_modelo_por_defecto_es_el_de_produccion_con_esquema_estricto() -> None:
-    assert ConfigInferencia(api_key=CLAVE).modelo == MODELO_POR_DEFECTO
+def test_el_modelo_fijado_sale_del_entorno_y_sin_definirlo_no_hay(
+    entorno_limpio: pytest.MonkeyPatch,
+) -> None:
+    entorno_limpio.setenv("HONEYML_INFERENCIA_CLAVE", "k")
+    assert ConfigInferencia.desde_entorno().modelo is None
+
+    entorno_limpio.setenv("HONEYML_MODELO", MODELO_POR_DEFECTO)
+    assert ConfigInferencia.desde_entorno().modelo == MODELO_POR_DEFECTO
+
+
+def test_sin_modelo_pedido_ni_fijado_el_cliente_usa_el_de_produccion() -> None:
+    sin_fijar = ConfigInferencia(api_key=CLAVE, base_url="http://proveedor.invalido/v1")
+    cliente, enviados = _cliente_con([_ok()], sin_fijar)
+    r = cliente.completar("s", "u", {"type": "object"})
+
+    assert enviados[0]["model"] == MODELO_POR_DEFECTO
+    assert r.modelo == MODELO_POR_DEFECTO
     assert MODELO_POR_DEFECTO in inferencia.PRECIOS  # y tiene precio conocido
 
 

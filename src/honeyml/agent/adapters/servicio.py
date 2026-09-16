@@ -89,13 +89,8 @@ class AdaptadorDeInferencia:
 
     @property
     def modelo_fijado(self) -> str | None:
-        """El modelo clavado por configuración, o None cuando la política puede elegir.
-
-        Se considera fijado solo cuando difiere del valor por defecto. Si no, arrancar sin
-        `HONEYML_MODELO` clavaría el modelo de más capacidad en todos los intentos y la política
-        no se aplicaría nunca, y en silencio, que es la peor forma de no aplicarse.
-        """
-        return self.config.modelo if self.config.modelo != MODELO_POR_DEFECTO else None
+        """El modelo clavado por configuración, o None cuando la política puede elegir."""
+        return self.config.modelo
 
     def completar(
         self,
