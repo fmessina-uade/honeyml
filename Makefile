@@ -3,7 +3,8 @@
         api dash replays \
         elastic-up elastic-down elastic-logs elastic-dev-up elastic-dev-down elastic-dev-logs \
         es-bootstrap validate-indexing pull-logs \
-        analisis-up analisis-down analisis-logs publicar-artefactos tunel
+        analisis-up analisis-down analisis-logs publicar-artefactos tunel \
+        respaldar-decisiones
 
 COMPOSE_FILE = infra/honeypots/docker-compose.yml
 COMPOSE_DEV  = infra/honeypots/docker-compose.dev.yml
@@ -57,6 +58,7 @@ help:
 	@echo "    make analisis-up Levantar el motor de triaje y la API en contenedores"
 	@echo "    make publicar-artefactos  Subir los artefactos derivados al VPS"
 	@echo "    make tunel     Kibana y la API del VPS en esta máquina, por túnel SSH"
+	@echo "    make respaldar-decisiones  Traer los volcados de decisiones del VPS"
 	@echo ""
 	@echo "  Variables:"
 	@echo "    VPS_IP    IP del VPS de DigitalOcean (o definir en .vps_ip)"
@@ -313,6 +315,19 @@ endif
 	@echo "Kibana en http://localhost:5601 y la API en http://localhost:8000. Ctrl+C para cerrar."
 	@ssh -N -L 5601:127.0.0.1:5601 -L 8000:127.0.0.1:8000 \
 		-p $(SSH_PORT) -i $(SSH_KEY) -o IdentitiesOnly=yes $(SSH_USER)@$(VPS_IP)
+
+# Saca del servidor los volcados diarios de decisiones. El respaldo del servidor vive en el mismo
+# disco que los produce, así que por sí solo no protege de perder la máquina. Cada decisión costó
+# una llamada paga y los eventos, en cambio, se reingieren desde los registros crudos.
+respaldar-decisiones:
+ifndef VPS_IP
+	$(error VPS_IP no definido. Crear archivo .vps_ip o exportar: export VPS_IP=<ip>)
+endif
+	@mkdir -p data/respaldos/decisiones
+	rsync -rlptvz --rsync-path="sudo rsync" \
+		-e "ssh -p $(SSH_PORT) -i $(SSH_KEY) -o IdentitiesOnly=yes" \
+		$(SSH_USER)@$(VPS_IP):/home/$(SSH_USER)/backups/decisiones/ data/respaldos/decisiones/
+	@echo "Volcados en data/respaldos/decisiones/"
 
 # Consumidor del bus. Sigue el stream hasta que se lo interrumpe; con LIMITE=N atiende N eventos
 # y sale, que es la forma de inspeccionar sin quedarse escuchando.

@@ -16,10 +16,18 @@ HEALTHCHECK_LOG="/var/log/honeyml_health.log"
 THRESHOLD_CPU=85
 THRESHOLD_MEM=90
 THRESHOLD_DISK=80
-# el watchdog y su imagen viven en el repositorio, un nivel arriba de este script
+# Eventos de atraso a partir de los cuales el motor dejó de consumir. En régimen el atraso vuelve a
+# cero en minutos; este número solo se alcanza con el motor detenido durante horas.
+THRESHOLD_ATRASO=5000
+# el watchdog, el respaldo y la imagen de diagnóstico viven en el repositorio, un nivel arriba
 REPO_VPS="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WATCHDOG_SCRIPT="/usr/local/bin/honeyml_watchdog.sh"
 WATCHDOG_LOG="/var/log/honeyml_watchdog.log"
+BACKUP_SCRIPT="/usr/local/bin/honeyml_backup.sh"
+BACKUP_LOG="/var/log/honeyml_backup.log"
+# Los flujos que graba Dionaea son evidencia, pero crecen sin techo y comparten disco con el índice.
+BISTREAMS="/var/lib/docker/volumes/honeypots_dionaea_var/_data/lib/dionaea/bistreams"
+RETENCION_BISTREAMS_DIAS=30
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"
@@ -95,15 +103,42 @@ while IFS= read -r line; do
     fi
 done < <(df -h | tail -n +2 | grep -v tmpfs)
 
-# honeypot containers
-for container in cowrie dionaea; do
-    if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^\${container}\$"; then
-        STATUS=\$(docker inspect --format='{{.State.Status}}' "\$container" 2>/dev/null || echo "unknown")
-        if [[ "\$STATUS" != "running" ]]; then
-            send_alert "CRITICAL" "Contenedor '\${container}' no está corriendo (estado: \${STATUS})"
-        fi
+# Contenedores de las dos zonas. Se pregunta por los que existen y no por los que corren: con
+# 'docker ps' un contenedor frenado no figura en la lista, así que la comprobación se salteaba justo
+# en el caso que tiene que avisar. Uno que no existe se omite, para que el mismo chequeo sirva en un
+# anfitrión que solo tiene los sensores y en uno que además corre el análisis.
+for container in cowrie dionaea elasticsearch logstash kibana filebeat redis motor api; do
+    STATUS=\$(docker inspect --format='{{.State.Status}}' "\$container" 2>/dev/null || echo "")
+    if [[ -z "\$STATUS" ]]; then
+        continue
+    fi
+    if [[ "\$STATUS" != "running" ]]; then
+        send_alert "CRITICAL" "Contenedor '\${container}' en estado \${STATUS}"
     fi
 done
+
+# Elasticsearch en rojo: hay fragmentos sin asignar, y ahí el índice deja de contestar parte de las
+# consultas. El amarillo no se avisa, porque con un solo nodo las réplicas quedan sin asignar por
+# diseño.
+if docker inspect --format='{{.State.Status}}' elasticsearch >/dev/null 2>&1; then
+    ES_ESTADO=\$(curl -s --max-time 10 http://localhost:9200/_cluster/health 2>/dev/null \
+        | grep -o '"status":"[a-z]*"' | cut -d'"' -f4)
+    if [[ "\$ES_ESTADO" == "red" ]]; then
+        send_alert "CRITICAL" "Elasticsearch en rojo"
+    elif [[ -z "\$ES_ESTADO" ]]; then
+        send_alert "WARNING" "Elasticsearch no contesta el estado del clúster"
+    fi
+fi
+
+# Atraso del bus. Que el motor esté corriendo no alcanza: si deja de consumir, el contenedor sigue
+# en pie y lo único que lo delata es el atraso creciendo sin techo.
+if docker inspect --format='{{.State.Status}}' redis >/dev/null 2>&1; then
+    ATRASO=\$(docker exec redis redis-cli --raw XINFO GROUPS honeyml:events 2>/dev/null \
+        | awk '/^lag\$/{getline; print; exit}')
+    if [[ "\$ATRASO" =~ ^[0-9]+\$ ]] && [[ "\$ATRASO" -ge $THRESHOLD_ATRASO ]]; then
+        send_alert "WARNING" "El motor no consume: \${ATRASO} eventos de atraso en el bus"
+    fi
+fi
 
 # el servicio SSH de administración
 if ! ss -tlnp | grep -q ":2200 "; then
@@ -158,9 +193,11 @@ DAILY_SCRIPT
 
 chmod +x "$DAILY_REPORT_SCRIPT"
 
-# 3. el watchdog de los sensores, y la imagen con la que lee la pila de un proceso colgado
-log "[3/4] Instalando el watchdog de los sensores..."
+# 3. los scripts del anfitrión: watchdog de los sensores, respaldo, y la imagen con la que se lee la
+#    pila de un proceso colgado
+log "[3/4] Instalando el watchdog y el respaldo..."
 install -m 755 "$REPO_VPS/honeyml_watchdog.sh" "$WATCHDOG_SCRIPT"
+install -m 755 "$REPO_VPS/honeyml_backup.sh" "$BACKUP_SCRIPT"
 if command -v docker >/dev/null 2>&1; then
     docker build -q -t honeyml-pyspy "$REPO_VPS/pyspy" >/dev/null
     log "  Imagen honeyml-pyspy construida."
@@ -186,8 +223,14 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 # watchdog de los sensores cada 5 minutos
 */5 * * * * root $WATCHDOG_SCRIPT >> $WATCHDOG_LOG 2>&1
 
+# respaldo diario de la telemetría y de las decisiones, a las 03:00 UTC
+0 3 * * * root $BACKUP_SCRIPT >> $BACKUP_LOG 2>&1
+
 # rotación semanal del registro de actividad de los honeypots
 0 3 * * 0 root find /var/log -name "honeyml_*.log" -mtime +30 -delete 2>/dev/null || true
+
+# retención semanal de los flujos grabados por Dionaea, que si no llenan el disco
+0 4 * * 0 root find $BISTREAMS -type f -mtime +$RETENCION_BISTREAMS_DIAS -delete 2>/dev/null; find $BISTREAMS -mindepth 1 -type d -empty -delete 2>/dev/null || true
 CRONEOF
 
 chmod 644 "$CRON_FILE"
@@ -200,6 +243,7 @@ log "Scripts instalados:"
 log "  Health check (c/5 min) : $HEALTHCHECK_SCRIPT"
 log "  Reporte diario (07:00) : $DAILY_REPORT_SCRIPT"
 log "  Watchdog (c/5 min)     : $WATCHDOG_SCRIPT"
+log "  Respaldo (03:00)       : $BACKUP_SCRIPT"
 log "  Log de monitoreo       : $HEALTHCHECK_LOG"
 log ""
 log "Para probar manualmente: bash $HEALTHCHECK_SCRIPT"
