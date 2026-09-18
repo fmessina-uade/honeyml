@@ -1,5 +1,5 @@
 .PHONY: help up down logs status ps clean deploy-vps dev-up dev-down dev-logs validate lint test \
-        test-integration consumer triaje grafo arquetipos modelo evaluacion \
+        test-integration consumer triaje grafo arquetipos modelo evaluacion clasificar \
         api dash replays \
         elastic-up elastic-down elastic-logs elastic-dev-up elastic-dev-down elastic-dev-logs \
         es-bootstrap validate-indexing pull-logs \
@@ -36,6 +36,11 @@ help:
 	@echo "    make es-bootstrap     Aplicar plantilla componible ECS a Elasticsearch"
 	@echo "    make validate-indexing  Validar indexación y normalización ECS"
 	@echo "    make elastic-up       Levantar el stack en el VPS (producción)"
+	@echo ""
+	@echo "  Clasificador supervisado (conjunto de referencia UWF-ZeekData24):"
+	@echo "    make modelo      Reentrenar y exportar el modelo final con su tarjeta"
+	@echo "    make evaluacion  Las cuatro mediciones del modelo"
+	@echo "    make clasificar  Demostración sobre flujos de prueba no vistos"
 	@echo ""
 	@echo "  Panel educativo (demo):"
 	@echo "    make replays   Extraer sesiones de ataque anotadas"
@@ -359,6 +364,14 @@ modelo:
 #   make evaluacion RAPIDO=1     submuestreado, para validar el armado
 evaluacion:
 	@./.venv/bin/python -m honeyml.features.uwf_evaluacion $(if $(RAPIDO),--rapido,)
+
+# Demostración del clasificador: flujos de prueba que el modelo no vio, táctica real contra
+# predicha, y el F1 macro recalculado en el momento contra el de la tarjeta. Usa el modelo que
+# exportó `make modelo`, sin reentrenar.
+#   make clasificar                        dos flujos por clase y un error real
+#   make clasificar POR_CLASE=4 SEMILLA=7  otra muestra
+clasificar:
+	@./.venv/bin/python -m honeyml.features.uwf_clasificar $(if $(POR_CLASE),--por-clase $(POR_CLASE),) $(if $(SEMILLA),--semilla $(SEMILLA),)
 
 # Un solo comando para todo el ciclo de datos: bajar registros frescos de los sensores, esperar a
 # que el pipeline los ingiera, y regenerar todos los artefactos derivados. Reemplaza correr cinco

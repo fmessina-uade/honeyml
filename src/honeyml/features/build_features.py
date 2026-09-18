@@ -1,18 +1,17 @@
 """Características de tiempo y frecuencia por dirección de origen, desde la telemetría de Cowrie.
 
 La unidad de análisis es la dirección: cada atacante se reduce a un vector de volumen, intentos de
-acceso, tiempos y conducta, para después entrenar el modelo supervisado. Trabaja sobre el parquet
-ECS (data/processed/honeypot_events.parquet).
+acceso, tiempos y conducta. La tabla es la entrada de los arquetipos, el agrupamiento no supervisado
+de atacantes. Trabaja sobre el parquet ECS (data/processed/honeypot_events.parquet).
 
 Cuatro decisiones que conviene tener presentes al leer el resto del módulo. Las cuentas y las tasas
 tienen cola pesada, así que van con log1p para domar la asimetría. La tasa de eventos usa un piso de
 un minuto en el lapso, porque con ráfagas el lapso se va a cero y el número explota. Se podan las
 características redundantes, las que tienen correlación alta entre sí. Y el escalado no se hace acá:
-va dentro del Pipeline de modelado, ajustado solo con entrenamiento, así no se filtran estadísticas
-de la partición de prueba.
+la tabla conserva magnitudes que se pueden leer, y el que la consume estandariza lo que necesita.
 
 Uso:
-    python -m src.honeyml.features.build_features
+    python -m honeyml.features.build_features
 """
 
 from __future__ import annotations

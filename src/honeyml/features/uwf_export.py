@@ -1,9 +1,13 @@
 """Ajusta el clasificador final una vez y lo persiste con todo lo necesario para confiar en él.
 
 Los módulos de comparación y de ajuste entrenan el modelo y lo descartan en cada corrida. Eso está
-bien mientras la pregunta es cuál modelo, y deja de servir cuando la respuesta es este modelo: el
-motor de triaje no puede reentrenar en cada evento, y un número que nadie puede reproducir es una
-afirmación, no un resultado.
+bien mientras la pregunta es cuál modelo, y deja de servir cuando la respuesta es este modelo: la
+demostración y cualquier lectura posterior tienen que usar exactamente el modelo que se informa, y
+un número que nadie puede reproducir es una afirmación, no un resultado.
+
+El modelo vive en el subsistema de validación y no en el motor de triaje. Aprende de flujos de Zeek
+de un laboratorio etiquetado, y los sensores de HoneyML no producen esos campos: se evalúa sobre su
+conjunto de referencia y sirve de línea base, no clasifica la telemetría capturada.
 
 El módulo produce dos archivos que viajan juntos:
 
@@ -20,7 +24,7 @@ así que el modelo exportado se entrena con toda ella y el umbral sigue sin ver 
 se ajustó.
 
 El ranking de características. Importancia por permutación sobre las quince columnas originales,
-medida sobre el modelo que efectivamente se despliega, y no la del bosque aleatorio que se descarta
+medida sobre el modelo que efectivamente se exporta, y no la del bosque aleatorio que se descarta
 en la comparación, que responde qué le importa a un clasificador que nadie corre.
 
 Y la procedencia. Versiones de las bibliotecas, orden de clases, lista de columnas, tamaños de
@@ -388,10 +392,10 @@ def main() -> None:
 def cargar_modelo() -> tuple[Pipeline, dict[str, Any]]:
     """Carga el modelo exportado y su tarjeta, y se niega a devolver un par que no coincide.
 
-    El motor no tiene forma de notar que la tarjeta describe un archivo distinto del que acaba de
-    cargar, porque el pipeline predice igual con el punto de operación equivocado. Comparar el
-    resumen criptográfico acá convierte eso en un error al cargar, en vez de una respuesta
-    equivocada al decidir.
+    Quien lo carga no tiene forma de notar que la tarjeta describe un archivo distinto del que acaba
+    de cargar, porque el pipeline predice igual con el punto de operación equivocado. Comparar el
+    resumen criptográfico acá convierte eso en un error al cargar, en vez de una predicción
+    equivocada que nadie detecta.
     """
     if not MODEL_FILE.exists():
         raise FileNotFoundError(
