@@ -62,17 +62,18 @@ instantanea_activo() {
 }
 
 instantanea_decisiones() {
-    local dest_dir="$1"
+    local dest_dir="$1" volcadas=0
     # El índice solo existe donde corre la zona de análisis. En un anfitrión que solo tiene los
     # sensores no hay nada que volcar, y eso no es una falla.
     if ! curl -sf --max-time 10 "$ES_URL/$INDICE_DECISIONES/_count" >/dev/null 2>&1; then
         log "AVISO: no responde $INDICE_DECISIONES, se omiten las decisiones"
+        echo 0
         return 0
     fi
     local dest="$dest_dir/decisiones-${TODAY}.ndjson.gz"
     # Se guarda el identificador junto al documento: es el `doc_id` del evento, y sin él una
     # restauración perdería la correspondencia entre la decisión y el evento que la originó.
-    if python3 - "$ES_URL" "$INDICE_DECISIONES" "$dest.tmp" <<'PY'
+    if volcadas=$(python3 - "$ES_URL" "$INDICE_DECISIONES" "$dest.tmp" <<'PY'
 import gzip
 import json
 import sys
@@ -100,12 +101,14 @@ with gzip.open(destino, "wt", encoding="utf-8") as f:
         r = pedir("/_search/scroll", {"scroll": "5m", "scroll_id": r["_scroll_id"]})
 print(total)
 PY
-    then
+    ); then
         mv "$dest.tmp" "$dest"
     else
         rm -f "$dest.tmp"
         log "ERROR: falló el volcado de decisiones"
+        volcadas=0
     fi
+    echo "$volcadas"
 }
 
 main() {
@@ -118,7 +121,8 @@ main() {
     # Dionaea no rota: solo hay archivo activo
     instantanea_activo "$DIONAEA_SRC/dionaea.json" "$BACKUP_ROOT/dionaea" "dionaea"
 
-    instantanea_decisiones "$BACKUP_ROOT/decisiones"
+    local decisiones
+    decisiones=$(instantanea_decisiones "$BACKUP_ROOT/decisiones")
 
     # purga las instantáneas del activo y los volcados viejos de decisiones; los rotados de los
     # sensores son el archivo histórico y no se tocan
@@ -133,7 +137,7 @@ main() {
     local total tamano
     total=$(find "$BACKUP_ROOT" -name '*.gz' | wc -l)
     tamano=$(du -sh "$BACKUP_ROOT" | cut -f1)
-    log "OK: ${rotados_cowrie} rotados nuevos, instantáneas del día guardadas, ${purgadas} purgadas. Total: ${total} archivos, ${tamano}."
+    log "OK: ${rotados_cowrie} rotados nuevos, instantáneas del día guardadas, ${decisiones} decisiones, ${purgadas} purgadas. Total: ${total} archivos, ${tamano}."
 }
 
 main "$@"
