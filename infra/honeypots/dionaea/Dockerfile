@@ -18,16 +18,26 @@ COPY log_json.yaml /opt/dionaea/template/etc/dionaea/ihandlers-enabled/log_json.
 RUN rm -f /opt/dionaea/template/etc/dionaea/services-enabled/sip.yaml \
           /opt/dionaea/template/etc/dionaea/services-enabled/pptp.yaml
 
-# 4. Neutraliza el pretty-print de paquetes, que es la causa de los cuelgues.
-#    Cada paquete recibido pasa por Packet.show(), que recorre campo por campo armando la
-#    representación de cada valor y emite un registro de depuración por campo. Un flujo con muchas
-#    cabeceras al puerto MSSQL hace que el manejador llame a show() miles de veces sobre el único
-#    hilo del sensor: se clava un núcleo al 100 % y deja de aceptar conexiones sin morirse. El texto
-#    que arma ya se descarta, porque el registro está en advertencias, así que la captura no cambia:
-#    la telemetría sale por log_json y por los bistreams, no por show(). La clase Packet vive en
-#    smb/include/packet.py y de ella heredan los paquetes de MSSQL, SMB y MySQL, así que un solo
-#    reemplazo los cubre a los tres. El archivo original deja ese corte previsto y comentado al
-#    inicio del método.
+# 4. Corta el bucle de MSSQL ante una cabecera TDS imposible, que es la causa de los cuelgues.
+#    El largo que declara la cabecera incluye sus propios 8 bytes, pero el manejador solo descarta el
+#    largo 0. Con un largo de 1 o 2 vuelve a leer la cabecera sobre ese pedazo corto, el campo queda
+#    en su valor por defecto, que es 0, y la posición no avanza nunca. Alcanza un paquete de 8 bytes
+#    al 1433 para clavar el único hilo del sensor al 100 % sin límite de tiempo: deja de aceptar
+#    conexiones sin morirse, y solo lo saca el watchdog. Rechazar todo largo menor a 8 deja afuera
+#    únicamente cabeceras que el protocolo no admite.
+RUN F=/opt/dionaea/lib/dionaea/python/dionaea/mssql/mssql.py; \
+    [ "$(grep -c '^ *if p.Length == 0:$' "$F")" = 1 ] || { echo "mssql.py: no está la validación del largo; revisar antes de reemplazarla"; exit 1; }; \
+    sed -i 's/^\( *\)if p.Length == 0:$/\1if p.Length < 8:/' "$F" && \
+    grep -q '^ *if p.Length < 8:$' "$F"
+
+# 5. Neutraliza el pretty-print de paquetes. Cada paquete recibido pasa por Packet.show(), que
+#    recorre campo por campo armando la representación de cada valor y emite un registro de
+#    depuración por campo. El texto se descarta, porque el registro está en advertencias, pero el
+#    costo se paga igual sobre el único hilo: una ráfaga de miles de cabeceras al 1433 lo ocupa
+#    varios segundos. La captura no cambia, porque la telemetría sale por log_json y por los
+#    bistreams y no por show(). La clase Packet vive en smb/include/packet.py y de ella heredan los
+#    paquetes de MSSQL, SMB y MySQL, así que un solo reemplazo los cubre a los tres. El archivo
+#    original deja ese corte previsto y comentado al inicio del método.
 RUN F=/opt/dionaea/lib/dionaea/python/dionaea/smb/include/packet.py; \
     grep -q '^class Packet(' "$F" || { echo "packet.py: no está la clase Packet; revisar antes de neutralizar show()"; exit 1; }; \
     printf '\n\ndef _honeyml_show_desactivado(self, *args, **kwargs):\n    return None\n\n\nPacket.show = _honeyml_show_desactivado\n' >> "$F"
