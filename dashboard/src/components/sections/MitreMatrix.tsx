@@ -1,18 +1,34 @@
 import { ExternalLink } from 'lucide-react';
-import type { Bucket, Replay } from '../../lib/api';
+import type { Bucket, Overview, Replay } from '../../lib/api';
 import { tacticColor } from './SessionReplay';
 import Reveal from '../Reveal';
 import Tooltip, { useTooltip } from '../Tooltip';
 import { n, pct } from '../../lib/format';
 import { useI18n } from '../../lib/i18n';
 
-// Las cuatro tácticas que las capturas ejercitan de verdad, en el orden en que las recorre una intrusión.
-const OBSERVED = ['Descubrimiento', 'Ejecución', 'Evasión de defensas', 'Persistencia'] as const;
+// Las dos del ingreso salen de los intentos de acceso: probar claves es fuerza bruta y entrar con
+// una que funciona es usar una cuenta válida. No aparecen en el replay, que empieza con la sesión
+// ya abierta, así que se cuentan con los contadores de portada.
+const ACCESS = ['Acceso a credenciales', 'Acceso inicial'] as const;
+
+// Las que ejercitan los comandos de las sesiones capturadas.
+const IN_SESSION = ['Descubrimiento', 'Ejecución', 'Evasión de defensas', 'Persistencia'] as const;
+
+// Las seis que el señuelo observa, en el orden en que las recorre una intrusión. Es el mismo
+// vocabulario que el motor de triaje puede asignar (TACTICAS_OBSERVABLES en annotations.py), y el
+// triaje lo toma de acá para las correcciones del analista.
+export const OBSERVED = [...ACCESS, ...IN_SESSION] as const;
+
+// Técnica de MITRE que corresponde a cada táctica de acceso.
+const ACCESS_TECHNIQUE: Record<(typeof ACCESS)[number], string> = {
+  'Acceso a credenciales': 'T1110',
+  'Acceso inicial': 'T1078',
+};
 
 // Las que un señuelo de baja interacción estructuralmente no puede ver. Mostrarlas en gris es la
 // gracia: el hueco es una propiedad del sensor y no una omisión del panel, y decirlo es lo que
 // convierte un gráfico de cobertura en una explicación.
-const NOT_OBSERVED = ['Acceso a credenciales', 'Movimiento lateral', 'Impacto'] as const;
+const NOT_OBSERVED = ['Movimiento lateral', 'Impacto'] as const;
 
 /**
  * Las tácticas de MITRE ATT&CK encendidas con las capturas del propio proyecto.
@@ -22,7 +38,15 @@ const NOT_OBSERVED = ['Acceso a credenciales', 'Movimiento lateral', 'Impacto'] 
  * cobertura total; una que muestra los huecos, con el motivo, enseña a leer cualquier afirmación de
  * cobertura.
  */
-export default function MitreMatrix({ replays, stages }: { replays: Replay[]; stages: Bucket[] }) {
+export default function MitreMatrix({
+  replays,
+  stages,
+  overview,
+}: {
+  replays: Replay[];
+  stages: Bucket[];
+  overview: Overview;
+}) {
   const { t } = useI18n();
   const tip = useTooltip();
 
@@ -59,6 +83,10 @@ export default function MitreMatrix({ replays, stages }: { replays: Replay[]; st
     }
   }
   const techList = [...techniques.entries()].sort((a, b) => b[1].steps - a[1].steps);
+  const accessCount: Record<(typeof ACCESS)[number], number> = {
+    'Acceso a credenciales': overview.logins,
+    'Acceso inicial': overview.logins_success,
+  };
 
   const tacticName = (key: string) =>
     t.tactics[key as keyof typeof t.tactics]?.name ?? key;
@@ -103,9 +131,71 @@ export default function MitreMatrix({ replays, stages }: { replays: Replay[]; st
         </div>
       </Reveal>
 
-      {/* Observed tactics, ranked by how much of the replay material they account for */}
+      {/* Access tactics, counted over every login attempt */}
+      <div className="bar-group grid sm:grid-cols-2 gap-3">
+        {ACCESS.map((tac, idx) => {
+          const count = accessCount[tac];
+          const label = tac === 'Acceso inicial' ? t.mitre.successes : t.mitre.attempts;
+          return (
+            <Reveal key={tac} delay={idx * 90}>
+              <div
+                className="bar-item tile rounded-xl p-4 h-full transition-opacity duration-200 cursor-default"
+                style={{
+                  background: `${tacticColor(tac)}12`,
+                  boxShadow: `inset 0 0 0 1px ${tacticColor(tac)}40`,
+                }}
+              >
+                <span className="tile-glow" style={{ background: tacticColor(tac) }} />
+                <div className="relative">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-2">
+                      <span
+                        className="w-1.5 h-1.5 rounded-full"
+                        style={{ background: tacticColor(tac) }}
+                      />
+                      <span
+                        className="text-[11px] font-medium"
+                        style={{ color: tacticColor(tac) }}
+                      >
+                        {tacticName(tac)}
+                      </span>
+                    </span>
+                    <span className="font-data text-[10px] text-white/35">
+                      {ACCESS_TECHNIQUE[tac]}
+                    </span>
+                  </div>
+                  <div className="flex items-baseline gap-2 mt-2">
+                    <span className="font-data text-xl text-white">{n(count)}</span>
+                    <span className="text-[9px] text-white/35">{label}</span>
+                  </div>
+                  {/* de cada intento, cuántos terminaron adentro */}
+                  <div className="h-1 rounded bg-white/5 mt-2 overflow-hidden">
+                    <div
+                      className="h-1 rounded transition-all duration-700"
+                      style={{
+                        width: `${overview.logins ? (count / overview.logins) * 100 : 0}%`,
+                        background: tacticColor(tac),
+                      }}
+                    />
+                  </div>
+                  {tac === 'Acceso inicial' && (
+                    <div className="text-[9px] text-white/30 mt-1 font-data">
+                      {pct(count, overview.logins)}% {t.mitre.ofAttempts}
+                    </div>
+                  )}
+                  <div className="text-[10px] text-white/45 mt-2.5 leading-relaxed">
+                    {tacticMeaning(tac)}
+                  </div>
+                </div>
+              </div>
+            </Reveal>
+          );
+        })}
+      </div>
+
+      {/* Tactics seen inside the sessions, ranked by how much of the replay material they account for */}
       <div className="bar-group grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {OBSERVED.map((tac, idx) => {
+        {IN_SESSION.map((tac, idx) => {
           const sessions = sessionsPer.get(tac) ?? 0;
           const steps = stepsPer.get(tac) ?? 0;
           const techs = techniquesPer.get(tac)?.size ?? 0;
@@ -205,7 +295,7 @@ export default function MitreMatrix({ replays, stages }: { replays: Replay[]; st
           <div className="text-[9px] uppercase tracking-wider text-white/30 mb-3">
             {t.mitre.notObserved}
           </div>
-          <div className="grid sm:grid-cols-3 gap-3">
+          <div className="grid sm:grid-cols-2 gap-3">
             {NOT_OBSERVED.map((tac) => (
               <div
                 key={tac}
@@ -240,6 +330,28 @@ export default function MitreMatrix({ replays, stages }: { replays: Replay[]; st
             {t.mitre.techNote}
           </div>
           <div className="flex flex-wrap gap-2">
+            {ACCESS.map((tac) => (
+              <a
+                key={ACCESS_TECHNIQUE[tac]}
+                href={`https://attack.mitre.org/techniques/${ACCESS_TECHNIQUE[tac]}/`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex items-center gap-2 rounded-lg px-2.5 py-1.5 ring-1 transition-all hover:-translate-y-[1px]"
+                style={{
+                  background: `${tacticColor(tac)}10`,
+                  borderColor: 'transparent',
+                  boxShadow: `inset 0 0 0 1px ${tacticColor(tac)}30`,
+                }}
+              >
+                <span className="font-data text-[11px]" style={{ color: tacticColor(tac) }}>
+                  {ACCESS_TECHNIQUE[tac]}
+                </span>
+                <span className="text-[10px] text-white/35">
+                  {n(accessCount[tac])} {t.mitre.events}
+                </span>
+                <ExternalLink className="w-2.5 h-2.5 text-white/20 group-hover:text-white/50 transition" />
+              </a>
+            ))}
             {techList.map(([id, info]) => (
               <a
                 key={id}

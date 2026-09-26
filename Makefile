@@ -1,5 +1,5 @@
 .PHONY: help up down logs status ps clean deploy-vps dev-up dev-down dev-logs validate lint test \
-        test-integration consumer triaje grafo arquetipos modelo evaluacion clasificar \
+        test-integration consumer triaje retriaje grafo arquetipos modelo evaluacion clasificar \
         api dash replays \
         elastic-up elastic-down elastic-logs elastic-dev-up elastic-dev-down elastic-dev-logs \
         es-bootstrap validate-indexing pull-logs \
@@ -218,7 +218,7 @@ endif
 
 elastic-dev-up:
 	@if [ ! -f infra/elastic/.env ]; then cp infra/elastic/.env.example infra/elastic/.env; echo "Creado infra/elastic/.env desde el ejemplo."; fi
-	# Se levantan almacenamiento y procesamiento, y se aplica la plantilla ECS ANTES que Filebeat,
+	# Se levantan almacenamiento y procesamiento, y se aplica la plantilla ECS antes que Filebeat,
 	# así los índices salen con los tipos ECS correctos y no hay carrera con el mapeo.
 	docker compose --env-file infra/elastic/.env -f $(ELASTIC_FILE) -f $(ELASTIC_DEV) up -d elasticsearch logstash kibana
 	@ES_URL=http://localhost:9200 bash infra/elastic/scripts/es_bootstrap.sh
@@ -316,9 +316,10 @@ endif
 	@ssh -N -L 5601:127.0.0.1:5601 -L 8000:127.0.0.1:8000 \
 		-p $(SSH_PORT) -i $(SSH_KEY) -o IdentitiesOnly=yes $(SSH_USER)@$(VPS_IP)
 
-# Saca del servidor los volcados diarios de decisiones. El respaldo del servidor vive en el mismo
-# disco que los produce, así que por sí solo no protege de perder la máquina. Cada decisión costó
-# una llamada paga y los eventos, en cambio, se reingieren desde los registros crudos.
+# Saca del servidor los volcados diarios de decisiones y de veredictos del analista. El respaldo del
+# servidor vive en el mismo disco que los produce, así que por sí solo no protege de perder la
+# máquina. Cada decisión costó una llamada paga y cada veredicto es trabajo de una persona; los
+# eventos, en cambio, se reingieren desde los registros crudos.
 respaldar-decisiones:
 ifndef VPS_IP
 	$(error VPS_IP no definido. Crear archivo .vps_ip o exportar: export VPS_IP=<ip>)
@@ -359,7 +360,16 @@ consumer:
 triaje:
 	@./.venv/bin/python -m honeyml.agent.motor $(if $(LIMITE),--limite $(LIMITE),) $(if $(TODO),--todo,) $(if $(REUTILIZAR),--reutilizar,) $(if $(REESCRIBIR),--reescribir,)
 
-# Topología del motor de triaje y qué nodo tiene implementación hoy.
+# Vuelve a triar los eventos de una categoría cuando cambió lo que el motor puede decir de ellos,
+# por ejemplo al sumar una táctica. Olvida sus firmas del repertorio y sobrescribe lo guardado, así
+# que conviene correrlo después del respaldo del día. SECO=1 solo cuenta y estima el gasto. En el
+# servidor corre dentro del contenedor del motor:
+#   sudo docker exec motor python -m honeyml.agent.retriaje --categoria authentication
+#   make retriaje CATEGORIA=authentication SECO=1
+retriaje:
+	@./.venv/bin/python -m honeyml.agent.retriaje --categoria $(CATEGORIA) $(if $(SECO),--seco,)
+
+# Topología del motor de triaje y qué nodo tiene implementación.
 grafo:
 	@./.venv/bin/python -m honeyml.agent.graph
 
@@ -392,7 +402,7 @@ clasificar:
 # que el pipeline los ingiera, y regenerar todos los artefactos derivados. Reemplaza correr cinco
 # objetivos a mano.
 #
-# NO levanta el stack: primero hay que correr `make elastic-dev-up`. Mantenerlos separados hace que
+# No levanta el stack: primero hay que correr `make elastic-dev-up`. Mantenerlos separados hace que
 # un refresh no pueda levantar contenedores que uno no esperaba, y en silencio.
 refresh:
 	@echo "==> 1/3  Descargando registros de los sensores"

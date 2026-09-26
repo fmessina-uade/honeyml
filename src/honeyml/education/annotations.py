@@ -30,10 +30,15 @@ class Annotation:
 # tiene permitido asignar. Están acá porque acá se asignan por comando, y el nodo de validación las
 # importa en vez de escribir una segunda copia que se desincronice.
 #
-# Las otras tres del panel (acceso a credenciales, movimiento lateral, impacto) quedan afuera a
-# propósito: la sección MITRE las muestra en gris justamente para explicar que un señuelo de baja
-# interacción no las ve. Si el motor pudiera asignarlas, esa explicación dejaría de ser cierta.
+# Las dos primeras no salen de un comando sino del ingreso. Probar credenciales contra el señuelo es
+# fuerza bruta (T1110, acceso a credenciales), y entrar con una que funciona es usar una cuenta
+# válida (T1078, acceso inicial): las dos cosas las registra el sensor en cada intento. Movimiento
+# lateral e impacto quedan afuera a propósito, y el panel las muestra en gris para explicar que un
+# señuelo de baja interacción no las ve. Si el motor pudiera asignarlas, esa explicación dejaría de
+# ser cierta. Van en el orden en que las recorre una intrusión, el mismo de la matriz del panel.
 TACTICAS_OBSERVABLES = (
+    "Acceso a credenciales",
+    "Acceso inicial",
     "Descubrimiento",
     "Ejecución",
     "Evasión de defensas",
@@ -64,7 +69,7 @@ RULES: list[tuple[re.Pattern[str], Annotation]] = [
         Annotation(
             what="Lee las características del procesador y la memoria disponible.",
             why="Mide la capacidad de cómputo del equipo. Es el reconocimiento típico previo a "
-            "instalar un minero de criptomonedas: cuanto más potente, más rentable.",
+            "instalar un minero de criptomonedas: cuanta más capacidad, más rentable.",
             what_en="Reads the processor's characteristics and the available memory.",
             why_en=(
                 "Measures the machine's compute capacity. This is the reconnaissance typically "

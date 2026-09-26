@@ -2,7 +2,7 @@
 // `Dict` se deriva del español, que es la fuente de verdad, así que una clave que falte en inglés
 // es un error de tipos.
 //
-// Lo que NO está acá: las explicaciones por comando del replay. Esas vienen de la API, que sirve
+// Lo que no está acá: las explicaciones por comando del replay. Esas vienen de la API, que sirve
 // los dos idiomas (ver honeyml/education/annotations.py).
 
 const es = {
@@ -14,8 +14,9 @@ const es = {
     live: 'Datos reales capturados',
     frozen: 'Snapshot congelado',
     frozenTitle: 'Snapshot tomado el',
+    range: (desde: string, hasta: string) => `${desde} al ${hasta}`,
   },
-  loading: 'Cargando…',
+  loading: 'Cargando...',
   error: {
     title: 'No se pudo cargar la telemetría',
     hint: 'Verificá que la API esté corriendo:',
@@ -29,6 +30,7 @@ const es = {
     arquetipos: 'Tipos de atacante',
     origen: 'De dónde vienen',
     mitre: 'Tácticas MITRE',
+    triaje: 'Triaje del motor',
   },
   lead: {
     pulso:
@@ -44,6 +46,8 @@ const es = {
       'Casi ninguno de los que golpean la puerta llega a entrar. Estos son los que sí, y en qué se distinguen.',
     origen: 'El país dice poco por sí solo. La red que opera la dirección dice bastante más.',
     mitre: 'El marco con el que se clasifica cada acción, iluminado con las capturas propias.',
+    triaje:
+      'Lo que el motor decidió sobre cada evento, con qué evidencia y a qué costo. Lo que no pudo cerrar solo lo termina de decidir quien opera el panel.',
   },
   pulse: {
     events: 'Eventos capturados',
@@ -67,7 +71,7 @@ const es = {
     busiestNote:
       'Hora del día en que llegan los ataques, en horario universal. La distribución es plana: no hay horario de oficina del otro lado, son procesos automáticos corriendo sin pausa.',
     hour: 'hora',
-    ratio: (r: string) => `${r}× entre pico y valle`,
+    ratio: (r: string) => `${r} veces entre pico y valle`,
     loginsAtThisHour: 'intentos de acceso en esa hora',
     events_short: 'eventos',
     outages: 'Interrupciones de captura',
@@ -88,7 +92,7 @@ const es = {
     accessGranted: (u: string, p: string) => `Acceso concedido con ${u}:${p}`,
     sessionEnded: 'sesión finalizada',
     step: (i: number, n: number) => `Paso ${i} de ${n}`,
-    keys: 'espacio pausa · ← → paso a paso',
+    keys: 'espacio pausa, las flechas avanzan o retroceden de a un paso',
     goToStep: 'Ir a este paso',
     why: 'Por qué lo hace',
     others: 'Otras sesiones capturadas',
@@ -133,12 +137,12 @@ const es = {
     unitPass: 'veces que se probó esta contraseña',
     empty: '(vacía)',
     ofTop: 'del top 10',
-    timesLess: (n: string, k: string) => `${n}× menos que ${k}`,
+    timesLess: (n: string, k: string) => `${n} veces menos que ${k}`,
   },
   mitre: {
     coverageTitle: 'Cobertura del marco',
     coverageNote:
-      'De las catorce tácticas de MITRE ATT&CK Enterprise, estas son las que aparecen en las sesiones capturadas. Las ausentes corresponden a etapas que un señuelo de baja interacción no llega a observar, así que no representan un vacío del panel.',
+      'De las catorce tácticas de MITRE ATT&CK Enterprise, estas son las que el señuelo observa. Las dos de acceso salen de los intentos de ingreso y las demás, de los comandos de las sesiones capturadas. Las ausentes corresponden a etapas que un señuelo de baja interacción no llega a observar, así que no representan un vacío del panel.',
     observed: 'observadas',
     notObserved: 'no observadas en este señuelo',
     sessions: 'sesiones observadas',
@@ -154,6 +158,10 @@ const es = {
       'Cada técnica es un identificador del catálogo de MITRE ATT&CK. Hacé clic para ver la ficha oficial.',
     steps: 'pasos',
     whyNotSeen: 'Por qué no aparece',
+    attempts: 'intentos de acceso',
+    successes: 'accesos exitosos',
+    ofAttempts: 'de los intentos',
+    events: 'eventos',
   },
   tactics: {
     Descubrimiento: {
@@ -175,7 +183,13 @@ const es = {
     },
     'Acceso a credenciales': {
       name: 'Acceso a credenciales',
-      meaning: 'Roba usuarios y contraseñas para moverse a otros sistemas.',
+      meaning:
+        'Prueba usuarios y contraseñas hasta dar con uno que funcione. Acá es fuerza bruta automatizada.',
+    },
+    'Acceso inicial': {
+      name: 'Acceso inicial',
+      meaning:
+        'Entra al equipo con una credencial que funciona, casi siempre una clave por defecto.',
     },
     'Movimiento lateral': {
       name: 'Movimiento lateral',
@@ -187,8 +201,6 @@ const es = {
     },
   },
   notObservedWhy: {
-    'Acceso a credenciales':
-      'El señuelo no guarda credenciales reales que robar: no hay archivos de contraseñas ni sesiones de otros usuarios.',
     'Movimiento lateral':
       'El sensor está aislado en su propia red, sin equipos vecinos a los que saltar. El bloqueo de tráfico saliente lo impide además a nivel de red.',
     Impacto:
@@ -227,7 +239,7 @@ const es = {
     sources: 'direcciones',
     perSource: (r: string) => `${r} sesiones por dirección: la misma máquina repitiendo el guion`,
     script: 'El guion exacto',
-    truncated: (n: number) => `… y ${n - 12} comandos más`,
+    truncated: (n: number) => `y ${n - 12} comandos más`,
     lesson:
       'Casi todas las sesiones capturadas son el mismo guion ejecutado por muchas máquinas, y no ataques distintos. Agrupar por secuencia exacta de comandos lo hace evidente, y de paso muestra por qué contar alertas no sirve para medir amenazas. Una familia con miles de sesiones desde un puñado de direcciones no son miles de atacantes: es un programa, repetido.',
   },
@@ -235,7 +247,7 @@ const es = {
     addresses: 'direcciones',
     // Los rasgos se traducen acá y no en la API: el backend manda el nombre de columna, que es
     // neutral al idioma, y así no hay que enviar dos versiones de cada texto.
-    usedCmd: (c: string) => `usó «${c}»`,
+    usedCmd: (c: string) => `usó "${c}"`,
     traits: {
       log1p_n_eventos: 'volumen de eventos',
       log1p_n_sesiones: 'cantidad de sesiones',
@@ -328,7 +340,7 @@ const es = {
     office: 'Oficina L-V 9-18',
     night: 'Madrugada 0-6',
     weekend: 'Fin de semana',
-    vsOffice: (r: string) => `${r}× la actividad de oficina`,
+    vsOffice: (r: string) => `${r} veces la actividad de oficina`,
     verdictAutomated:
       'Acá está la prueba de que no hay nadie del otro lado. Un sistema operado por personas se enciende de lunes a viernes en horario de oficina y se apaga de noche y los fines de semana. Acá pasa lo contrario: la madrugada y el fin de semana superan al horario laboral. Los atacantes no trabajan de noche. Simplemente no duermen, porque son programas corriendo sin supervisión.',
     verdictMixed:
@@ -337,7 +349,7 @@ const es = {
   controls: {
     interval: { hour: 'Por hora', day: 'Por día', week: 'Por semana' },
     allSensors: 'Ambos',
-    loading: 'actualizando…',
+    loading: 'actualizando...',
     from: 'Desde',
     to: 'Hasta',
     reset: 'Ver todo',
@@ -348,6 +360,88 @@ const es = {
       mes: 'Último mes',
       todo: 'Todo',
     },
+  },
+  triage: {
+    decisions: 'Decisiones del motor',
+    reasoned: 'razonadas por el modelo',
+    copied: 'copiadas del repertorio',
+    cost: 'Costo de inferencia',
+    correctedByEngine: 'corregidas tras un rechazo de la validación',
+    conclusion: 'Tiempo de conclusión',
+    conclusionNote: (d: number) => `del evento a la decisión guardada, últimos ${d} días`,
+    median: 'mediana',
+    p90: 'p90',
+    noData: 'sin datos',
+    pending: 'Pendientes de revisión',
+    pendingNote: (r: string) => `de ${r} que el motor no pudo cerrar solo`,
+    bySeverity: 'Por severidad',
+    byTactic: 'Por táctica',
+    noTactic: 'sin táctica',
+    filterHint: 'Tocá una barra para filtrar el listado.',
+    state: { todas: 'Todas', pendientes: 'Pendientes', revisadas: 'Revisadas' },
+    severity: 'Severidad',
+    tactic: 'Táctica',
+    sensor: 'Sensor',
+    any: 'Cualquiera',
+    clear: 'Limpiar filtros',
+    when: 'Momento',
+    event: 'Evento',
+    empty: 'No hay decisiones con estos filtros.',
+    page: (a: string, b: string, total: string) => `${a} a ${b} de ${total}`,
+    prev: 'Anterior',
+    next: 'Siguiente',
+    copiedMark: 'Copiada del repertorio',
+    reasonedMark: 'Razonada por el modelo',
+    needsReview: 'Requiere revisión',
+    reviewed: 'Revisada',
+    notConcluded: 'sin concluir',
+    liveOnly: 'Las decisiones del motor se leen solo en vivo, y la API no alcanza a Elasticsearch.',
+    detail: {
+      close: 'Cerrar',
+      attributes: 'Atributos normalizados del evento',
+      noEvent:
+        'El evento ya no está en los índices de telemetría. La decisión conserva sus datos principales.',
+      classification: 'Clasificación del motor',
+      notConcluded: 'El motor no llegó a una clasificación.',
+      confidence: 'confianza',
+      bounds: (piso: string, techo: string) =>
+        `La escala admite de ${piso} a ${techo} para este evento.`,
+      justification: 'Justificación',
+      evidence: 'Evidencia',
+      cycle: 'Cómo se decidió',
+      copiedFrom: 'Copiada de la decisión de otro evento con la misma conducta:',
+      open: 'abrir',
+      attempts: 'intentos',
+      rejections: 'rechazos',
+      reproaches: 'Reproches de la validación',
+      failed: 'Consultas que fallaron',
+      failedNote: 'La decisión se tomó sin esta parte del contexto, por eso va a revisión.',
+      cutReason: 'Motivo del corte',
+      model: 'Modelo',
+    },
+    verdict: {
+      title: 'Veredicto del analista',
+      explain:
+        'La decisión del motor no se modifica: el veredicto queda al lado, para medir después en qué se equivocó.',
+      none: 'Todavía sin veredicto.',
+      confirm: 'Confirmar la del motor',
+      correct: 'Corregir',
+      save: 'Guardar corrección',
+      cancel: 'Cancelar',
+      note: 'Nota (opcional)',
+      saving: 'Guardando...',
+      confirmed: 'Confirmó la clasificación del motor',
+      corrected: 'Corrigió la clasificación',
+      cannotConfirm: 'No hay clasificación del motor que confirmar: corresponde corregir.',
+      change: 'Cambiar veredicto',
+    },
+  },
+  severities: {
+    informativo: 'informativo',
+    bajo: 'bajo',
+    medio: 'medio',
+    alto: 'alto',
+    critico: 'crítico',
   },
   capture: {
     on: 'Modo captura',
@@ -369,8 +463,9 @@ const en: typeof es = {
     live: 'Real captured data',
     frozen: 'Frozen snapshot',
     frozenTitle: 'Snapshot taken on',
+    range: (desde: string, hasta: string) => `${desde} to ${hasta}`,
   },
-  loading: 'Loading…',
+  loading: 'Loading...',
   error: {
     title: 'Could not load telemetry',
     hint: 'Check that the API is running:',
@@ -384,6 +479,7 @@ const en: typeof es = {
     arquetipos: 'Kinds of attacker',
     origen: 'Where they come from',
     mitre: 'MITRE tactics',
+    triaje: 'Engine triage',
   },
   lead: {
     pulso: 'A machine nobody advertised anywhere, exposed to the internet. This is what it gets.',
@@ -398,6 +494,8 @@ const en: typeof es = {
       'Almost none of those knocking ever get in. These are the ones who do, and what sets them apart.',
     origen: 'The country says little on its own. The network operating the address says far more.',
     mitre: 'The framework used to classify each action, lit up with our own captures.',
+    triaje:
+      'What the engine decided about each event, on what evidence and at what cost. Whatever it could not settle on its own is decided by whoever operates the panel.',
   },
   pulse: {
     events: 'Captured events',
@@ -421,7 +519,7 @@ const en: typeof es = {
     busiestNote:
       'Hour of day when attacks arrive, in universal time. The distribution is flat: there are no office hours on the other side, these are automated processes running non-stop.',
     hour: 'hour',
-    ratio: (r: string) => `${r}× between peak and trough`,
+    ratio: (r: string) => `${r} times between peak and trough`,
     loginsAtThisHour: 'access attempts in that hour',
     events_short: 'events',
     outages: 'Capture outages',
@@ -442,7 +540,7 @@ const en: typeof es = {
     accessGranted: (u: string, p: string) => `Access granted with ${u}:${p}`,
     sessionEnded: 'session ended',
     step: (i: number, n: number) => `Step ${i} of ${n}`,
-    keys: 'space pauses · ← → step by step',
+    keys: 'space pauses, the arrow keys step forward or back',
     goToStep: 'Jump to this step',
     why: 'Why they do it',
     others: 'Other captured sessions',
@@ -487,12 +585,12 @@ const en: typeof es = {
     unitPass: 'times this password was tried',
     empty: '(empty)',
     ofTop: 'of the top 10',
-    timesLess: (n: string, k: string) => `${n}× fewer than ${k}`,
+    timesLess: (n: string, k: string) => `${n} times fewer than ${k}`,
   },
   mitre: {
     coverageTitle: 'Framework coverage',
     coverageNote:
-      'Of the fourteen MITRE ATT&CK Enterprise tactics, these are the ones that appear in the captured sessions. The missing ones correspond to stages a low-interaction decoy never gets to observe, so they do not represent a gap in the panel.',
+      'Of the fourteen MITRE ATT&CK Enterprise tactics, these are the ones the decoy observes. The two access tactics come from login attempts and the rest from the commands in the captured sessions. The missing ones correspond to stages a low-interaction decoy never gets to observe, so they do not represent a gap in the panel.',
     observed: 'observed',
     notObserved: 'not observed in this decoy',
     sessions: 'sessions observed',
@@ -508,6 +606,10 @@ const en: typeof es = {
       'Each technique is an identifier from the MITRE ATT&CK catalogue. Click to open the official entry.',
     steps: 'steps',
     whyNotSeen: 'Why it does not appear',
+    attempts: 'login attempts',
+    successes: 'successful logins',
+    ofAttempts: 'of all attempts',
+    events: 'events',
   },
   tactics: {
     Descubrimiento: {
@@ -529,7 +631,12 @@ const en: typeof es = {
     },
     'Acceso a credenciales': {
       name: 'Credential Access',
-      meaning: 'Steals usernames and passwords to move on to other systems.',
+      meaning: 'Tries usernames and passwords until one works. Here it is automated brute force.',
+    },
+    'Acceso inicial': {
+      name: 'Initial Access',
+      meaning:
+        'Gets into the machine with a credential that works, almost always a default password.',
     },
     'Movimiento lateral': {
       name: 'Lateral Movement',
@@ -541,8 +648,6 @@ const en: typeof es = {
     },
   },
   notObservedWhy: {
-    'Acceso a credenciales':
-      'The decoy holds no real credentials to steal: there are no password files and no other users’ sessions.',
     'Movimiento lateral':
       'The sensor is isolated on its own network, with no neighbouring machines to jump to. Outbound traffic blocking prevents it at the network layer as well.',
     Impacto:
@@ -581,13 +686,13 @@ const en: typeof es = {
     sources: 'addresses',
     perSource: (r: string) => `${r} sessions per address: the same machine repeating the script`,
     script: 'The exact script',
-    truncated: (n: number) => `… and ${n - 12} more commands`,
+    truncated: (n: number) => `and ${n - 12} more commands`,
     lesson:
       'Almost every captured session is the same script run by many machines rather than a distinct attack. Grouping by exact command sequence makes that obvious, and shows why counting alerts does not measure threat. A family with thousands of sessions from a handful of addresses is not thousands of attackers: it is one program, repeated.',
   },
   archetypes: {
     addresses: 'addresses',
-    usedCmd: (c: string) => `ran «${c}»`,
+    usedCmd: (c: string) => `ran "${c}"`,
     traits: {
       log1p_n_eventos: 'event volume',
       log1p_n_sesiones: 'number of sessions',
@@ -678,7 +783,7 @@ const en: typeof es = {
     office: 'Office Mon-Fri 9-18',
     night: 'Small hours 0-6',
     weekend: 'Weekend',
-    vsOffice: (r: string) => `${r}× office-hours activity`,
+    vsOffice: (r: string) => `${r} times office-hours activity`,
     verdictAutomated:
       'There is the proof that nobody is on the other side. A system run by people lights up on weekdays during office hours and goes quiet at night and on weekends. Here the opposite happens: the small hours and the weekend beat the working day. Attackers do not work nights. They simply do not sleep, because they are programs running unattended.',
     verdictMixed:
@@ -687,7 +792,7 @@ const en: typeof es = {
   controls: {
     interval: { hour: 'Hourly', day: 'Daily', week: 'Weekly' },
     allSensors: 'Both',
-    loading: 'updating…',
+    loading: 'updating...',
     from: 'From',
     to: 'To',
     reset: 'Show all',
@@ -698,6 +803,89 @@ const en: typeof es = {
       mes: 'Last month',
       todo: 'All',
     },
+  },
+  triage: {
+    decisions: 'Engine decisions',
+    reasoned: 'reasoned by the model',
+    copied: 'copied from the repertoire',
+    cost: 'Inference cost',
+    correctedByEngine: 'corrected after a validation rejection',
+    conclusion: 'Time to conclusion',
+    conclusionNote: (d: number) => `from the event to the stored decision, last ${d} days`,
+    median: 'median',
+    p90: 'p90',
+    noData: 'no data',
+    pending: 'Pending review',
+    pendingNote: (r: string) => `out of ${r} the engine could not settle on its own`,
+    bySeverity: 'By severity',
+    byTactic: 'By tactic',
+    noTactic: 'no tactic',
+    filterHint: 'Click a bar to filter the list.',
+    state: { todas: 'All', pendientes: 'Pending', revisadas: 'Reviewed' },
+    severity: 'Severity',
+    tactic: 'Tactic',
+    sensor: 'Sensor',
+    any: 'Any',
+    clear: 'Clear filters',
+    when: 'When',
+    event: 'Event',
+    empty: 'No decisions match these filters.',
+    page: (a: string, b: string, total: string) => `${a} to ${b} of ${total}`,
+    prev: 'Previous',
+    next: 'Next',
+    copiedMark: 'Copied from the repertoire',
+    reasonedMark: 'Reasoned by the model',
+    needsReview: 'Needs review',
+    reviewed: 'Reviewed',
+    notConcluded: 'not concluded',
+    liveOnly: 'Engine decisions are only read live, and the API cannot reach Elasticsearch.',
+    detail: {
+      close: 'Close',
+      attributes: 'Normalised event attributes',
+      noEvent:
+        'The event is no longer in the telemetry indices. The decision keeps its main fields.',
+      classification: 'Engine classification',
+      notConcluded: 'The engine did not reach a classification.',
+      confidence: 'confidence',
+      bounds: (piso: string, techo: string) =>
+        `The scale allows ${piso} to ${techo} for this event.`,
+      justification: 'Justification',
+      evidence: 'Evidence',
+      cycle: 'How it was decided',
+      copiedFrom: 'Copied from the decision on another event with the same behaviour:',
+      open: 'open',
+      attempts: 'attempts',
+      rejections: 'rejections',
+      reproaches: 'Validation feedback',
+      failed: 'Queries that failed',
+      failedNote:
+        'The decision was made without this part of the context, which is why it goes to review.',
+      cutReason: 'Why it stopped',
+      model: 'Model',
+    },
+    verdict: {
+      title: "Analyst's verdict",
+      explain:
+        "The engine's decision is left untouched: the verdict is stored next to it, so its mistakes can be measured later.",
+      none: 'No verdict yet.',
+      confirm: "Confirm the engine's",
+      correct: 'Correct',
+      save: 'Save correction',
+      cancel: 'Cancel',
+      note: 'Note (optional)',
+      saving: 'Saving...',
+      confirmed: "Confirmed the engine's classification",
+      corrected: 'Corrected the classification',
+      cannotConfirm: 'There is no engine classification to confirm: it has to be corrected.',
+      change: 'Change verdict',
+    },
+  },
+  severities: {
+    informativo: 'informational',
+    bajo: 'low',
+    medio: 'medium',
+    alto: 'high',
+    critico: 'critical',
   },
   capture: {
     on: 'Capture mode',

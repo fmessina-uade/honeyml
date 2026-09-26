@@ -8,8 +8,14 @@ simplemente no listarlo.
 Qué se guarda, además del nivel. La justificación y la evidencia, porque una decisión de triaje que
 no se puede releer es una opinión. El piso y el techo que la escala calculó para ese evento, así
 quien audite verifica que el nivel era defendible sin tener que recalcularlos. Los reproches, que
-cuentan si el modelo acertó de una o hubo que corregirlo. Y qué modelo contestó y cuánto costó, que
-es la única forma de responder después si convino la política de escalar recién al reintentar.
+cuentan si el modelo acertó de una o hubo que corregirlo. Qué modelo contestó y cuánto costó, que
+es la única forma de responder después si convino la política de escalar recién al reintentar. Y
+qué consultas del contexto fallaron, porque una decisión tomada sin el historial de la dirección
+no vale lo mismo que una tomada con él.
+
+Esas dos cosas, que el ciclo no concluya o que concluya con consultas fallidas, dejan la decisión
+marcada para revisión. La decisión final sobre esos casos la toma quien opera el panel, y queda en
+un índice aparte: la del motor no se toca, así se puede medir después en qué se equivocó.
 
 Una cosa que este nodo decide y no acepta: `concluyente`. El modo estricto del proveedor obliga al
 modelo a emitir ese campo, así que viene con un valor, pero describe cómo terminó el ciclo y no algo
@@ -30,7 +36,7 @@ from typing import Any
 from ..adapters.almacen import Almacen, AlmacenElastic
 from ..adapters.repertorio import Repertorio
 from ..severidad import piso, techo
-from ..state import EstadoTriaje, resultado_del_ciclo
+from ..state import SUFIJO_DE_FALLA, EstadoTriaje, resultado_del_ciclo
 
 # Tope de reproches que se guardan. Con MAX_INTENTOS en 3 y varios problemas por ronda, el techo
 # real ronda la docena; el corte está para que un cambio de esos números no infle un documento sin
@@ -83,9 +89,27 @@ def _de_la_decision(estado: EstadoTriaje, concluyente: bool) -> dict[str, Any]:
     }
 
 
+def consultas_fallidas(estado: EstadoTriaje) -> list[str]:
+    """Qué consultas del contexto fallaron, por nombre.
+
+    Los nodos de contexto e historial anotan cada falla como `<consulta>_falló` en los hallazgos,
+    con el mensaje del error. En el documento va solo el nombre, que es lo que necesita quien revisa
+    ("se decidió sin la sesión"). El mensaje sirve para depurar y lo imprime el motor.
+    """
+    contexto = estado.get("contexto")
+    if contexto is None:
+        return []
+    return sorted(
+        clave.removesuffix(SUFIJO_DE_FALLA)
+        for clave in contexto.hallazgos
+        if clave.endswith(SUFIJO_DE_FALLA)
+    )
+
+
 def documento(estado: EstadoTriaje) -> dict[str, Any]:
     """Arma el documento que se indexa. Separado de `guardar` para poder probarlo sin almacén."""
     motivo = resultado_del_ciclo(estado)
+    fallidas = consultas_fallidas(estado)
     return {
         # Cuándo se decidió, que no es cuándo ocurrió el evento. Los dos hacen falta: uno mide el
         # atraso del motor, el otro ubica el ataque.
@@ -103,6 +127,8 @@ def documento(estado: EstadoTriaje) -> dict[str, Any]:
             # puede verificar que una copia coincide con su original.
             "firma": estado.get("firma") or None,
             "reutilizada_de": estado.get("reutilizada_de") or None,
+            "consultas_fallidas": fallidas,
+            "requiere_revision": motivo is not None or bool(fallidas),
         },
         "modelo": estado.get("consumo") or {},
     }
@@ -151,9 +177,10 @@ def _registrar_la_firma(estado: EstadoTriaje, repertorio: Repertorio | None) -> 
     decisión que no se persistió, y las miles de repeticiones que vienen detrás copiarían de un
     documento inexistente.
 
-    Solo se registran las concluyentes. Una decisión que no pasó la validación describe un ciclo que
-    salió mal, no una conducta resuelta: propagarla le pondría el mismo fracaso a todas las
-    repeticiones de la firma en lugar de darles otra oportunidad.
+    Solo se registran las concluyentes y tomadas con todas sus consultas. Una decisión que no pasó
+    la validación describe un ciclo que salió mal, no una conducta resuelta, y una tomada sin parte
+    del contexto está esperando la revisión de alguien: propagar cualquiera de las dos le pondría el
+    mismo defecto a todas las repeticiones de la firma en lugar de darles otra oportunidad.
 
     Y no se re-registra lo que ya vino del repertorio: el `doc_id` de origen tiene que seguir siendo
     el del evento que efectivamente se razonó, o la cadena de auditoría apunta a una copia.
@@ -163,6 +190,8 @@ def _registrar_la_firma(estado: EstadoTriaje, repertorio: Repertorio | None) -> 
     firma = estado.get("firma")
     decision = estado.get("decision")
     if not firma or decision is None or resultado_del_ciclo(estado) is not None:
+        return
+    if consultas_fallidas(estado):
         return
     evento = estado["evento"]
     repertorio.registrar(firma, decision.model_dump(mode="json"), evento.doc_id)

@@ -8,6 +8,9 @@ ejecutaron una secuencia, pero sobre tres meses, y ese número no separa un gote
 cuarenta direcciones repartidas en un trimestre son el ruido de fondo de internet, y cuarenta
 dentro de una hora son otra cosa. La ventana es lo que le da sentido al conteo.
 
+Los precedentes son lo que el propio motor ya decidió sobre la dirección. Salen del almacén de
+decisiones y no de la telemetría, así que dicen cómo se la juzgó y no solo qué hizo.
+
 Igual que el nodo de contexto, acá no se pondera nada: se recupera y se anota.
 """
 
@@ -17,15 +20,11 @@ from typing import Any
 from urllib.error import URLError
 
 from .. import tools
-from ..state import EstadoTriaje
+from ..state import SUFIJO_DE_FALLA, EstadoTriaje
 
 # Mismo criterio que en el nodo de contexto: el índice caído corta el ciclo, una consulta que falla
 # se anota y sigue. Ver el encabezado de `nodes/contexto.py`.
 SIN_INDICE = (URLError, ConnectionError, TimeoutError)
-
-# Lo que se va a poder responder cuando exista el almacén de decisiones, y hoy no. Se declara para
-# que la ausencia quede escrita en los hallazgos en vez de parecer un resultado vacío.
-PRECEDENTES_PENDIENTES = "no consultados: todavía no hay almacén de decisiones"
 
 
 def _intentar(nombre: str, hallazgos: dict[str, Any], fn: Any, *args: Any) -> Any:
@@ -34,7 +33,7 @@ def _intentar(nombre: str, hallazgos: dict[str, Any], fn: Any, *args: Any) -> An
     except SIN_INDICE:
         raise
     except Exception as exc:  # noqa: BLE001 - ver el nodo de contexto
-        hallazgos[f"{nombre}_falló"] = f"{type(exc).__name__}: {exc}"
+        hallazgos[f"{nombre}{SUFIJO_DE_FALLA}"] = f"{type(exc).__name__}: {exc}"
         return None
 
 
@@ -62,6 +61,10 @@ def recuperar(estado: EstadoTriaje) -> EstadoTriaje:
     if rafaga is not None:
         hallazgos["rafaga"] = rafaga
 
-    hallazgos["precedentes"] = PRECEDENTES_PENDIENTES
+    precedentes = _intentar(
+        "precedentes", hallazgos, tools.precedentes_de_direccion, evento.source_ip, evento.timestamp
+    )
+    if precedentes is not None:
+        hallazgos["precedentes"] = precedentes
 
     return {"contexto": contexto.model_copy(update={"hallazgos": hallazgos})}

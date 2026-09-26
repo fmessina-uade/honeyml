@@ -11,6 +11,7 @@ import {
   Archive,
   Users,
   Globe,
+  ShieldCheck,
 } from 'lucide-react';
 import {
   api,
@@ -30,10 +31,12 @@ import Protocols from './components/sections/Protocols';
 import Fingerprints from './components/sections/Fingerprints';
 import Archetypes from './components/sections/Archetypes';
 import Geography from './components/sections/Geography';
+import Triage from './components/sections/Triage';
 import AttackCanvas from './components/AttackCanvas';
 
 // El orden es narrativo: primero la escala, después una intrusión concreta, después toda la
-// superficie, después la evidencia detrás del consejo, y al final el marco formal.
+// superficie, después la evidencia detrás del consejo, después el marco formal, y al final lo que
+// el motor decidió con ese marco.
 const SECTIONS = [
   { id: 'pulso', icon: Radar },
   { id: 'anatomia', icon: Terminal },
@@ -43,6 +46,7 @@ const SECTIONS = [
   { id: 'arquetipos', icon: Users },
   { id: 'origen', icon: Globe },
   { id: 'mitre', icon: Grid3x3 },
+  { id: 'triaje', icon: ShieldCheck },
 ] as const;
 
 type SectionId = (typeof SECTIONS)[number]['id'];
@@ -176,8 +180,10 @@ export default function App() {
           )}
           {snapshot && (
             <div className="font-data text-[9px] text-white/25 -mt-2">
-              {snapshot.overview.first_event?.slice(0, 10)} →{' '}
-              {snapshot.overview.last_event?.slice(0, 10)}
+              {t.footer.range(
+                snapshot.overview.first_event?.slice(0, 10) ?? '',
+                snapshot.overview.last_event?.slice(0, 10) ?? '',
+              )}
             </div>
           )}
         </div>
@@ -263,7 +269,14 @@ export default function App() {
                   {t.error.title}
                 </div>
               ))}
-            {active === 'mitre' && <MitreMatrix replays={replays} stages={snapshot.stages} />}
+            {active === 'mitre' && (
+              <MitreMatrix
+                replays={replays}
+                stages={snapshot.stages}
+                overview={snapshot.overview}
+              />
+            )}
+            {active === 'triaje' && <Triage />}
           </div>
         )}
       </main>

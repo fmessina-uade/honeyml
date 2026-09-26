@@ -1,20 +1,17 @@
 #!/usr/bin/env bash
-# honeyml_backup.sh: respaldo diario de la telemetría de los honeypots y de las decisiones.
-# Ejecutado por cron todos los días a las 03:00 UTC.
+# Respaldo diario de la telemetría, de las decisiones del motor y de los veredictos del analista.
+# Lo corre el cron todos los días a las 03:00 UTC.
 #
-# Por qué existe: los sensores rotan sus registros y eliminan los antiguos, así que el volumen
-# Docker NO es un archivo histórico. Sin este respaldo, la evidencia más vieja que la ventana de
-# rotación se pierde de forma irrecuperable.
+# Los sensores rotan sus registros y borran los viejos, así que el volumen de Docker no guarda la
+# historia: sin este respaldo, lo que sale de la ventana de rotación se pierde para siempre.
 #
-# Estrategia:
-#   - Los archivos ya rotados son inmutables: se copian comprimidos UNA sola vez y se conservan.
-#     Son el archivo histórico y no se purgan.
-#   - El archivo activo cambia todo el tiempo: se guarda una instantánea diaria comprimida, que
-#     sí se purga, porque queda cubierta por el rotado del día siguiente.
-#   - Las decisiones son la excepción que más importa: los eventos se pueden reingerir desde los
-#     registros crudos, pero cada decisión costó una llamada paga y no se puede rehacer gratis. Se
-#     vuelca el índice entero, que es chico, y el volcado se restaura con la misma operación masiva
-#     con que se lo escribió.
+# Cada cosa se guarda según cuánto cambia. Un archivo ya rotado no cambia más, así que se copia
+# comprimido una sola vez y se conserva: es el archivo histórico y no se purga. El archivo activo
+# cambia todo el tiempo y se guarda una instantánea comprimida por día, que sí se purga, porque el
+# rotado del día siguiente la cubre. Las decisiones y los veredictos son lo que más importa: los
+# eventos se reingieren desde los registros crudos, pero cada decisión costó una llamada paga y cada
+# veredicto es trabajo de una persona, y ninguno de los dos se rehace. Se vuelcan los dos índices
+# enteros, que son chicos, y se restauran con la misma operación masiva con que se los escribió.
 #
 # Todo esto queda en el mismo disco que produce los datos, así que es la mitad del respaldo. La otra
 # mitad es sacarlo del servidor, y eso lo hace `make respaldar-decisiones` desde la estación.
@@ -30,7 +27,6 @@ SNAPSHOT_RETENTION_DAYS=14
 # cada volcado de decisiones es el índice entero, así que unos pocos alcanzan para volver atrás
 DECISIONES_RETENTION_DAYS=14
 ES_URL="http://localhost:9200"
-INDICE_DECISIONES="honeyml-decisiones"
 OWNER="honeyml:honeyml"
 
 TODAY=$(date -u '+%Y-%m-%d')
@@ -61,19 +57,18 @@ instantanea_activo() {
     gzip -c "$origen" > "$dest.tmp" && mv "$dest.tmp" "$dest"
 }
 
-instantanea_decisiones() {
-    local dest_dir="$1" volcadas=0
-    # El índice solo existe donde corre la zona de análisis. En un anfitrión que solo tiene los
-    # sensores no hay nada que volcar, y eso no es una falla.
-    if ! curl -sf --max-time 10 "$ES_URL/$INDICE_DECISIONES/_count" >/dev/null 2>&1; then
-        log "AVISO: no responde $INDICE_DECISIONES, se omiten las decisiones"
+volcar_indice() {
+    local indice="$1" prefijo="$2" dest_dir="$3" volcadas=0
+    # Los índices solo existen donde corre la zona de análisis, y el de revisiones recién aparece
+    # con el primer veredicto. En los dos casos no hay nada que volcar, y eso no es una falla.
+    if ! curl -sf --max-time 10 "$ES_URL/$indice/_count" >/dev/null 2>&1; then
         echo 0
         return 0
     fi
-    local dest="$dest_dir/decisiones-${TODAY}.ndjson.gz"
+    local dest="$dest_dir/${prefijo}-${TODAY}.ndjson.gz"
     # Se guarda el identificador junto al documento: es el `doc_id` del evento, y sin él una
-    # restauración perdería la correspondencia entre la decisión y el evento que la originó.
-    if volcadas=$(python3 - "$ES_URL" "$INDICE_DECISIONES" "$dest.tmp" <<'PY'
+    # restauración perdería la correspondencia con el evento que lo originó.
+    if volcadas=$(python3 - "$ES_URL" "$indice" "$dest.tmp" <<'PY'
 import gzip
 import json
 import sys
@@ -105,7 +100,7 @@ PY
         mv "$dest.tmp" "$dest"
     else
         rm -f "$dest.tmp"
-        log "ERROR: falló el volcado de decisiones"
+        log "ERROR: falló el volcado de $indice"
         volcadas=0
     fi
     echo "$volcadas"
@@ -121,15 +116,17 @@ main() {
     # Dionaea no rota: solo hay archivo activo
     instantanea_activo "$DIONAEA_SRC/dionaea.json" "$BACKUP_ROOT/dionaea" "dionaea"
 
-    local decisiones
-    decisiones=$(instantanea_decisiones "$BACKUP_ROOT/decisiones")
+    local decisiones revisiones
+    decisiones=$(volcar_indice honeyml-decisiones decisiones "$BACKUP_ROOT/decisiones")
+    [[ "$decisiones" -gt 0 ]] || log "AVISO: no se volcó ninguna decisión"
+    revisiones=$(volcar_indice honeyml-revisiones revisiones "$BACKUP_ROOT/decisiones")
 
-    # purga las instantáneas del activo y los volcados viejos de decisiones; los rotados de los
-    # sensores son el archivo histórico y no se tocan
+    # purga las instantáneas del activo y los volcados viejos de decisiones y revisiones; los
+    # rotados de los sensores son el archivo histórico y no se tocan
     local purgadas
     purgadas=$(find "$BACKUP_ROOT" -name '*-activo-*.json.gz' \
         -mtime "+$SNAPSHOT_RETENTION_DAYS" -print -delete 2>/dev/null | wc -l)
-    purgadas=$((purgadas + $(find "$BACKUP_ROOT/decisiones" -name 'decisiones-*.ndjson.gz' \
+    purgadas=$((purgadas + $(find "$BACKUP_ROOT/decisiones" -name '*-*.ndjson.gz' \
         -mtime "+$DECISIONES_RETENTION_DAYS" -print -delete 2>/dev/null | wc -l)))
 
     chown -R "$OWNER" "$BACKUP_ROOT" 2>/dev/null || true
@@ -137,7 +134,7 @@ main() {
     local total tamano
     total=$(find "$BACKUP_ROOT" -name '*.gz' | wc -l)
     tamano=$(du -sh "$BACKUP_ROOT" | cut -f1)
-    log "OK: ${rotados_cowrie} rotados nuevos, instantáneas del día guardadas, ${decisiones} decisiones, ${purgadas} purgadas. Total: ${total} archivos, ${tamano}."
+    log "OK: ${rotados_cowrie} rotados nuevos, instantáneas del día guardadas, ${decisiones} decisiones, ${revisiones} revisiones, ${purgadas} purgadas. Total: ${total} archivos, ${tamano}."
 }
 
 main "$@"

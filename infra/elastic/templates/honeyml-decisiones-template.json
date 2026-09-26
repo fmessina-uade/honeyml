@@ -48,7 +48,9 @@
             "rechazos": { "type": "integer" },
             "reproches": { "type": "text" },
             "firma": { "type": "keyword" },
-            "reutilizada_de": { "type": "keyword" }
+            "reutilizada_de": { "type": "keyword" },
+            "consultas_fallidas": { "type": "keyword" },
+            "requiere_revision": { "type": "boolean" }
           }
         },
         "modelo": {

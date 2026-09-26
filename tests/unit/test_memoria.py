@@ -23,7 +23,7 @@ from honeyml.agent import firma as modulo_firma
 from honeyml.agent.consumer import EventoDelBus
 from honeyml.agent.nodes import memoria, persistencia
 from honeyml.agent.severidad import Severidad, dentro_de_limites, piso, techo
-from honeyml.agent.state import Decision, estado_inicial
+from honeyml.agent.state import Contexto, Decision, estado_inicial
 
 
 def _evento(**kw: Any) -> EventoDelBus:
@@ -70,7 +70,7 @@ class RepertorioFalso:
         self.datos[firma] = {"decision": decision, "doc_id": doc_id}
 
 
-# ---- la firma -------------------------------------------------------------------------------
+# La firma
 
 
 def test_la_firma_ignora_quien_y_cuando() -> None:
@@ -139,7 +139,7 @@ def test_un_comando_sin_escapes_firma_igual_que_con_los_campos_sin_tocar() -> No
     assert modulo_firma.de_evento(evento) == esperado
 
 
-# ---- la invariante que vuelve correcta la reutilización --------------------------------------
+# La invariante que vuelve correcta la reutilización
 
 
 @pytest.mark.parametrize(
@@ -180,7 +180,7 @@ def test_el_piso_no_depende_de_nada_que_la_firma_deje_afuera(
         assert dentro_de_limites(nivel, uno) == dentro_de_limites(nivel, otro)
 
 
-# ---- el nodo --------------------------------------------------------------------------------
+# El nodo
 
 
 def test_sin_repertorio_calcula_la_firma_y_no_decide() -> None:
@@ -221,7 +221,7 @@ def test_una_entrada_que_ya_no_valida_se_descarta() -> None:
     assert "decision" not in salida
 
 
-# ---- el registro, que pasa por persistencia --------------------------------------------------
+# El registro, que pasa por persistencia
 
 
 def _estado(**kw: Any) -> Any:
@@ -277,6 +277,20 @@ def test_no_registra_una_decision_no_concluyente() -> None:
         repertorio=repertorio,
     )
     assert repertorio.datos == {}
+
+
+def test_no_registra_una_decision_tomada_con_consultas_fallidas() -> None:
+    """Está esperando la revisión del operador: copiarla le pasaría el contexto incompleto a todas
+    las repeticiones de la firma."""
+    repertorio, almacen = RepertorioFalso(), AlmacenFalso()
+    contexto = Contexto(doc_id="doc-uno", resumen="x", hallazgos={"sesion_falló": "KeyError"})
+    persistencia.guardar(
+        _estado(firma="f1", decision=_decision(), contexto=contexto),
+        almacen=almacen,
+        repertorio=repertorio,
+    )
+    assert repertorio.datos == {}
+    assert almacen.escrito[0][1]["ciclo"]["requiere_revision"] is True
 
 
 def test_no_re_registra_lo_que_vino_del_repertorio() -> None:

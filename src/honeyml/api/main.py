@@ -4,6 +4,9 @@ Se pone entre el navegador y Elasticsearch para que la API de búsqueda nunca qu
 cliente, y además sirve las sesiones anotadas del replay. Corre al lado de Elasticsearch en la red
 privada y se alcanza por el túnel SSH, nunca publicado.
 
+Lee y no escribe, con una sola excepción: el veredicto del analista sobre una decisión del motor,
+que va a su propio índice y nunca toca la telemetría ni la decisión. Está en `decisiones.py`.
+
 Uso:
     uvicorn honeyml.api.main:app --reload --port 8000
 """
@@ -13,15 +16,15 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
-from urllib.error import URLError
+from typing import Any, Literal
+from urllib.error import HTTPError, URLError
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from ..education import fingerprints, password_index
 from ..features import arquetipos
-from . import offline, queries
+from . import decisiones, offline, queries
 
 REPLAY_FILE = Path("data/processed/replay_sessions.json")
 
@@ -55,13 +58,36 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# durante el desarrollo el panel corre en el servidor de Vite
+# Durante el desarrollo el panel corre en el servidor de Vite. PUT solo lo usa el veredicto del
+# analista.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-    allow_methods=["GET"],
+    allow_methods=["GET", "PUT"],
     allow_headers=["*"],
 )
+
+
+def _en_vivo[T](fetch: Callable[[], T]) -> T:
+    """Para lo que no tiene respaldo congelado: las decisiones y las revisiones se leen en vivo.
+
+    `HTTPError` va primero porque hereda de `URLError`: un pedido que Elasticsearch rechaza no es
+    Elasticsearch caído, y decirlo así mandaría a buscar el problema en el lugar equivocado.
+    """
+    try:
+        return fetch()
+    except HTTPError as exc:
+        raise HTTPException(
+            status_code=502, detail=f"Elasticsearch rechazó la consulta ({exc.code})."
+        ) from exc
+    except (URLError, ConnectionError, TimeoutError) as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Elasticsearch no responde. Las decisiones del motor se leen solo en vivo: el "
+                "respaldo congelado no las guarda."
+            ),
+        ) from exc
 
 
 @app.get("/api/health")
@@ -244,3 +270,53 @@ def get_replays() -> list[dict[str, Any]]:
         )
     data: list[dict[str, Any]] = json.loads(REPLAY_FILE.read_text(encoding="utf-8"))
     return data
+
+
+@app.get("/api/decisiones/resumen")
+def get_resumen_de_decisiones() -> dict[str, Any]:
+    """Cuánto decidió el motor, cómo, a qué costo, en cuánto tiempo y qué espera revisión."""
+    return _en_vivo(decisiones.resumen)
+
+
+@app.get("/api/decisiones")
+def get_decisiones(
+    severidad: str | None = None,
+    tactica: str | None = None,
+    sensor: str | None = None,
+    estado: Literal["todas", "pendientes", "revisadas"] = "todas",
+    desde: int = 0,
+    tamano: int = 25,
+) -> dict[str, Any]:
+    """Las decisiones del motor, filtradas y de a páginas. `tactica=ninguna` trae las que no
+    tienen."""
+    return _en_vivo(
+        lambda: decisiones.listar(
+            severidad=severidad,
+            tactica=tactica,
+            sensor=sensor,
+            estado=estado,
+            desde=desde,
+            tamano=tamano,
+        )
+    )
+
+
+@app.get("/api/decisiones/{doc_id}")
+def get_decision(doc_id: str) -> dict[str, Any]:
+    """Una decisión con su evento y el veredicto del analista, si lo hay."""
+    encontrada = _en_vivo(lambda: decisiones.detalle(doc_id))
+    if encontrada is None:
+        raise HTTPException(status_code=404, detail="Ese evento no tiene decisión del motor.")
+    return encontrada
+
+
+@app.put("/api/decisiones/{doc_id}/revision")
+def put_revision(doc_id: str, veredicto: decisiones.Veredicto) -> dict[str, Any]:
+    """El veredicto del analista. Es la única escritura de toda la API; ver `decisiones.py`."""
+    try:
+        guardada = _en_vivo(lambda: decisiones.revisar(doc_id, veredicto))
+    except decisiones.SinClasificacionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if guardada is None:
+        raise HTTPException(status_code=404, detail="Ese evento no tiene decisión del motor.")
+    return guardada

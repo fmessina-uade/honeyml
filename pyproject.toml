@@ -44,6 +44,9 @@ agent = [
 # responde "pytest no instalado" y la suite no corre.
 dev = [
     "pytest>=8.0",
+    # El cliente de pruebas de FastAPI lo necesita. Llega arrastrado por LangGraph, y la suite de
+    # la API no puede depender de que LangGraph lo siga trayendo.
+    "httpx>=0.27",
     "ruff>=0.6",
     # Clavado a la misma versión que el hook de .pre-commit-config.yaml: dos versiones distintas
     # dan dos veredictos distintos. Está para poder invocarlo a mano sobre un archivo puntual;

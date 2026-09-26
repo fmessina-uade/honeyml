@@ -1,6 +1,4 @@
-# =============================================================================
 # Python
-# =============================================================================
 __pycache__/
 *.py[cod]
 *$py.class
@@ -12,8 +10,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-# anchored to the repo root: unanchored these also matched dashboard/src/lib/ and
-# dashboard/dist/, silently dropping the API client and the palette from the commit
+# Anclados a la raíz: sin la barra también coinciden con dashboard/src/lib/ y dashboard/dist/, y
+# dejan afuera del commit el cliente de la API y la paleta del panel sin avisar.
 /lib/
 /lib64/
 /dist/
@@ -27,9 +25,7 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# =============================================================================
 # Entornos virtuales
-# =============================================================================
 .env
 .venv
 env/
@@ -39,9 +35,7 @@ env.bak/
 venv.bak/
 .python-version
 
-# =============================================================================
 # Variables de entorno y secretos
-# =============================================================================
 .env*
 !.env.example
 *.secret
@@ -68,16 +62,12 @@ known_hosts
 ansible-vault-password
 vault_pass.txt
 
-# =============================================================================
-# Docker — datos locales y overrides de entorno
-# =============================================================================
+# Docker: datos locales y overrides de entorno
 docker-compose.override.yml
 docker-compose.local.yml
 .docker/
 
-# =============================================================================
-# DATOS DE HONEYPOTS — CRÍTICO
-# =============================================================================
+# Datos de los honeypots, que nunca van al repositorio
 infra/honeypots/data/
 infra/honeypots/logs/
 infra/honeypots/volumes/
@@ -106,25 +96,19 @@ infra/honeypots/dionaea/log/
 *.exe
 *.elf
 
-# =============================================================================
-# Elastic Stack — datos persistentes
-# =============================================================================
+# Elastic Stack: datos persistentes
 infra/elastic/data/
 infra/elastic/logs/
 infra/elastic/snapshot/
 infra/kibana/data/
 
-# =============================================================================
 # Logs generales
-# =============================================================================
 *.log
 *.log.*
 logs/
 /var/log/
 
-# =============================================================================
 # Testing
-# =============================================================================
 .pytest_cache/
 .coverage
 htmlcov/
@@ -136,17 +120,13 @@ coverage.xml
 junit.xml
 test-results/
 
-# =============================================================================
 # Linters y type checkers
-# =============================================================================
 .mypy_cache/
 .dmypy.json
 dmypy.json
 .ruff_cache/
 
-# =============================================================================
 # IDEs y editores
-# =============================================================================
 .idea/
 .vscode/
 *.swp
@@ -166,14 +146,10 @@ ehthumbs.db
 Thumbs.db
 desktop.ini
 
-# =============================================================================
 # Jupyter Notebooks
-# =============================================================================
 .ipynb_checkpoints/
 
-# =============================================================================
 # Terraform / Infraestructura como Código
-# =============================================================================
 *.tfstate
 *.tfstate.backup
 .terraform/
@@ -181,17 +157,13 @@ desktop.ini
 terraform.tfvars
 *.auto.tfvars
 
-# =============================================================================
 # Archivos de construcción y distribución
-# =============================================================================
 *.tar.gz
 *.zip
 *.tar.bz2
 
-# =============================================================================
 # Modelos de Machine Learning (scikit-learn, PyTorch, HuggingFace, llama.cpp)
 # Los modelos entrenados se distribuyen por otros medios (DVC, S3, HF Hub, etc.)
-# =============================================================================
 # scikit-learn / joblib
 *.pkl
 *.pickle
@@ -221,9 +193,7 @@ model_cache/
 hf_cache/
 .cache/huggingface/
 
-# =============================================================================
 # Bases de datos vectoriales (RAG, búsqueda semántica)
-# =============================================================================
 # ChromaDB
 chroma/
 chromadb/
@@ -235,21 +205,20 @@ lancedb/
 # Qdrant local
 qdrant_storage/
 
-# =============================================================================
-# LangGraph / LangChain — estado persistido y trazas
-# =============================================================================
+# LangGraph y LangChain: estado persistido y trazas
 # LangGraph checkpoints (SQLite local de estado de agentes)
 langgraph.db
 *.langgraph.db
 # LangSmith trazas locales
 langsmith/
 
-# =============================================================================
 # Datasets y datos de entrenamiento
-# =============================================================================
 data/raw/
 data/processed/
 data/external/
+# Lo que `make respaldar-decisiones` trae del servidor. Son decisiones con direcciones, comandos y
+# credenciales de atacantes: se respaldan, pero no se publican.
+data/respaldos/
 *.csv
 *.parquet
 *.arrow
@@ -258,29 +227,21 @@ data/external/
 reports/figures/
 *.jsonl.gz
 
-# =============================================================================
 # Artefactos de CI/CD locales
-# =============================================================================
 .act/
 
-# =============================================================================
 # Referencia a IP del VPS (no exponer en repo público)
-# =============================================================================
 .vps_ip
 .domain
 infra/vps/.env
 
-# =============================================================================
 # Documentación local: notas de trabajo, que no se versionan
-# =============================================================================
 *.md
 docs/
 informe/
 contexto.md
 
-# =============================================================================
 # Frontend (dashboard educativo)
-# =============================================================================
 node_modules/
 dashboard/dist/
 .vite/

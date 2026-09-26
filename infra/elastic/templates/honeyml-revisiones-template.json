@@ -1,0 +1,32 @@
+{
+  "index_patterns": [
+    "honeyml-revisiones"
+  ],
+  "priority": 200,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0
+    },
+    "mappings": {
+      "dynamic": "strict",
+      "properties": {
+        "@timestamp": { "type": "date" },
+        "doc_id": { "type": "keyword" },
+        "veredicto": { "type": "keyword" },
+        "severidad": { "type": "keyword" },
+        "tactica_mitre": { "type": "keyword" },
+        "nota": { "type": "text" },
+        "motor": {
+          "properties": {
+            "severidad": { "type": "keyword" },
+            "tactica_mitre": { "type": "keyword" },
+            "concluyente": { "type": "boolean" },
+            "requiere_revision": { "type": "boolean" },
+            "consultas_fallidas": { "type": "keyword" }
+          }
+        }
+      }
+    }
+  }
+}

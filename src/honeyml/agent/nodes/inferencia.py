@@ -70,11 +70,18 @@ def _tacticas_admitidas() -> str:
 
     Se arma desde `TACTICAS_OBSERVABLES` y no se escribe una segunda copia, por lo mismo que la
     escala de severidad: dos listas de lo mismo se terminan desincronizando.
+
+    Las dos de acceso llevan su criterio escrito. Un ingreso exitoso admite las dos lecturas (entró,
+    pero antes adivinó la clave), y sin una regla la táctica oscilaría entre firmas de la misma
+    conducta. La regla sale del resultado, que el contexto ya trae.
     """
     admitidas = ", ".join(f"'{t}'" for t in TACTICAS_OBSERVABLES)
     return (
         f"Tácticas MITRE admitidas, y solo estas: {admitidas}. Si ninguna describe el evento, el "
         "valor correcto es nulo.\n"
+        "En un evento de autenticación la táctica sale del resultado: con 'success' el atacante "
+        "entró con una credencial que funciona y corresponde 'Acceso inicial'; con cualquier otro "
+        "resultado estaba probando credenciales y corresponde 'Acceso a credenciales'.\n"
         "La lista está en español y es cerrada porque el panel enciende su matriz con esos nombres "
         "exactos. Los nombres canónicos en inglés, como 'Execution' o 'Credential Access', no se "
         "admiten. Las que faltan son las que un señuelo de baja interacción no puede observar."
@@ -125,7 +132,7 @@ def _pedido(estado: EstadoTriaje) -> str:
         # única parte del pedido que sí es una instrucción.
         numerados = "\n".join(f"{i}. {r}" for i, r in enumerate(reproches, start=1))
         partes.append(
-            "TU RESPUESTA ANTERIOR NO SE PUDO USAR. Corregí exactamente esto y volvé a "
+            "Tu respuesta anterior no se pudo usar. Corregí exactamente esto y volvé a "
             f"responder:\n{numerados}"
         )
 

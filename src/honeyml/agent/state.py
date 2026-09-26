@@ -25,6 +25,11 @@ from .severidad import Severidad, dentro_de_limites
 # arreglar, y cada intento es una llamada paga.
 MAX_INTENTOS = 3
 
+# Cómo anotan los nodos de contexto e historial una consulta que falló: `historial_falló`, con el
+# mensaje del error como valor. Persistencia lo busca por este sufijo para marcar la decisión para
+# revisión, así que los tres lo toman de acá.
+SUFIJO_DE_FALLA = "_falló"
+
 
 class Decision(BaseModel):
     """La respuesta del motor sobre un evento. Es el envoltorio, todavía no el vocabulario.

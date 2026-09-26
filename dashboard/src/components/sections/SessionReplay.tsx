@@ -9,6 +9,8 @@ const TACTIC_COLOR: Record<string, string> = {
   Ejecución: 'var(--agent-coral)',
   Persistencia: 'var(--neural-teal)',
   'Evasión de defensas': '#a78bfa',
+  'Acceso a credenciales': '#60a5fa',
+  'Acceso inicial': '#f472b6',
 };
 
 export function tacticColor(tactic: string): string {
@@ -16,9 +18,9 @@ export function tacticColor(tactic: string): string {
 }
 
 const SPEEDS = [
-  { label: '0,5×', ms: 4400 },
-  { label: '1×', ms: 2200 },
-  { label: '2×', ms: 1100 },
+  { label: '0,5x', ms: 4400 },
+  { label: '1x', ms: 2200 },
+  { label: '2x', ms: 1100 },
 ];
 
 /**
@@ -117,7 +119,7 @@ export default function SessionReplay({ replays }: { replays: Replay[] }) {
           <div className="flex items-center gap-2 text-[11px] text-white/60">
             <Terminal className="w-3.5 h-3.5" />
             <span className="font-data">
-              {replay.attacker}@honeypot · {replay.protocol}
+              {replay.attacker}@honeypot ({replay.protocol})
             </span>
           </div>
           <div className="flex items-center gap-2">

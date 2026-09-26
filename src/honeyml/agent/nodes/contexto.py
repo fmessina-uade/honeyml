@@ -23,7 +23,7 @@ from typing import Any
 from urllib.error import URLError
 
 from .. import tools
-from ..state import Contexto, EstadoTriaje
+from ..state import SUFIJO_DE_FALLA, Contexto, EstadoTriaje
 
 # Fallos de transporte: el índice no está. Se distinguen de "la consulta no encontró nada", que es
 # un resultado y no un fallo.
@@ -42,7 +42,7 @@ def _intentar(nombre: str, hallazgos: dict[str, Any], fn: Any, *args: Any) -> An
     except SIN_INDICE:
         raise
     except Exception as exc:  # noqa: BLE001 - ver el docstring
-        hallazgos[f"{nombre}_falló"] = f"{type(exc).__name__}: {exc}"
+        hallazgos[f"{nombre}{SUFIJO_DE_FALLA}"] = f"{type(exc).__name__}: {exc}"
         return None
 
 

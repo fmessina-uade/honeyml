@@ -77,7 +77,7 @@ def _decision(**kw: Any) -> Decision:
 def _estado(**kw: Any) -> Any:
     base: dict[str, Any] = {
         "evento": _evento(),
-        "contexto": Contexto(doc_id="abc123", resumen="cowrie/process 203.0.113.7 ssh · uname -a"),
+        "contexto": Contexto(doc_id="abc123", resumen="cowrie/process 203.0.113.7 ssh: uname -a"),
         "decision": _decision(),
         "intentos": 1,
         "rechazos": 0,
@@ -94,7 +94,7 @@ def _estado(**kw: Any) -> Any:
     return base
 
 
-# ---- el camino que funciona --------------------------------------------------------------------
+# El camino que funciona
 
 
 def test_guarda_bajo_el_doc_id_del_evento() -> None:
@@ -151,7 +151,7 @@ def test_la_marca_temporal_de_la_decision_no_es_la_del_evento() -> None:
     assert doc["@timestamp"] > "2026-08-20"
 
 
-# ---- `concluyente` lo escribe el motor ----------------------------------------------------------
+# `concluyente` lo escribe el motor
 
 
 def test_una_decision_valida_queda_concluyente() -> None:
@@ -164,9 +164,9 @@ def test_una_decision_valida_queda_concluyente() -> None:
 def test_el_modelo_ni_siquiera_puede_opinar_sobre_concluyente() -> None:
     """El campo describe cómo terminó el ciclo, y eso el modelo no lo puede saber.
 
-    Se le pedía y después se le descartaba el valor. Ahora no está en el esquema, así que si lo
-    manda igual, `extra="forbid"` lo rechaza como cualquier campo inventado. Es más fuerte que
-    sobrescribirlo: el modelo no llega a formarse una opinión que después haya que ignorar.
+    No está en el esquema, así que si lo manda igual, `extra="forbid"` lo rechaza como cualquier
+    campo inventado. Es más fuerte que pedírselo y sobrescribirlo: el modelo no llega a formarse
+    una opinión que después haya que ignorar.
     """
     assert "concluyente" not in Decision.model_fields
 
@@ -182,7 +182,7 @@ def test_el_modelo_no_puede_declararse_concluyente_si_el_ciclo_fallo() -> None:
     assert doc["ciclo"]["motivo_de_corte"] == "esquema_invalido"
 
 
-# ---- los caminos que no produjeron decisión -----------------------------------------------------
+# Los caminos que no produjeron decisión
 
 
 def test_un_evento_sin_decision_igual_queda_registrado() -> None:
@@ -193,6 +193,31 @@ def test_un_evento_sin_decision_igual_queda_registrado() -> None:
     _, doc = almacen.escrituras[0]
     assert doc["ciclo"]["motivo_de_corte"] == "sin_contexto"
     assert "severidad" not in doc["decision"]
+
+
+def test_las_consultas_fallidas_quedan_y_mandan_a_revision() -> None:
+    """Una decisión tomada sin parte del contexto la termina de decidir quien opera el panel."""
+    contexto = Contexto(
+        doc_id="abc123",
+        resumen="x",
+        hallazgos={"historial_falló": "KeyError: 'aggregations'", "sesion_falló": "timeout"},
+    )
+    doc = nodo.documento(_estado(contexto=contexto))
+
+    assert doc["ciclo"]["consultas_fallidas"] == ["historial", "sesion"]
+    assert doc["ciclo"]["requiere_revision"] is True
+    assert doc["decision"]["concluyente"] is True  # concluyó, pero con el contexto incompleto
+
+
+def test_una_decision_completa_no_va_a_revision() -> None:
+    doc = nodo.documento(_estado())
+    assert doc["ciclo"]["consultas_fallidas"] == []
+    assert doc["ciclo"]["requiere_revision"] is False
+
+
+def test_un_ciclo_que_no_concluye_va_a_revision() -> None:
+    doc = nodo.documento(_estado(decision=None, motivo_de_corte="esquema_invalido"))
+    assert doc["ciclo"]["requiere_revision"] is True
 
 
 def test_sin_decision_igual_se_guardan_los_limites() -> None:
@@ -220,7 +245,7 @@ def test_los_reproches_tienen_tope() -> None:
     assert len(doc["ciclo"]["reproches"]) == nodo.MAX_REPROCHES_GUARDADOS
 
 
-# ---- cuando el almacén no está ------------------------------------------------------------------
+# Cuando el almacén no está
 
 
 def test_si_el_almacen_no_responde_el_nodo_levanta() -> None:
@@ -237,7 +262,7 @@ def test_sin_evento_no_escribe_nada() -> None:
     assert almacen.escrituras == []
 
 
-# ---- el documento contra el mapeo estricto -------------------------------------------------------
+# El documento contra el mapeo estricto
 
 
 def _campos(objeto: Any, prefijo: str = "") -> set[str]:
@@ -293,7 +318,7 @@ def test_la_plantilla_es_estricta_y_de_un_solo_indice() -> None:
     assert plantilla["index_patterns"] == ["honeyml-decisiones"]
 
 
-# ---- el almacén: qué reintenta y qué no ----------------------------------------------------------
+# El almacén: qué reintenta y qué no
 
 
 class _Transporte:

@@ -1,14 +1,11 @@
 """El grafo de triaje: qué nodos hay, en qué orden corren y dónde el ciclo puede volver atrás.
 
-    memoria -> contexto -> historial -> inferencia -> validación --(válida)--> persistencia -> fin
-       |          |                        ^             |                         ^
-       |          |                        +--(reproche)-+   hasta MAX_INTENTOS    |
-       |          +--(sin dirección de origen, nada que correlacionar)-------------+
-       +--(esta conducta ya se decidió antes)--------------------------------------+
-
-Es una máquina de estados y no una cadena por dos aristas: la validación puede devolverle la
-respuesta al nodo de inferencia con el error adjunto, y hay dos atajos que saltan a persistencia sin
-pasar por el proveedor. Todo lo demás es una línea recta.
+El orden es memoria, contexto, historial, inferencia, validación y persistencia. Es una máquina de
+estados y no una cadena por dos aristas: la validación puede devolverle la respuesta al nodo de
+inferencia con el error adjunto, hasta MAX_INTENTOS veces, y hay dos atajos que saltan a
+persistencia sin pasar por el proveedor. Memoria salta cuando esa misma conducta ya se decidió, y
+contexto cuando el evento no trae dirección de origen y no hay nada que correlacionar. Todo lo demás
+es una línea recta.
 
 Los dos atajos se parecen y no son lo mismo. El de contexto corta porque no hay nada sobre lo que
 razonar y guarda una decisión no concluyente. El de memoria corta porque ya se razonó sobre esta
@@ -16,7 +13,7 @@ misma conducta y guarda una decisión concluyente, copiada y declarada como tal.
 
 La parte que más cuesta ver leyendo el código es que hay dos formas de fallar y terminan distinto.
 Si el proveedor contestó pero nunca con la forma pedida, después de MAX_INTENTOS se persiste una
-decisión no concluyente y el evento queda cerrado: el proveedor está vivo y reintentar mañana no le
+decisión no concluyente y el evento queda cerrado: el proveedor está vivo y reintentar después no le
 va a cambiar la gramática. Si en cambio no se lo pudo alcanzar, el nodo levanta, la excepción sale
 del grafo y el consumidor no confirma, así que otro lo reclama más tarde y no se persiste nada.
 Confundirlas es fácil, pero una caída es temporal y un modelo que no puede seguir un esquema no.
@@ -53,7 +50,7 @@ PERSISTENCIA = "persistencia"
 RESPONSABILIDAD: dict[str, str] = {
     MEMORIA: "calcula la firma de conducta y trae la decisión si esa firma ya se resolvió",
     CONTEXTO: "arma el contexto del evento a partir de las consultas de solo lectura",
-    HISTORIAL: "agrega la trayectoria de la dirección y la correlación de ráfaga",
+    HISTORIAL: "agrega la trayectoria de la dirección, la ráfaga y los precedentes del motor",
     INFERENCIA: "le pide al servicio de inferencia una decisión sobre el contexto",
     VALIDACION: "verifica el esquema y los límites, y redacta el reproche cuando no cumple",
     PERSISTENCIA: "guarda la decisión de forma durable",
@@ -85,7 +82,7 @@ def _pendiente(nombre: str) -> Nodo:
 
 
 def nodos_disponibles() -> dict[str, Nodo]:
-    """Las implementaciones que existen hoy. El resto vuelve como marcador."""
+    """La implementación de cada nodo. Uno que falte vuelve como marcador."""
     reales: dict[str, Nodo] = {
         MEMORIA: nodo_memoria.recordar,
         CONTEXTO: nodo_contexto.construir,
@@ -203,17 +200,14 @@ def describir() -> str:
     """La topología en texto, con el estado de cada nodo. Es lo que imprime `make grafo`."""
     disponibles = nodos_disponibles()
     lineas = ["Grafo de triaje", ""]
-    for i, nombre in enumerate(ORDEN):
+    for nombre in ORDEN:
         listo = not disponibles[nombre].__name__.startswith("pendiente_")
-        marca = "✅" if listo else "⏳"
-        flecha = "   │" if i < len(ORDEN) - 1 else ""
-        lineas.append(f"  {marca} {nombre:<14} {RESPONSABILIDAD[nombre]}")
-        if flecha:
-            lineas.append(flecha)
+        estado = "listo" if listo else "pendiente"
+        lineas.append(f"  {nombre:<14} {estado:<10} {RESPONSABILIDAD[nombre]}")
     lineas += [
         "",
-        f"  validación → inferencia cuando el esquema falla, hasta {MAX_INTENTOS} intentos",
-        "  validación → persistencia cuando la decisión es válida, o cuando se agotaron",
+        f"  De validación vuelve a inferencia si el esquema falla, hasta {MAX_INTENTOS} intentos.",
+        "  De validación pasa a persistencia cuando la decisión es válida, o cuando se agotaron.",
         "",
         "  Un proveedor inalcanzable no toma ninguna de las dos salidas: el nodo levanta, el",
         "  consumidor no confirma y el evento vuelve a quedar pendiente para otro consumidor.",

@@ -30,6 +30,29 @@ export function pct(value: number, total: number, decimals = 1): string {
   });
 }
 
-/** One decimal, active locale. For ratios like "17,5× menos que root". */
+/** Un decimal, en el locale activo. Para razones como "17,5 veces menos que root". */
 export const dec = (v: number, d = 1) =>
   v.toLocaleString(locale, { minimumFractionDigits: d, maximumFractionDigits: d });
+
+/** Día, mes y hora en el locale activo. Vacío si la marca no se puede leer, en lugar de "Invalid
+ *  Date" en pantalla. */
+export function fechaHora(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString(locale, {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    // en es-AR la hora sale con "a. m.", que no entra en una columna angosta
+    hourCycle: 'h23',
+  });
+}
+
+/** Una duración en la unidad que se lee sin hacer cuentas: segundos, minutos u horas. */
+export function duracion(segundos: number): string {
+  if (segundos < 60) return `${dec(segundos, 0)} s`;
+  if (segundos < 3600) return `${dec(segundos / 60)} min`;
+  return `${dec(segundos / 3600)} h`;
+}

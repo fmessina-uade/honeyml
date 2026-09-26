@@ -18,14 +18,15 @@ Son acotadas. Cada consulta tiene tope. Una sesión del corpus corrió 1.400 com
 entera desplazaría al resto del contexto y se paga por token. Los topes son las constantes de abajo.
 
 Y están cortadas en la marca temporal del propio evento. Historial significa lo que se sabía antes
-de este evento, no todo lo que hay en el índice hoy. Sin el corte, el motor juzga un evento temprano
-con evidencia posterior, puntúa mejor de lo que jamás podría en vivo, y la campaña de validación
-adversaria termina midiendo un sistema que no puede existir. El horizonte es parámetro obligatorio
-de toda consulta histórica.
+de este evento, no todo lo que hay en el índice al consultar. Sin el corte, el motor juzga un evento
+temprano con evidencia posterior, puntúa mejor de lo que jamás podría en vivo, y la campaña de
+validación adversaria termina midiendo un sistema que no puede existir. El horizonte es parámetro
+obligatorio de toda consulta histórica.
 """
 
 from __future__ import annotations
 
+import urllib.error
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -33,6 +34,8 @@ from ..api import queries
 from ..education import fingerprints
 from ..education.session_replay import anonymize
 from ..features import arquetipos
+from .adapters.almacen import INDICE as INDICE_DECISIONES
+from .adapters.almacen import NO_EXISTE
 from .consumer import EventoDelBus
 from .severidad import Severidad, maxima, piso_de
 
@@ -63,8 +66,10 @@ def _restar_horas(marca: str, horas: int) -> str:
     return (t - timedelta(hours=horas)).isoformat().replace("+00:00", "Z")
 
 
-def _buscar(body: dict[str, Any], es_url: str = queries.ES_URL) -> dict[str, Any]:
-    return queries._search(body, es_url)
+def _buscar(
+    body: dict[str, Any], es_url: str = queries.ES_URL, index: str = queries.INDEX
+) -> dict[str, Any]:
+    return queries._search(body, es_url, index)
 
 
 def historial_de_direccion(ip: str, hasta: str, es_url: str = queries.ES_URL) -> dict[str, Any]:
@@ -216,8 +221,8 @@ def trayectoria_de_direccion(ip: str, hasta: str, es_url: str = queries.ES_URL) 
 
     `historial_de_direccion` cuenta qué hizo; esto dice hasta dónde llegó. Es la diferencia sobre la
     que está construida la escala de severidad: una dirección con nueve mil eventos previos que
-    nunca pasó de una pantalla de credenciales es otra cosa que una que ejecutó comandos el martes
-    pasado, y el conteo crudo no las distingue.
+    nunca pasó de una pantalla de credenciales es otra cosa que una que ejecutó comandos hace unos
+    días, y el conteo crudo no las distingue.
 
     Devuelve los pares (categoría, resultado) que produjo antes del horizonte, cada uno pasado por
     la misma regla de piso con la que se juzga al motor, así que "ya alcanzó ALTO" significa lo
@@ -326,6 +331,64 @@ def rafaga_en_la_ventana(
             "direcciones": int(agg["por_comando"]["direcciones"]["value"]),
         }
     return salida
+
+
+def precedentes_de_direccion(ip: str, hasta: str, es_url: str = queries.ES_URL) -> dict[str, Any]:
+    """Qué había decidido ya el motor sobre esta dirección, antes de este evento.
+
+    La trayectoria dice hasta dónde llegó la dirección según la telemetría; esto dice cómo la juzgó
+    el propio motor. No son lo mismo, porque al almacén solo llega lo que pasa por el bus: una
+    dirección puede tener miles de intentos en la telemetría y ninguna decisión, y eso quiere decir
+    que es la primera vez que hace algo que valga triar.
+
+    El corte es por el momento del evento y no por cuándo se decidió, por lo mismo que el resto del
+    módulo: un evento que se tría tarde no puede ver las decisiones de los que ocurrieron después.
+
+    Un índice que todavía no existe es una instalación sin decisiones, no una falla. Cualquier otra
+    respuesta de error sale como `RuntimeError` y no como `HTTPError`, que hereda de `URLError`: el
+    nodo tomaría un problema de este índice por Elasticsearch caído y cortaría el ciclo, cuando lo
+    que corresponde es anotar la consulta como fallida y seguir.
+    """
+    if not ip or not hasta:
+        return {"decisiones": 0}
+
+    body = {
+        "size": 0,
+        "track_total_hits": True,
+        "query": {
+            "bool": {
+                "filter": [
+                    {"term": {"evento.origen": ip}},
+                    {"range": {"evento.momento": {"lt": hasta}}},
+                ]
+            }
+        },
+        "aggs": {
+            "niveles": {"terms": {"field": "decision.severidad", "size": 8}},
+            "tacticas": {"terms": {"field": "decision.tactica_mitre", "size": 10}},
+            "ultima": {"max": {"field": "evento.momento"}},
+        },
+    }
+    try:
+        r = _buscar(body, es_url, index=INDICE_DECISIONES)
+    except urllib.error.HTTPError as exc:
+        if exc.code == NO_EXISTE:
+            return {"decisiones": 0}
+        raise RuntimeError(f"el almacén de decisiones respondió {exc.code}") from exc
+
+    total = r["hits"]["total"]["value"]
+    if total == 0:
+        return {"decisiones": 0}
+
+    por_nivel = {b["key"]: b["doc_count"] for b in r["aggregations"]["niveles"]["buckets"]}
+    tope = maxima([Severidad(nivel) for nivel in por_nivel])
+    return {
+        "decisiones": total,
+        "maximo_decidido": tope.value if tope else None,
+        "por_nivel": por_nivel,
+        "tacticas": {b["key"]: b["doc_count"] for b in r["aggregations"]["tacticas"]["buckets"]},
+        "ultima": r["aggregations"]["ultima"].get("value_as_string"),
+    }
 
 
 def arquetipos_del_corpus() -> dict[str, Any] | None:

@@ -39,7 +39,7 @@ from .graph import INFERENCIA, MEMORIA, PERSISTENCIA, construir_grafo, ejecutar
 from .nodes import inferencia as nodo_inferencia
 from .nodes import memoria as nodo_memoria
 from .nodes import persistencia as nodo_persistencia
-from .state import EstadoTriaje, estado_inicial, resultado_del_ciclo
+from .state import SUFIJO_DE_FALLA, EstadoTriaje, estado_inicial, resultado_del_ciclo
 
 # Tamaño de atraso a partir del cual el motor se niega a arrancar sin que se lo pidan explícito.
 #
@@ -151,9 +151,20 @@ def _linea(evento: bus.EventoDelBus, final: EstadoTriaje) -> str:
     corregido = f" tras {intentos} intentos" if intentos > 1 else ""
     # Una marca distinta para lo copiado: en una corrida larga lo que importa ver de un vistazo es
     # cuántas decisiones se pagaron y cuántas salieron del repertorio.
-    marca = "=" if final.get("reutilizada_de") else "·"
+    marca = "=" if final.get("reutilizada_de") else "+"
     tactica = decision.tactica_mitre or "sin táctica"
-    return f"  {marca} {decision.severidad.value:<10} {tactica:<22}{corregido} {evento.resumen()}"
+    linea = f"  {marca} {decision.severidad.value:<10} {tactica:<22}{corregido} {evento.resumen()}"
+
+    # El documento guarda qué consulta falló y no por qué. El porqué es para quien depura, y este
+    # registro es el único lugar donde queda.
+    fallidas = nodo_persistencia.consultas_fallidas(final)
+    if not fallidas:
+        return linea
+    hallazgos = final["contexto"].hallazgos
+    detalle = [
+        f"      {nombre} falló: {hallazgos[nombre + SUFIJO_DE_FALLA]}" for nombre in fallidas
+    ]
+    return "\n".join([f"{linea}\n    ! a revisión, decidida sin {', '.join(fallidas)}", *detalle])
 
 
 def manejador(
@@ -242,7 +253,7 @@ def main() -> int:
     try:
         inferencia = AdaptadorDeInferencia()
     except CredencialAusenteError as exc:
-        print(f"✗ {exc}")
+        print(f"  No se puede arrancar: {exc}")
         return 1
 
     repertorio = RepertorioEnRedis() if args.reutilizar else None
