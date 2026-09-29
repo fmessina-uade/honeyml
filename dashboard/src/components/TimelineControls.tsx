@@ -157,7 +157,7 @@ export default function TimelineControls({
             className={fecha}
             aria-label={t.controls.from}
           />
-          <span className="text-white/25 text-[10px]">→</span>
+          <span className="text-white/25 text-[10px]">{t.controls.to.toLowerCase()}</span>
           <input
             type="date"
             value={hasta}
@@ -170,8 +170,8 @@ export default function TimelineControls({
           />
         </div>
 
-        {/* The chart keeps showing the previous data while a new range loads, so without this the
-            controls would look unresponsive on a slow query. */}
+        {/* Mientras llega el rango nuevo el gráfico sigue mostrando el anterior. Sin este aviso,
+            con una consulta lenta los controles parecerían no responder. */}
         {loading && (
           <span className="text-[10px] text-white/35 font-data">{t.controls.loading}</span>
         )}

@@ -8,14 +8,21 @@
 // exactamente uno, lo maneja el proveedor de idioma, y la alternativa es una prop en cada número
 // del panel.
 
-let locale: 'es-AR' | 'en-GB' = 'es-AR';
+let locale: 'es-AR' | 'en-US' = 'es-AR';
 
 /** La llama el proveedor de idioma cada vez que el idioma cambia. */
 export function setNumberLocale(lang: 'es' | 'en'): void {
-  locale = lang === 'en' ? 'en-GB' : 'es-AR';
+  locale = lang === 'en' ? 'en-US' : 'es-AR';
 }
 
 export const n = (v: number) => v.toLocaleString(locale);
+
+/** El locale vigente, para las fechas que cada sección arma con su propio formato. */
+export const localeActual = () => locale;
+
+/** Cifra abreviada para los ejes: "10 mil" en español, "10K" en inglés. */
+export const compacto = (v: number) =>
+  new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 }).format(v);
 
 /** Porcentaje en el locale activo. Los valores que redondean a cero muestran "<0,1" y no "0,0". */
 export function pct(value: number, total: number, decimals = 1): string {

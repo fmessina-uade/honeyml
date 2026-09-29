@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertCircle, CheckCircle2, ChevronRight, Copy, Sparkles, X } from 'lucide-react';
+import {
+  AlertCircle,
+  CheckCircle2,
+  ChevronRight,
+  Coins,
+  Copy,
+  Inbox,
+  Sparkles,
+  Timer,
+  Workflow,
+  X,
+} from 'lucide-react';
 import {
   api,
   type DetalleDecision,
@@ -13,6 +24,7 @@ import { dec, duracion, fechaHora, n } from '../../lib/format';
 import { useI18n } from '../../lib/i18n';
 import Reveal from '../Reveal';
 import EngineLive from '../EngineLive';
+import { Indicador } from '../Instrumento';
 import { tacticColor } from './SessionReplay';
 import { OBSERVED } from './MitreMatrix';
 
@@ -35,8 +47,8 @@ const TAMANO = 25;
 
 const FILTROS_INICIALES: FiltrosDecisiones = { estado: 'todas', desde: 0, tamano: TAMANO };
 
-const tarjeta = 'rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-4';
-const rotulo = 'text-[9px] uppercase tracking-wider text-white/35';
+const tarjeta = 'panel p-4';
+const rotulo = 'rotulo';
 
 /**
  * Lo que decidió el motor de triaje, y el lugar donde el analista tiene la última palabra.
@@ -138,73 +150,57 @@ export default function Triage() {
       {/* Los cuatro números del motor */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <Reveal>
-          <div className={`${tarjeta} h-full`}>
-            <div className={rotulo}>{t.triage.decisions}</div>
-            <div className="font-data text-2xl text-white mt-2">{n(resumen.total)}</div>
-            <div className="text-[10px] text-white/45 mt-1.5 leading-relaxed">
-              {n(resumen.razonadas)} {t.triage.reasoned}, {n(resumen.copiadas)} {t.triage.copied}
-            </div>
-          </div>
+          <Indicador
+            icono={Workflow}
+            rotulo={t.triage.decisions}
+            valor={n(resumen.total)}
+            sub={`${n(resumen.razonadas)} ${t.triage.reasoned}, ${n(resumen.copiadas)} ${t.triage.copied}`}
+            color="var(--agent-coral)"
+          />
         </Reveal>
         <Reveal delay={60}>
-          <div className={`${tarjeta} h-full`}>
-            <div className={rotulo}>{t.triage.cost}</div>
-            <div className="font-data text-2xl text-white mt-2">
-              USD {dec(resumen.costo_usd, 2)}
-            </div>
-            <div className="text-[10px] text-white/45 mt-1.5 leading-relaxed">
-              {n(resumen.corregidas_por_el_motor)} {t.triage.correctedByEngine}
-            </div>
-          </div>
+          <Indicador
+            icono={Coins}
+            rotulo={t.triage.cost}
+            valor={`USD ${dec(resumen.costo_usd, 2)}`}
+            sub={`${n(resumen.corregidas_por_el_motor)} ${t.triage.correctedByEngine}`}
+            color="var(--honey-amber)"
+          />
         </Reveal>
         <Reveal delay={120}>
-          <div className={`${tarjeta} h-full`}>
-            <div className={rotulo}>{t.triage.conclusion}</div>
-            {resumen.conclusion.mediana_s !== null ? (
-              <div className="flex items-baseline gap-3 mt-2">
-                <span className="font-data text-2xl text-white">
+          <Indicador
+            icono={Timer}
+            rotulo={t.triage.conclusion}
+            valor={
+              resumen.conclusion.mediana_s !== null ? (
+                <span className="flex items-baseline gap-2.5 flex-wrap">
                   {duracion(resumen.conclusion.mediana_s)}
+                  <span className="prosa text-[10px] text-white/40">{t.triage.median}</span>
+                  {resumen.conclusion.p90_s !== null && (
+                    <span className="text-[11px] tracking-normal text-white/55">
+                      {duracion(resumen.conclusion.p90_s)}{' '}
+                      <span className="prosa text-white/35">{t.triage.p90}</span>
+                    </span>
+                  )}
                 </span>
-                <span className="text-[10px] text-white/40">{t.triage.median}</span>
-                {resumen.conclusion.p90_s !== null && (
-                  <span className="font-data text-[11px] text-white/55">
-                    {duracion(resumen.conclusion.p90_s)}{' '}
-                    <span className="text-white/35">{t.triage.p90}</span>
-                  </span>
-                )}
-              </div>
-            ) : (
-              <div className="text-[13px] text-white/40 mt-2">{t.triage.noData}</div>
-            )}
-            <div className="text-[10px] text-white/45 mt-1.5 leading-relaxed">
-              {t.triage.conclusionNote(resumen.conclusion.ventana_dias)}
-            </div>
-          </div>
+              ) : (
+                <span className="prosa text-[13px] text-white/40">{t.triage.noData}</span>
+              )
+            }
+            sub={t.triage.conclusionNote(resumen.conclusion.ventana_dias)}
+            color="var(--neural-teal)"
+          />
         </Reveal>
         <Reveal delay={180}>
-          <button
+          <Indicador
+            icono={Inbox}
+            rotulo={t.triage.pending}
+            valor={n(resumen.revision.pendientes)}
+            sub={`${t.triage.pendingNote(n(resumen.revision.requieren))}, ${n(resumen.revision.revisadas)} ${t.triage.reviewed.toLowerCase()}`}
+            color={resumen.revision.pendientes ? 'var(--agent-coral)' : 'var(--ghost-slate)'}
+            resaltado={resumen.revision.pendientes > 0}
             onClick={() => filtrar({ estado: 'pendientes' })}
-            className={`${tarjeta} h-full w-full text-left transition hover:bg-white/[0.05]`}
-            style={
-              resumen.revision.pendientes
-                ? { boxShadow: 'inset 0 0 0 1px rgba(255,107,53,0.35)' }
-                : undefined
-            }
-          >
-            <div className={rotulo}>{t.triage.pending}</div>
-            <div
-              className="font-data text-2xl mt-2"
-              style={{
-                color: resumen.revision.pendientes ? 'var(--agent-coral)' : 'white',
-              }}
-            >
-              {n(resumen.revision.pendientes)}
-            </div>
-            <div className="text-[10px] text-white/45 mt-1.5 leading-relaxed">
-              {t.triage.pendingNote(n(resumen.revision.requieren))}, {n(resumen.revision.revisadas)}{' '}
-              {t.triage.reviewed.toLowerCase()}
-            </div>
-          </button>
+          />
         </Reveal>
       </div>
 
@@ -212,7 +208,7 @@ export default function Triage() {
       <div className="grid md:grid-cols-2 gap-3">
         <Reveal delay={80}>
           <div className={`${tarjeta} h-full`}>
-            <div className="flex items-baseline justify-between">
+            <div className="flex items-baseline justify-between gap-3 flex-wrap">
               <span className={rotulo}>{t.triage.bySeverity}</span>
               <span className="text-[9px] text-white/25">{t.triage.filterHint}</span>
             </div>
@@ -340,7 +336,7 @@ function Barra({
         activa ? 'bg-white/[0.06]' : 'hover:bg-white/[0.03]'
       }`}
     >
-      <span className="w-40 shrink-0 truncate text-[11px] text-white/65 first-letter:uppercase">
+      <span className="w-28 sm:w-40 shrink-0 truncate text-[11px] text-white/65 first-letter:uppercase">
         {etiqueta}
       </span>
       <span className="flex-1 h-1.5 rounded bg-white/5 overflow-hidden">
@@ -349,7 +345,9 @@ function Barra({
           style={{ width: `${(valor / maximo) * 100}%`, background: color }}
         />
       </span>
-      <span className="font-data text-[10px] text-white/45 w-16 text-right">{n(valor)}</span>
+      <span className="font-data text-[10px] text-white/45 w-14 sm:w-16 text-right">
+        {n(valor)}
+      </span>
     </button>
   );
 }
@@ -431,12 +429,13 @@ function Listado({
   const hasta = Math.min(desde + filtros.tamano, listado.total);
 
   return (
-    <div className="rounded-xl ring-1 ring-white/5 bg-white/[0.03] overflow-hidden">
-      <div className="grid grid-cols-[88px_minmax(0,1fr)_auto] gap-3 px-3 py-2 border-b border-white/5 text-[9px] uppercase tracking-wider text-white/30">
-        <span>{t.triage.when}</span>
+    <div className="panel overflow-hidden min-w-0">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[88px_minmax(0,1fr)_auto] gap-3 px-3 py-2 border-b border-white/5 rotulo">
+        <span className="hidden sm:block">{t.triage.when}</span>
         <span>{t.triage.event}</span>
         <span>
-          {t.triage.severity} / {t.triage.tactic}
+          {t.triage.severity}
+          <span className="hidden sm:inline"> / {t.triage.tactic}</span>
         </span>
       </div>
       {listado.items.length === 0 && (
@@ -452,7 +451,7 @@ function Listado({
         />
       ))}
       {listado.total > 0 && (
-        <div className="flex items-center justify-between px-3 py-2 border-t border-white/5 text-[10px] text-white/40">
+        <div className="flex items-center justify-between gap-2 flex-wrap px-3 py-2 border-t border-white/5 text-[10px] text-white/40">
           <span className="font-data">
             {t.triage.page(n(desde + 1), n(hasta), n(listado.total))}
           </span>
@@ -494,14 +493,17 @@ function Fila({
   return (
     <button
       onClick={onClick}
-      className={`w-full grid grid-cols-[88px_minmax(0,1fr)_auto] gap-3 items-center px-3 py-2 text-left border-b border-white/[0.03] transition ${
+      className={`w-full grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[88px_minmax(0,1fr)_auto] gap-3 items-center px-3 py-2 text-left border-b border-white/[0.03] transition ${
         activa ? 'bg-white/[0.06]' : 'hover:bg-white/[0.03]'
       }`}
     >
-      <span className="font-data text-[10px] text-white/40">{fechaHora(d.momento)}</span>
+      <span className="hidden sm:block font-data text-[10px] text-white/40">
+        {fechaHora(d.momento)}
+      </span>
       <span className="min-w-0">
         <span className="block truncate text-[11px] text-white/75 font-data">{d.resumen}</span>
-        <span className="flex items-center gap-1.5 text-[9px] text-white/30 mt-0.5">
+        <span className="flex items-center gap-1.5 flex-wrap text-[9px] text-white/30 mt-0.5">
+          <span className="sm:hidden font-data">{fechaHora(d.momento)}</span>
           {d.copiada ? (
             <Copy className="w-2.5 h-2.5" aria-label={t.triage.copiedMark} />
           ) : (
@@ -528,7 +530,7 @@ function Fila({
       <span className="flex items-center gap-2 justify-end">
         <ChipSeveridad severidad={d.severidad} />
         <span
-          className="text-[10px] w-32 truncate text-right"
+          className="hidden sm:block text-[10px] w-32 truncate text-right"
           style={{
             color: d.tactica_mitre ? tacticColor(d.tactica_mitre) : 'rgba(255,255,255,0.3)',
           }}

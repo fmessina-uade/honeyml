@@ -92,9 +92,9 @@ export default function WeekHeatmap({ data }: { data: WeeklyRhythm }) {
   ];
 
   return (
-    <div className="rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-4">
+    <div className="panel p-4">
       <div className="flex items-baseline justify-between mb-3 flex-wrap gap-2">
-        <span className="text-[9px] uppercase tracking-wider text-white/35">{t.week.title}</span>
+        <span className="rotulo">{t.week.title}</span>
         <span className="text-[10px] text-white/30">{t.week.utc}</span>
       </div>
 
@@ -124,7 +124,7 @@ export default function WeekHeatmap({ data }: { data: WeeklyRhythm }) {
                       e,
                       <div className="min-w-[150px]">
                         <div className="text-[11px] text-white/90">
-                          {t.week.daysLong[d]} · {String(h).padStart(2, '0')}:00
+                          {t.week.daysLong[d]}, {String(h).padStart(2, '0')}:00
                         </div>
                         <div className="font-data text-[15px] text-white mt-0.5">
                           {n(Math.round(v))}
@@ -144,13 +144,11 @@ export default function WeekHeatmap({ data }: { data: WeeklyRhythm }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 mt-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-4">
         {resumen.map((r) => (
           <div key={r.label} className="rounded-lg bg-white/[0.03] p-2.5">
-            <div className="font-data text-[15px] text-white/90">{n(Math.round(r.value))}</div>
-            <div className="text-[9px] uppercase tracking-wider text-white/35 mt-0.5">
-              {r.label}
-            </div>
+            <div className="cifra-chica">{n(Math.round(r.value))}</div>
+            <div className="rotulo mt-0.5">{r.label}</div>
             {r.ratio !== null && (
               <div
                 className="text-[10px] mt-1"

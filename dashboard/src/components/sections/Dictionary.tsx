@@ -1,11 +1,13 @@
+import { KeyRound, UserRound } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import type { Bucket } from '../../lib/api';
 import Reveal from '../Reveal';
 import Tooltip, { useTooltip } from '../Tooltip';
 import { useI18n } from '../../lib/i18n';
 import PasswordCheck from '../PasswordCheck';
+import ManoAlzada from '../ManoAlzada';
+import { Hexagono } from '../Instrumento';
 import { n, pct, dec } from '../../lib/format';
-
-
 
 // Por qué los atacantes van a buscar justamente estas credenciales. Es la capa que convierte un
 // ranking en una lección: el lector se va sabiendo qué cambiar en su propia máquina.
@@ -36,7 +38,7 @@ const PASS_NOTES: Record<string, string> = {
 const USER_NOTES_EN: Record<string, string> = {
   root: 'It exists on practically every Linux install, and it is the only account with full control. That is why it concentrates most attempts: there is no username to guess.',
   admin: 'The default name on routers, cameras and web panels. Tried as soon as root fails.',
-  user: 'A generic account common in unpersonalised system images.',
+  user: 'A generic account common in unpersonalized system images.',
   ubuntu: 'The account Ubuntu cloud images create by default.',
   test: 'A test account someone created for something specific and forgot about. A classic.',
   postgres: 'The database service account. It gives direct access to the data.',
@@ -57,6 +59,9 @@ const PASS_NOTES_EN: Record<string, string> = {
   '': 'An empty password: the device was never configured.',
 };
 
+// Cuántos puestos del ranking se muestran con su explicación.
+const PUESTOS = 8;
+
 function Panel({
   title,
   hint,
@@ -64,6 +69,7 @@ function Panel({
   notes,
   accent,
   unit,
+  icono: Icono,
 }: {
   title: string;
   hint: string;
@@ -71,20 +77,75 @@ function Panel({
   notes: Record<string, string>;
   accent: string;
   unit: string;
+  icono: LucideIcon;
 }) {
   const { t } = useI18n();
   const tip = useTooltip();
   const max = Math.max(...buckets.map((b) => b.count), 1);
   // la proporción se calcula sobre el ranking entero, así se ve la concentración y no solo el orden
   const total = buckets.reduce((a, b) => a + b.count, 0);
+  const primero = buckets[0];
+  const anchoPrimero = primero && total ? (primero.count / total) * 100 : 0;
 
   return (
-    <div className="rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-4 h-full">
+    <div className="panel overflow-hidden p-4 h-full">
       <Tooltip content={tip.content} at={tip.at} />
-      <div className="text-[9px] uppercase tracking-wider text-white/35">{title}</div>
-      <div className="text-[11px] text-white/45 mt-1 mb-3 leading-relaxed">{hint}</div>
+      <span
+        className="absolute inset-x-0 top-0 h-px"
+        style={{ background: `linear-gradient(90deg, transparent, ${accent}, transparent)` }}
+      />
+      <div className="flex items-center gap-2.5">
+        <Hexagono color={accent}>
+          <Icono className="w-3.5 h-3.5" />
+        </Hexagono>
+        <span className="rotulo">{title}</span>
+      </div>
+      <div className="text-[11px] text-white/45 mt-2 leading-relaxed">{hint}</div>
+
+      {/* La concentración de un vistazo: el ranking entero como una sola tira, cada tramo del
+          ancho de su parte. Lo que se anota es cuánto se lleva el primero solo. */}
+      {primero && (
+        <div className="relative pt-8 mt-1 mb-4">
+          <div className="flex h-3 rounded-sm overflow-hidden ring-1 ring-white/5">
+            {buckets.map((b, i) => (
+              <div
+                key={b.key}
+                className="h-full"
+                style={{
+                  width: `${(b.count / total) * 100}%`,
+                  background: `color-mix(in srgb, ${accent} ${Math.max(85 - i * 9, 12)}%, transparent)`,
+                  borderRight: '1px solid rgba(13,17,23,0.7)',
+                }}
+              />
+            ))}
+          </div>
+          <ManoAlzada
+            trazos={[
+              {
+                tipo: 'elipse',
+                x: anchoPrimero / 2,
+                y: 85,
+                ancho: anchoPrimero + 5,
+                alto: 70,
+              },
+            ]}
+            notas={[
+              {
+                x: 1,
+                y: -6,
+                texto: t.dictionary.noteTop(
+                  primero.key || t.dictionary.empty,
+                  pct(primero.count, total, 0),
+                ),
+                ancho: 300,
+              },
+            ]}
+          />
+        </div>
+      )}
+
       <div className="bar-group flex flex-col gap-2.5">
-        {buckets.slice(0, 8).map((b, i) => (
+        {buckets.slice(0, PUESTOS).map((b, i) => (
           <div
             key={b.key}
             className="bar-item transition-opacity duration-200 cursor-default"
@@ -92,11 +153,15 @@ function Panel({
               tip.show(
                 e,
                 <div className="min-w-[150px]">
-                  <div className="font-data text-[12px] text-white/90">{b.key || t.dictionary.empty}</div>
-                  <div className="font-data text-[15px] text-white mt-0.5">{n(b.count)}</div>
+                  <div className="font-data text-[12px] text-white/90">
+                    {b.key || t.dictionary.empty}
+                  </div>
+                  <div className="cifra-chica text-white mt-0.5">{n(b.count)}</div>
                   <div className="text-[10px] text-white/45 mt-0.5">{unit}</div>
                   <div className="flex items-center justify-between gap-4 text-[10px] text-white/40 mt-1.5 pt-1.5 border-t border-white/8">
-                    <span>{pct(b.count, total)}% {t.dictionary.ofTop}</span>
+                    <span>
+                      {pct(b.count, total)}% {t.dictionary.ofTop}
+                    </span>
                     <span className="font-data">#{i + 1}</span>
                   </div>
                   {i > 0 && (
@@ -109,11 +174,16 @@ function Panel({
             }
             onMouseLeave={tip.hide}
           >
-            <div className="flex items-baseline justify-between">
-              <span className="font-data text-[12px] text-white/85">{b.key || t.dictionary.empty}</span>
-              <span className="font-data text-[10px] text-white/40">{n(b.count)}</span>
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="flex items-baseline gap-2 min-w-0">
+                <span className="font-data text-[9px] text-white/25 w-4 shrink-0">{i + 1}</span>
+                <span className="font-data text-[12px] text-white/85 truncate">
+                  {b.key || t.dictionary.empty}
+                </span>
+              </span>
+              <span className="font-data text-[10px] text-white/40 shrink-0">{n(b.count)}</span>
             </div>
-            <div className="h-1 rounded bg-white/5 mt-1 overflow-hidden">
+            <div className="h-1 rounded bg-white/5 mt-1 ml-6 overflow-hidden">
               <div
                 className="h-1 rounded transition-all duration-700"
                 style={{
@@ -124,7 +194,9 @@ function Panel({
               />
             </div>
             {notes[b.key] && (
-              <div className="text-[10px] text-white/45 mt-1.5 leading-relaxed">{notes[b.key]}</div>
+              <div className="text-[10px] text-white/45 mt-1.5 ml-6 leading-relaxed">
+                {notes[b.key]}
+              </div>
             )}
           </div>
         ))}
@@ -134,13 +206,7 @@ function Panel({
 }
 
 /** Credenciales y comandos, cada uno con el motivo detrás. */
-export default function Dictionary({
-  users,
-  passwords,
-}: {
-  users: Bucket[];
-  passwords: Bucket[];
-}) {
+export default function Dictionary({ users, passwords }: { users: Bucket[]; passwords: Bucket[] }) {
   const { t, lang } = useI18n();
   return (
     <section className="flex flex-col gap-4">
@@ -149,26 +215,28 @@ export default function Dictionary({
       </Reveal>
 
       <div className="grid md:grid-cols-2 gap-4">
-      <Reveal>
-        <Panel
-        title={t.dictionary.usersTitle}
-        hint={t.dictionary.usersHint}
-          buckets={users}
-          notes={lang === "en" ? USER_NOTES_EN : USER_NOTES}
-          accent="var(--honey-amber)"
-          unit={t.dictionary.unitUsers}
-        />
-      </Reveal>
-      <Reveal delay={120}>
-        <Panel
-        title={t.dictionary.passTitle}
-        hint={t.dictionary.passHint}
-          buckets={passwords}
-          notes={lang === "en" ? PASS_NOTES_EN : PASS_NOTES}
-          accent="var(--agent-coral)"
-          unit={t.dictionary.unitPass}
-        />
-      </Reveal>
+        <Reveal>
+          <Panel
+            title={t.dictionary.usersTitle}
+            hint={t.dictionary.usersHint}
+            buckets={users}
+            notes={lang === 'en' ? USER_NOTES_EN : USER_NOTES}
+            accent="var(--honey-amber)"
+            unit={t.dictionary.unitUsers}
+            icono={UserRound}
+          />
+        </Reveal>
+        <Reveal delay={120}>
+          <Panel
+            title={t.dictionary.passTitle}
+            hint={t.dictionary.passHint}
+            buckets={passwords}
+            notes={lang === 'en' ? PASS_NOTES_EN : PASS_NOTES}
+            accent="var(--agent-coral)"
+            unit={t.dictionary.unitPass}
+            icono={KeyRound}
+          />
+        </Reveal>
       </div>
     </section>
   );

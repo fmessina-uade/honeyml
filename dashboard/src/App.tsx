@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Radar,
   Terminal,
@@ -23,6 +23,7 @@ import {
 } from './lib/api';
 import { useI18n } from './lib/i18n';
 import LangToggle from './components/LangToggle';
+import Descifrado from './components/Descifrado';
 import Pulse from './components/sections/Pulse';
 import SessionReplay from './components/sections/SessionReplay';
 import Dictionary from './components/sections/Dictionary';
@@ -51,6 +52,11 @@ const SECTIONS = [
 
 type SectionId = (typeof SECTIONS)[number]['id'];
 
+function SinDatos() {
+  const { t } = useI18n();
+  return <div className="panel p-8 text-center text-[13px] text-white/50">{t.error.title}</div>;
+}
+
 export default function App() {
   const { t } = useI18n();
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
@@ -62,6 +68,8 @@ export default function App() {
   const [archetypes, setArchetypes] = useState<ArchetypeData | null>(null);
   // el modo captura congela todas las animaciones, así las capturas de pantalla se repiten igual
   const [capture, setCapture] = useState(false);
+  const principal = useRef<HTMLElement>(null);
+  const navAngosta = useRef<HTMLElement>(null);
 
   useEffect(() => {
     Promise.all([api.snapshot(), api.replays()])
@@ -91,32 +99,117 @@ export default function App() {
     document.documentElement.dataset.capture = capture ? 'on' : 'off';
   }, [capture]);
 
+  // Un único oyente para el filo de todas las tarjetas: cada una sabe dónde está el puntero por
+  // dos variables de CSS, sin un manejador por tarjeta.
+  useEffect(() => {
+    const mover = (e: PointerEvent) => {
+      const tarjeta = (e.target as Element | null)?.closest?.('.panel') as HTMLElement | null;
+      if (!tarjeta) return;
+      const r = tarjeta.getBoundingClientRect();
+      tarjeta.style.setProperty('--mx', `${e.clientX - r.left}px`);
+      tarjeta.style.setProperty('--my', `${e.clientY - r.top}px`);
+    };
+    document.addEventListener('pointermove', mover, { passive: true });
+    return () => document.removeEventListener('pointermove', mover);
+  }, []);
+
+  // Al cambiar de sección se vuelve arriba: si no, en el teléfono la sección nueva abre por la
+  // mitad, a la altura donde había quedado la anterior. En la barra angosta, además, el botón
+  // elegido se corre hasta quedar a la vista.
+  useEffect(() => {
+    principal.current?.scrollTo({ top: 0 });
+    const nav = navAngosta.current;
+    const boton = nav?.querySelector<HTMLElement>(`[data-seccion="${active}"]`);
+    if (nav && boton) {
+      nav.scrollTo({
+        left: boton.offsetLeft - nav.clientWidth / 2 + boton.clientWidth / 2,
+        behavior: 'smooth',
+      });
+    }
+  }, [active]);
+
+  const botonCaptura = (
+    <button
+      onClick={() => setCapture((c) => !c)}
+      title={t.capture.hint}
+      aria-label={t.capture.on}
+      aria-pressed={capture}
+      /* El modo captura apaga los eventos de puntero de toda la página para que el cursor no deje
+         un estado de hover en la captura. Este botón queda exceptuado, porque si no, no habría
+         forma de volver a apagarlo. */
+      data-capture-toggle
+      className={`flex items-center justify-center rounded-full p-1.5 transition ${
+        capture
+          ? 'bg-[var(--honey-amber)]/20 text-[var(--honey-amber)] ring-1 ring-[var(--honey-amber)]/40'
+          : 'bg-white/5 text-white/35 ring-1 ring-white/10 hover:text-white/70'
+      }`}
+    >
+      <Camera className="w-3.5 h-3.5" />
+    </button>
+  );
+
+  const marca = (
+    <div className="flex items-center gap-2.5">
+      <img
+        src="/favicon.png"
+        alt=""
+        aria-hidden
+        className="w-8 h-8 rounded-lg shrink-0"
+        width={32}
+        height={32}
+      />
+      <div>
+        <div className="text-[13px] text-white font-mono-display">{t.brand.name}</div>
+        <div className="text-[9px] text-white/40">{t.brand.subtitle}</div>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="h-screen flex overflow-hidden">
-      {/* Sidebar */}
-      <aside className="w-56 shrink-0 border-r border-white/5 bg-[#0f141b] p-4 flex flex-col overflow-y-auto thin-scroll">
-        <div className="flex items-center gap-2.5 mb-6">
-          <img
-            src="/favicon.png"
-            alt=""
-            aria-hidden
-            className="w-8 h-8 rounded-lg shrink-0"
-            width={32}
-            height={32}
-          />
-          <div>
-            <div className="text-[13px] font-medium text-white font-mono-display">
-              {t.brand.name}
-            </div>
-            <div className="text-[9px] text-white/40">{t.brand.subtitle}</div>
+    <div className="h-[100dvh] flex flex-col md:flex-row overflow-hidden">
+      {/* En pantallas angostas la barra lateral se vuelve una barra de arriba, con las secciones en
+          una fila que se desliza con el dedo. */}
+      <header className="md:hidden shrink-0 border-b border-white/5 bg-[#0f141b]">
+        <div className="flex items-center justify-between gap-3 px-4 pt-3 pb-2">
+          {marca}
+          <div className="flex items-center gap-2">
+            <LangToggle />
+            {botonCaptura}
           </div>
         </div>
+        <nav
+          ref={navAngosta}
+          className="flex gap-1 overflow-x-auto px-3 pb-2.5 sin-barra"
+          aria-label={t.brand.name}
+        >
+          {SECTIONS.map((s) => (
+            <button
+              key={s.id}
+              data-seccion={s.id}
+              onClick={() => setActive(s.id)}
+              aria-current={active === s.id ? 'page' : undefined}
+              className={`shrink-0 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] whitespace-nowrap transition-colors ${
+                active === s.id
+                  ? 'bg-[var(--honey-amber)]/15 text-[var(--honey-amber)] ring-1 ring-[var(--honey-amber)]/35'
+                  : 'text-white/50 ring-1 ring-white/[0.07]'
+              }`}
+            >
+              <s.icon className="w-3.5 h-3.5" />
+              {t.nav[s.id]}
+            </button>
+          ))}
+        </nav>
+      </header>
+
+      <aside className="hidden md:flex w-56 shrink-0 border-r border-white/5 bg-[#0f141b] p-4 flex-col overflow-y-auto thin-scroll">
+        <div className="mb-6">{marca}</div>
 
         <nav className="flex flex-col gap-1">
           {SECTIONS.map((s) => (
             <button
               key={s.id}
               onClick={() => setActive(s.id)}
+              aria-current={active === s.id ? 'page' : undefined}
               className={`relative overflow-hidden flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[12px] text-left transition-colors duration-200 ${
                 active === s.id
                   ? 'bg-white/5 text-white/90'
@@ -141,22 +234,7 @@ export default function App() {
         <div className="mt-auto pt-4 border-t border-white/5 flex flex-col gap-3">
           <div className="flex items-center gap-2">
             <LangToggle />
-            <button
-              onClick={() => setCapture((c) => !c)}
-              title={t.capture.hint}
-              aria-pressed={capture}
-              /* El modo captura apaga los eventos de puntero de toda la página para que el cursor
-                 no deje un estado de hover en la captura. Este botón queda exceptuado, porque si
-                 no, no habría forma de volver a apagarlo. */
-              data-capture-toggle
-              className={`flex items-center justify-center rounded-full p-1.5 transition ${
-                capture
-                  ? 'bg-[var(--honey-amber)]/20 text-[var(--honey-amber)] ring-1 ring-[var(--honey-amber)]/40'
-                  : 'bg-white/5 text-white/35 ring-1 ring-white/10 hover:text-white/70'
-              }`}
-            >
-              <Camera className="w-3.5 h-3.5" />
-            </button>
+            {botonCaptura}
           </div>
 
           {health?.mode === 'snapshot' ? (
@@ -189,96 +267,87 @@ export default function App() {
         </div>
       </aside>
 
-      {/* Main */}
-      <main className="flex-1 p-6 max-w-[1400px] overflow-y-auto thin-scroll">
-        <header key={`h-${active}`} className="relative mb-5 section-in -mx-6 -mt-6 px-6 pt-6 pb-4">
-          {snapshot && <AttackCanvas intensity={snapshot.timeline.map((d) => d.count)} />}
-          <div className="relative">
-            <h1 className="text-xl text-white font-mono-display">{t.nav[active]}</h1>
-            <p className="text-[13px] text-white/50 mt-1.5 max-w-2xl leading-relaxed">
-              {t.lead[active]}
-            </p>
-          </div>
-        </header>
+      <main
+        ref={principal}
+        className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden thin-scroll papel"
+      >
+        <div className="max-w-[1400px] p-4 md:p-6">
+          <header
+            key={`h-${active}`}
+            className="relative mb-5 section-in -mx-4 -mt-4 px-4 pt-4 pb-4 md:-mx-6 md:-mt-6 md:px-6 md:pt-6"
+          >
+            {snapshot && <AttackCanvas intensity={snapshot.timeline.map((d) => d.count)} />}
+            <div className="relative">
+              <h1 className="text-lg md:text-xl text-white font-mono-display">
+                <Descifrado texto={t.nav[active]} />
+              </h1>
+              <p className="text-[13px] text-white/50 mt-1.5 max-w-2xl leading-relaxed">
+                {t.lead[active]}
+              </p>
+            </div>
+          </header>
 
-        {error && (
-          <div className="rounded-xl ring-1 ring-[var(--agent-coral)]/30 bg-[var(--agent-coral)]/5 p-4 flex gap-3">
-            <AlertTriangle className="w-4 h-4 text-[var(--agent-coral)] shrink-0 mt-0.5" />
-            <div>
-              <div className="text-[13px] text-white/85">{t.error.title}</div>
-              <div className="font-data text-[11px] text-white/45 mt-1">{error}</div>
-              <div className="text-[11px] text-white/45 mt-2">
-                {t.error.hint} <span className="font-data">make api</span>
+          {error && (
+            <div className="rounded-xl ring-1 ring-[var(--agent-coral)]/30 bg-[var(--agent-coral)]/5 p-4 flex gap-3">
+              <AlertTriangle className="w-4 h-4 text-[var(--agent-coral)] shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                <div className="text-[13px] text-white/85">{t.error.title}</div>
+                <div className="font-data text-[11px] text-white/45 mt-1 break-all">{error}</div>
+                <div className="text-[11px] text-white/45 mt-2">
+                  {t.error.hint} <span className="font-data">make api</span>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Skeleton rather than a spinner: the snapshot runs several aggregations over 1,9 M
-            documents and takes a beat, and a layout that does not jump reads as deliberate. */}
-        {!snapshot && !error && (
-          <div className="flex flex-col gap-3 animate-pulse">
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="h-[104px] rounded-xl bg-white/[0.03] ring-1 ring-white/5" />
-              ))}
+          {/* Un esqueleto en lugar de un indicador que gira: el snapshot hace varias agregaciones
+              sobre todo el corpus y tarda un momento, y una grilla que no salta al llegar los
+              datos se lee como hecha a propósito. */}
+          {!snapshot && !error && (
+            <div className="flex flex-col gap-3 animate-pulse">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="h-[104px] panel" />
+                ))}
+              </div>
+              <div className="h-[196px] panel" />
             </div>
-            <div className="h-[196px] rounded-xl bg-white/[0.03] ring-1 ring-white/5" />
-          </div>
-        )}
+          )}
 
-        {snapshot && (
-          <div key={active} className="section-in">
-            {active === 'pulso' && (
-              <Pulse
-                overview={snapshot.overview}
-                timeline={snapshot.timeline}
-                hourly={snapshot.hourly}
-                weekly={snapshot.weekly_rhythm}
-              />
-            )}
-            {active === 'anatomia' && <SessionReplay replays={replays} />}
-            {active === 'diccionario' && (
-              <Dictionary
-                users={snapshot.credentials.users}
-                passwords={snapshot.credentials.passwords}
-              />
-            )}
-            {active === 'protocolos' && <Protocols detail={snapshot.protocol_detail} />}
-            {active === 'huellas' &&
-              (families ? (
-                <Fingerprints data={families} />
-              ) : (
-                <div className="rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-8 text-center text-[13px] text-white/50">
-                  {t.error.title}
-                </div>
-              ))}
-            {active === 'arquetipos' &&
-              (archetypes ? (
-                <Archetypes data={archetypes} />
-              ) : (
-                <div className="rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-8 text-center text-[13px] text-white/50">
-                  {t.error.title}
-                </div>
-              ))}
-            {active === 'origen' &&
-              (snapshot.geography ? (
-                <Geography data={snapshot.geography} />
-              ) : (
-                <div className="rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-8 text-center text-[13px] text-white/50">
-                  {t.error.title}
-                </div>
-              ))}
-            {active === 'mitre' && (
-              <MitreMatrix
-                replays={replays}
-                stages={snapshot.stages}
-                overview={snapshot.overview}
-              />
-            )}
-            {active === 'triaje' && <Triage />}
-          </div>
-        )}
+          {snapshot && (
+            <div key={active} className="section-in">
+              {active === 'pulso' && (
+                <Pulse
+                  overview={snapshot.overview}
+                  timeline={snapshot.timeline}
+                  hourly={snapshot.hourly}
+                  weekly={snapshot.weekly_rhythm}
+                />
+              )}
+              {active === 'anatomia' && <SessionReplay replays={replays} />}
+              {active === 'diccionario' && (
+                <Dictionary
+                  users={snapshot.credentials.users}
+                  passwords={snapshot.credentials.passwords}
+                />
+              )}
+              {active === 'protocolos' && <Protocols detail={snapshot.protocol_detail} />}
+              {active === 'huellas' && (families ? <Fingerprints data={families} /> : <SinDatos />)}
+              {active === 'arquetipos' &&
+                (archetypes ? <Archetypes data={archetypes} /> : <SinDatos />)}
+              {active === 'origen' &&
+                (snapshot.geography ? <Geography data={snapshot.geography} /> : <SinDatos />)}
+              {active === 'mitre' && (
+                <MitreMatrix
+                  replays={replays}
+                  stages={snapshot.stages}
+                  overview={snapshot.overview}
+                />
+              )}
+              {active === 'triaje' && <Triage />}
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );

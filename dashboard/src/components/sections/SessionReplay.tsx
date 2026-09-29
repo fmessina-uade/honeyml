@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Play, Pause, RotateCcw, Terminal, Gauge, Search } from 'lucide-react';
+import { Play, Pause, RotateCcw, Terminal, Gauge, Search, Crosshair } from 'lucide-react';
 import type { Replay } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
+import ManoAlzada from '../ManoAlzada';
+import { Hexagono } from '../Instrumento';
 
 // Una táctica, un color, reutilizado en todo el panel.
 const TACTIC_COLOR: Record<string, string> = {
@@ -22,6 +24,10 @@ const SPEEDS = [
   { label: '1x', ms: 2200 },
   { label: '2x', ms: 1100 },
 ];
+
+// El paso que se anota a mano es el primero de la táctica más grave que aparece en la sesión: el
+// momento en que el atacante deja de mirar y empieza a quedarse.
+const GRAVEDAD = ['Persistencia', 'Evasión de defensas', 'Ejecución', 'Descubrimiento'];
 
 /**
  * Lo que un gráfico no puede hacer: una intrusión real capturada, repasada comando por comando,
@@ -62,6 +68,7 @@ export default function SessionReplay({ replays }: { replays: Replay[] }) {
 
   // Espacio alterna, las flechas avanzan. Acotado a la sección para no secuestrar la página entera.
   const onKeyDown = (e: React.KeyboardEvent) => {
+    if ((e.target as HTMLElement).tagName === 'INPUT') return;
     if (e.key === ' ') {
       e.preventDefault();
       setPlaying((p) => !p);
@@ -82,11 +89,9 @@ export default function SessionReplay({ replays }: { replays: Replay[] }) {
 
   if (!replay) {
     return (
-      <div className="rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-8 text-center">
+      <div className="panel p-8 text-center">
         <div className="text-[13px] text-white/60">{t.replay.empty}</div>
-        <div className="text-[11px] text-white/35 mt-1">
-          {t.replay.emptyHint}
-        </div>
+        <div className="text-[11px] text-white/35 mt-1">{t.replay.emptyHint}</div>
       </div>
     );
   }
@@ -106,19 +111,37 @@ export default function SessionReplay({ replays }: { replays: Replay[] }) {
 
   const current = replay.steps[Math.min(step, total - 1)];
   const done = step >= total - 1;
+  const tacticName = (key: string) => t.tactics[key as keyof typeof t.tactics]?.name ?? key;
+
+  // Las tácticas de la sesión en el orden en que aparecen: es la leyenda de la cinta.
+  const enOrden = replay.steps
+    .map((s) => s.tactic)
+    .filter((tac, i, todas) => todas.indexOf(tac) === i);
+
+  const tacticaDelGiro = GRAVEDAD.find((tac) => enOrden.includes(tac));
+  const pasoDelGiro = tacticaDelGiro
+    ? replay.steps.findIndex((s) => s.tactic === tacticaDelGiro)
+    : -1;
+  const xGiro = total ? ((pasoDelGiro + 0.5) / total) * 100 : 50;
+  const giroALaIzquierda = xGiro > 55;
 
   return (
     <section
-      className="grid lg:grid-cols-[1fr_360px] gap-4 outline-none"
+      className="grid lg:grid-cols-[minmax(0,1fr)_360px] gap-4 outline-none"
       tabIndex={0}
       onKeyDown={onKeyDown}
     >
-      {/* Terminal */}
-      <div className="rounded-xl overflow-hidden ring-1 ring-white/10 bg-[#0f141b]">
-        <div className="flex items-center justify-between bg-[#161b22] border-b border-white/5 px-4 py-2.5 gap-2 flex-wrap">
-          <div className="flex items-center gap-2 text-[11px] text-white/60">
-            <Terminal className="w-3.5 h-3.5" />
-            <span className="font-data">
+      {/* La terminal */}
+      <div className="rounded-xl overflow-hidden ring-1 ring-white/10 bg-[#0b0f15] min-w-0">
+        <div className="flex items-center justify-between bg-[#131922] border-b border-white/5 px-3 sm:px-4 py-2.5 gap-2 flex-wrap">
+          <div className="flex items-center gap-2 text-[11px] text-white/60 min-w-0">
+            <span className="flex gap-1 shrink-0" aria-hidden>
+              <span className="w-2 h-2 rounded-full bg-white/10" />
+              <span className="w-2 h-2 rounded-full bg-white/10" />
+              <span className="w-2 h-2 rounded-full bg-white/10" />
+            </span>
+            <Terminal className="w-3.5 h-3.5 shrink-0 ml-1" />
+            <span className="font-data truncate">
               {replay.attacker}@honeypot ({replay.protocol})
             </span>
           </div>
@@ -159,7 +182,7 @@ export default function SessionReplay({ replays }: { replays: Replay[] }) {
 
         <div
           ref={scrollRef}
-          className="thin-scroll h-[420px] overflow-y-auto p-4 font-data text-[12px]"
+          className="thin-scroll h-[320px] sm:h-[400px] overflow-y-auto p-4 font-data text-[12px]"
         >
           <div className="text-[var(--neural-teal)] mb-3">
             <span className="text-white/40">$</span> ssh {replay.credentials.user}@honeypot
@@ -189,13 +212,14 @@ export default function SessionReplay({ replays }: { replays: Replay[] }) {
                   className="mt-1.5 ml-4 pl-3 border-l-2 text-[11px] text-white/55 leading-relaxed"
                   style={{ borderColor: tacticColor(s.tactic) }}
                 >
-                  {lang === "en" && s.what_en ? s.what_en : s.what}
+                  {lang === 'en' && s.what_en ? s.what_en : s.what}
                 </div>
               )}
             </div>
           ))}
 
-          {/* the cursor is what makes it read as a live terminal rather than a code block */}
+          {/* El cursor es lo que hace que se lea como una terminal viva y no como un bloque de
+              código. */}
           <div className="flex gap-2">
             <span className="text-white/40">$</span>
             {done && !playing ? (
@@ -206,80 +230,123 @@ export default function SessionReplay({ replays }: { replays: Replay[] }) {
           </div>
         </div>
 
-        {/* scrubbable progress: click anywhere to jump to that command */}
-        <div className="border-t border-white/5 px-4 py-2">
-          <input
-            type="range"
-            min={0}
-            max={Math.max(total - 1, 0)}
-            value={Math.min(step, total - 1)}
-            onChange={(e) => seek(Number(e.target.value))}
-            aria-label={t.replay.step(step + 1, total)}
-            className="w-full h-1 appearance-none bg-transparent cursor-pointer
-                       [&::-webkit-slider-runnable-track]:h-1 [&::-webkit-slider-runnable-track]:rounded
-                       [&::-webkit-slider-runnable-track]:bg-white/8
-                       [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2.5
-                       [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:rounded-full
-                       [&::-webkit-slider-thumb]:-mt-[3px] [&::-webkit-slider-thumb]:transition-transform
-                       hover:[&::-webkit-slider-thumb]:scale-125"
-            style={
-              {
-                '--c': tacticColor(current.tactic),
-                background: `linear-gradient(to right, ${tacticColor(current.tactic)} ${
-                  total > 1 ? (step / (total - 1)) * 100 : 100
-                }%, rgba(255,255,255,0.08) 0)`,
-                borderRadius: 4,
-              } as React.CSSProperties
-            }
-          />
-          <div className="flex justify-between mt-1.5 text-[9px] text-white/35">
+        {/* La cinta de la sesión: un tramo por comando, del color de su táctica. Se toca un tramo
+            para ir a ese paso, y la anotación marca dónde el ataque cambia de naturaleza. */}
+        <div className="border-t border-white/5 px-3 sm:px-4 pt-1 pb-3">
+          <div className="relative pt-10">
+            <div className="flex gap-[2px] h-3.5 items-end">
+              {replay.steps.map((s, i) => (
+                <button
+                  key={i}
+                  onClick={() => seek(i)}
+                  aria-label={t.replay.step(i + 1, total)}
+                  aria-current={i === step ? 'step' : undefined}
+                  className="flex-1 min-w-[3px] rounded-[2px] transition-all duration-300 hover:opacity-100"
+                  style={{
+                    background: tacticColor(s.tactic),
+                    opacity: i === step ? 1 : i < step ? 0.7 : 0.18,
+                    height: i === step ? '100%' : '55%',
+                    boxShadow: i === step ? `0 0 10px ${tacticColor(s.tactic)}` : undefined,
+                  }}
+                />
+              ))}
+            </div>
+            {pasoDelGiro >= 0 && tacticaDelGiro && (
+              <ManoAlzada
+                key={selected}
+                trazos={[
+                  {
+                    tipo: 'elipse',
+                    x: xGiro,
+                    y: 86,
+                    ancho: Math.max((100 / total) * 2.4, 4),
+                    alto: 62,
+                  },
+                  {
+                    tipo: 'flecha',
+                    desde: [giroALaIzquierda ? xGiro - 7 : xGiro + 7, 30],
+                    hasta: [giroALaIzquierda ? xGiro - 1.5 : xGiro + 1.5, 66],
+                    curva: giroALaIzquierda ? -0.3 : 0.3,
+                  },
+                ]}
+                notas={[
+                  {
+                    x: giroALaIzquierda ? xGiro - 8 : xGiro + 8,
+                    y: -6,
+                    texto: t.replay.turn(pasoDelGiro + 1, t.replay.turnWhat[tacticaDelGiro]),
+                    alinear: giroALaIzquierda ? 'derecha' : 'izquierda',
+                    ancho: 280,
+                  },
+                ]}
+              />
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2.5">
+            {enOrden.map((tac) => (
+              <span key={tac} className="flex items-center gap-1.5 text-[10px] text-white/45">
+                <span className="w-2 h-2 rounded-sm" style={{ background: tacticColor(tac) }} />
+                {tacticName(tac)}
+              </span>
+            ))}
+          </div>
+          <div className="flex justify-between gap-3 mt-2 text-[9px] text-white/35">
             <span>
-              {t.replay.step(Math.min(step + 1, total), total)}
+              <span className="font-data">{t.replay.step(Math.min(step + 1, total), total)}</span>
               <span className="text-white/20 ml-2 hidden sm:inline">{t.replay.keys}</span>
             </span>
-            <span>{replay.timestamp?.slice(0, 10)}</span>
+            <span className="font-data">{replay.timestamp?.slice(0, 10)}</span>
           </div>
         </div>
       </div>
 
-      {/* Explanation panel: the educational half */}
-      <div className="flex flex-col gap-3">
-        <div className="rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-4">
-          <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <span
-              className="w-1.5 h-1.5 rounded-full"
-              style={{ background: tacticColor(current.tactic) }}
-            />
-            <span className="text-[11px] font-medium" style={{ color: tacticColor(current.tactic) }}>
-              {t.tactics[current.tactic as keyof typeof t.tactics]?.name ?? current.tactic}
+      {/* La mitad educativa: qué hizo en este paso y por qué */}
+      <div className="flex flex-col gap-3 min-w-0">
+        <div className="panel overflow-hidden p-4">
+          <span
+            className="absolute inset-x-0 top-0 h-px"
+            style={{
+              background: `linear-gradient(90deg, transparent, ${tacticColor(current.tactic)}, transparent)`,
+            }}
+          />
+          <div className="flex items-center gap-2.5 mb-3 flex-wrap">
+            <Hexagono color={tacticColor(current.tactic)}>
+              <Crosshair className="w-3.5 h-3.5" />
+            </Hexagono>
+            <span className="flex flex-col">
+              <span className="rotulo">{t.replay.phase}</span>
+              <span className="titulo" style={{ color: tacticColor(current.tactic) }}>
+                {tacticName(current.tactic)}
+              </span>
             </span>
             {current.technique && (
               <a
                 href={`https://attack.mitre.org/techniques/${current.technique.replace('.', '/')}/`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-data text-[10px] text-white/35 hover:text-[var(--honey-amber)] transition underline decoration-dotted underline-offset-2"
+                className="ml-auto font-data text-[10px] text-white/40 hover:text-[var(--honey-amber)] transition underline decoration-dotted underline-offset-2"
                 title={t.replay.seeInMitre}
               >
-                [{current.technique}]
+                {current.technique}
               </a>
             )}
           </div>
           <div key={step} className="section-in">
-            <div className="text-[13px] text-white/85 leading-relaxed mb-3">{lang === "en" && current.what_en ? current.what_en : current.what}</div>
-            <div className="text-[8px] uppercase tracking-wider text-white/30 mb-1">
-              {t.replay.why}
+            <div className="text-[13px] text-white/85 leading-relaxed mb-3">
+              {lang === 'en' && current.what_en ? current.what_en : current.what}
             </div>
-            <div className="text-[12px] text-white/55 leading-relaxed">{lang === "en" && current.why_en ? current.why_en : current.why}</div>
+            <div className="rotulo mb-1">{t.replay.why}</div>
+            <div className="text-[12px] text-white/55 leading-relaxed">
+              {lang === 'en' && current.why_en ? current.why_en : current.why}
+            </div>
           </div>
         </div>
 
-        <div className="rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-4">
+        <div className="panel p-4">
           <div className="flex items-baseline justify-between mb-2">
-            <span className="text-[8px] uppercase tracking-wider text-white/30">
-              {t.replay.others}
+            <span className="rotulo">{t.replay.others}</span>
+            <span className="font-data text-[9px] text-white/30">
+              {t.replay.attackers(replays.length)}
             </span>
-            <span className="font-data text-[9px] text-white/25">{t.replay.attackers(replays.length)}</span>
           </div>
           <div className="relative mb-2">
             <Search className="w-3 h-3 text-white/25 absolute left-2 top-1/2 -translate-y-1/2" />
@@ -306,7 +373,7 @@ export default function SessionReplay({ replays }: { replays: Replay[] }) {
                     : 'hover:bg-white/[0.04] ring-1 ring-transparent'
                 }`}
               >
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center justify-between gap-2 min-w-0">
                   <span
                     className={`font-data text-[10px] ${
                       i === selected ? 'text-white/85' : 'text-white/55'
@@ -314,21 +381,26 @@ export default function SessionReplay({ replays }: { replays: Replay[] }) {
                   >
                     {r.attacker}
                   </span>
-                  <span className="font-data text-[9px] text-white/30 shrink-0">
+                  <span className="font-data text-[9px] text-white/30 truncate">
                     {r.credentials.user}:{r.credentials.password}
                   </span>
                 </div>
-                {/* the tactic strip is what distinguishes one bot from another at a glance */}
+                {/* La tira de tácticas es lo que distingue a un bot de otro de un vistazo. */}
                 <div className="flex items-center gap-1 mt-1.5">
-                  {r.tactics.map((t) => (
+                  {r.tactics.map((tac) => (
                     <span
-                      key={t}
-                      title={t}
+                      key={tac}
+                      title={tacticName(tac)}
                       className="h-1 flex-1 rounded-full"
-                      style={{ background: tacticColor(t), opacity: i === selected ? 0.95 : 0.4 }}
+                      style={{
+                        background: tacticColor(tac),
+                        opacity: i === selected ? 0.95 : 0.4,
+                      }}
                     />
                   ))}
-                  <span className="text-[9px] text-white/25 ml-1 shrink-0">{r.steps.length} {t.replay.cmd}</span>
+                  <span className="font-data text-[9px] text-white/25 ml-1 shrink-0">
+                    {r.steps.length} {t.replay.cmd}
+                  </span>
                 </div>
               </button>
             ))}

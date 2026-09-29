@@ -50,6 +50,9 @@ const es = {
       'Lo que el motor decidió sobre cada evento, con qué evidencia y a qué costo. Lo que no pudo cerrar solo lo termina de decidir quien opera el panel.',
   },
   pulse: {
+    notePeak: (eventos: string, fecha: string) => `el pico: ${eventos} eventos el ${fecha}`,
+    noteFlat: (veces: string) =>
+      `casi plana: el pico es ${veces} veces el valle. Del otro lado no duerme nadie.`,
     events: 'Eventos capturados',
     addresses: 'Direcciones atacantes',
     logins: 'Intentos de acceso',
@@ -103,6 +106,14 @@ const es = {
     seeInMitre: 'Ver la técnica en MITRE ATT&CK',
     search: 'Buscar atacante, credencial o táctica',
     noMatch: 'Ninguna sesión coincide.',
+    phase: 'Fase del ataque',
+    turn: (paso: number, que: string) => `paso ${paso}: ${que}`,
+    turnWhat: {
+      Persistencia: 'acá se asegura de poder volver',
+      'Evasión de defensas': 'acá borra sus rastros',
+      Ejecución: 'acá corre su propio código',
+      Descubrimiento: 'acá mira dónde cayó',
+    } as Record<string, string>,
   },
   protocols: {
     contrastTitle: 'Mismo sensor, lecturas opuestas',
@@ -124,6 +135,15 @@ const es = {
     tipSources: 'direcciones distintas',
     tipPerSource: 'eventos por dirección',
     tipShare: 'del tráfico multiprotocolo',
+    unknown: 'Servicio expuesto por el sensor multiprotocolo.',
+    fromSources: (d: string) => `desde ${d} direcciones`,
+    times: (v: string) => `${v} veces`,
+    axisX: 'direcciones distintas',
+    axisY: 'eventos por dirección',
+    isoLabel: (v: string) => `${v} eventos`,
+    isoNote: 'Sobre cada diagonal punteada el volumen total es el mismo.',
+    noteWorm: 'un gusano: pocas máquinas que no paran de insistir',
+    noteScan: 'un barrido: muchas direcciones, pocas veces cada una',
     lessonTitle: 'Lo que enseña la comparación',
     lesson:
       'Mirá las dos barras de SMB y las de HTTP. SMB acumula el grueso del volumen desde muy pocas direcciones: es un puñado de gusanos reintentando sin parar contra el mismo puerto. HTTP es al revés, mucho menos tráfico repartido entre muchísimas más direcciones: son escáneres distintos barriendo internet una vez cada uno. El mismo número de eventos significa cosas opuestas según cuántos lo produjeron, y por eso contar alertas no alcanza para priorizarlas.',
@@ -138,13 +158,16 @@ const es = {
     empty: '(vacía)',
     ofTop: 'del top 10',
     timesLess: (n: string, k: string) => `${n} veces menos que ${k}`,
+    noteTop: (k: string, p: string) => `${k} solo se lleva el ${p}% del ranking`,
   },
   mitre: {
     coverageTitle: 'Cobertura del marco',
     coverageNote:
       'De las catorce tácticas de MITRE ATT&CK Enterprise, estas son las que el señuelo observa. Las dos de acceso salen de los intentos de ingreso y las demás, de los comandos de las sesiones capturadas. Las ausentes corresponden a etapas que un señuelo de baja interacción no llega a observar, así que no representan un vacío del panel.',
-    observed: 'observadas',
-    notObserved: 'no observadas en este señuelo',
+    observedOf: (a: number, b: number) => `${a} de ${b} observadas`,
+    unseen: 'fuera de su alcance',
+    noteUnseen: 'esto el señuelo no lo puede ver',
+    ofReplayed: 'de los pasos repetidos',
     sessions: 'sesiones observadas',
     session: 'sesión observada',
     techniques: 'técnicas',
@@ -219,11 +242,17 @@ const es = {
     safeTitle: 'No aparece en las capturas.',
     safeBody:
       'Que no esté acá no la vuelve segura: este es un señuelo, no un catálogo completo. Significa que no está entre las que se probaron en estos setenta y seis días.',
+    hashTitle: 'El resumen SHA-256 de lo que escribiste, tal como sale del navegador.',
+    noteSent: 'solo esto viaja',
+    restStays: (c: number) => `${c} caracteres que se quedan en tu equipo`,
     privacy:
       'Cómo funciona: el navegador calcula el hash SHA-256 de lo que escribís y envía solo los primeros cinco caracteres. El servicio responde con todos los hashes capturados que empiezan igual, y la comparación termina acá. La contraseña nunca sale de tu equipo, y el servicio no puede saber cuál preguntaste.',
   },
   fingerprints: {
     concentrationTitle: 'Cuánto de todo esto es un solo programa',
+    otherFamilies: 'el resto de las familias',
+    ungrouped: 'sesiones sin familia',
+    notePanal: (c: number) => `un solo guion: ${c} de cada 100 sesiones`,
     topOne: 'la familia más grande',
     topThree: 'las tres primeras',
     machinesBehind: 'máquinas que lo corren',
@@ -269,6 +298,8 @@ const es = {
       log1p_interarribo_medio_s: 'tiempo medio entre eventos',
       log1p_eventos_por_hora: 'ritmo por hora',
     } as Record<string, string>,
+    traitsTitle: 'En qué se distingue, en desvíos del promedio',
+    sd: (v: string) => `${v} desv.`,
     ranCommands: 'Ejecutó comandos',
     downloaded: 'Descargó archivo',
     gotIn: 'Logró acceso',
@@ -306,7 +337,9 @@ const es = {
     ranHint: 'Llegaron a una consola e hicieron algo con ella',
     took: 'Trajeron algo de afuera',
     tookHint: 'Descargaron un archivo: es la señal de un compromiso real',
-    survives: (p: string) => `sobrevive el ${p}% del escalón anterior`,
+    ofTotal: (p: string) => `${p}% del total`,
+    ofPrevious: (p: string) => `${p}% del anterior`,
+    noteDrop: (p: string) => `acá se pierde el ${p}%`,
     lesson: (total: string, fin: string, porc: string) =>
       `De ${total} direcciones que golpearon la puerta, ${fin} llegaron a descargar algo: el ${porc}%. En esa caída se apoya el triaje automático. Tratar cada evento como una alerta obliga a revisar catorce mil cosas para encontrar doscientas, así que la tarea del motor pasa más por descartar bien que por detectar más.`,
   },
@@ -315,6 +348,8 @@ const es = {
     byAs: 'Por red que opera la dirección',
     addresses: 'direcciones',
     perAddress: (r: string) => `${r} eventos por dirección`,
+    fromAddresses: (d: string) => `desde ${d} direcciones`,
+    noteLoud: 'pocas máquinas, mucho ruido',
     eventsShort: 'eventos',
     perAddressShort: 'por dirección',
     // "De localizados" y no "del total": el porcentaje se calcula sobre los eventos cuyo país se
@@ -535,6 +570,9 @@ const en: typeof es = {
       'What the engine decided about each event, on what evidence and at what cost. Whatever it could not settle on its own is decided by whoever operates the panel.',
   },
   pulse: {
+    notePeak: (eventos: string, fecha: string) => `the peak: ${eventos} events on ${fecha}`,
+    noteFlat: (veces: string) =>
+      `almost flat: the peak is ${veces} times the trough. Nobody sleeps on the other side.`,
     events: 'Captured events',
     addresses: 'Attacking addresses',
     logins: 'Access attempts',
@@ -588,6 +626,14 @@ const en: typeof es = {
     seeInMitre: 'View this technique on MITRE ATT&CK',
     search: 'Search attacker, credential or tactic',
     noMatch: 'No session matches.',
+    phase: 'Attack phase',
+    turn: (paso: number, que: string) => `step ${paso}: ${que}`,
+    turnWhat: {
+      Persistencia: 'here it makes sure it can come back',
+      'Evasión de defensas': 'here it wipes its tracks',
+      Ejecución: 'here it runs its own code',
+      Descubrimiento: 'here it looks around',
+    } as Record<string, string>,
   },
   protocols: {
     contrastTitle: 'Same sensor, opposite readings',
@@ -609,9 +655,18 @@ const en: typeof es = {
     tipSources: 'distinct addresses',
     tipPerSource: 'events per address',
     tipShare: 'of multiprotocol traffic',
+    unknown: 'A service exposed by the multiprotocol sensor.',
+    fromSources: (d: string) => `from ${d} addresses`,
+    times: (v: string) => `${v} times`,
+    axisX: 'distinct addresses',
+    axisY: 'events per address',
+    isoLabel: (v: string) => `${v} events`,
+    isoNote: 'Along each dotted diagonal the total volume is the same.',
+    noteWorm: 'a worm: a few machines that never stop pushing',
+    noteScan: 'a sweep: many addresses, a few hits each',
     lessonTitle: 'What the comparison teaches',
     lesson:
-      'Look at the two bars for SMB and those for HTTP. SMB piles up the bulk of the volume from very few addresses: a handful of worms retrying endlessly against the same port. HTTP is the reverse, far less traffic spread across many more addresses: distinct scanners sweeping the internet once each. The same event count means opposite things depending on how many sources produced it, and that is why counting alerts is not enough to prioritise them.',
+      'Look at the two bars for SMB and those for HTTP. SMB piles up the bulk of the volume from very few addresses: a handful of worms retrying endlessly against the same port. HTTP is the reverse, far less traffic spread across many more addresses: distinct scanners sweeping the internet once each. The same event count means opposite things depending on how many sources produced it, and that is why counting alerts is not enough to prioritize them.',
   },
   dictionary: {
     usersTitle: 'Most attempted usernames',
@@ -623,13 +678,16 @@ const en: typeof es = {
     empty: '(empty)',
     ofTop: 'of the top 10',
     timesLess: (n: string, k: string) => `${n} times fewer than ${k}`,
+    noteTop: (k: string, p: string) => `${k} alone takes ${p}% of the ranking`,
   },
   mitre: {
     coverageTitle: 'Framework coverage',
     coverageNote:
       'Of the fourteen MITRE ATT&CK Enterprise tactics, these are the ones the decoy observes. The two access tactics come from login attempts and the rest from the commands in the captured sessions. The missing ones correspond to stages a low-interaction decoy never gets to observe, so they do not represent a gap in the panel.',
-    observed: 'observed',
-    notObserved: 'not observed in this decoy',
+    observedOf: (a: number, b: number) => `${a} of ${b} observed`,
+    unseen: 'out of its reach',
+    noteUnseen: 'the decoy cannot see this',
+    ofReplayed: 'of the replayed steps',
     sessions: 'sessions observed',
     session: 'session observed',
     techniques: 'techniques',
@@ -640,7 +698,7 @@ const en: typeof es = {
     ofEverything: 'of everything captured',
     techTitle: 'Observed techniques',
     techNote:
-      'Each technique is an identifier from the MITRE ATT&CK catalogue. Click to open the official entry.',
+      'Each technique is an identifier from the MITRE ATT&CK catalog. Click to open the official entry.',
     steps: 'steps',
     whyNotSeen: 'Why it does not appear',
     attempts: 'login attempts',
@@ -686,7 +744,7 @@ const en: typeof es = {
   },
   notObservedWhy: {
     'Movimiento lateral':
-      'The sensor is isolated on its own network, with no neighbouring machines to jump to. Outbound traffic blocking prevents it at the network layer as well.',
+      'The sensor is isolated on its own network, with no neighboring machines to jump to. Outbound traffic blocking prevents it at the network layer as well.',
     Impacto:
       'It requires a persistence the emulation does not sustain: the attacker leaves before reaching this stage.',
   },
@@ -702,12 +760,18 @@ const en: typeof es = {
       `It was tried ${c} times against this machine. If you use it anywhere, change it: nobody has to target you, the bots try it by default.`,
     safeTitle: 'It does not appear in the captures.',
     safeBody:
-      'Not being here does not make it safe: this is one decoy, not a complete catalogue. It means it is not among those tried during these seventy-six days.',
+      'Not being here does not make it safe: this is one decoy, not a complete catalog. It means it is not among those tried during these seventy-six days.',
+    hashTitle: 'The SHA-256 digest of what you typed, as it leaves the browser.',
+    noteSent: 'only this travels',
+    restStays: (c: number) => `${c} characters that stay on your machine`,
     privacy:
       'How it works: the browser computes the SHA-256 hash of what you type and sends only the first five characters. The service replies with every captured hash starting the same way, and the comparison finishes here. The password never leaves your machine, and the service cannot tell which one you asked about.',
   },
   fingerprints: {
     concentrationTitle: 'How much of it is one program',
+    otherFamilies: 'the other families',
+    ungrouped: 'sessions without a family',
+    notePanal: (c: number) => `a single script: ${c} out of every 100 sessions`,
     topOne: 'the largest family',
     topThree: 'the top three',
     machinesBehind: 'machines running it',
@@ -751,13 +815,15 @@ const en: typeof es = {
       log1p_interarribo_medio_s: 'mean time between events',
       log1p_eventos_por_hora: 'pace per hour',
     } as Record<string, string>,
+    traitsTitle: 'What sets it apart, in standard deviations',
+    sd: (v: string) => `${v} SD`,
     ranCommands: 'Ran commands',
     downloaded: 'Downloaded a file',
     gotIn: 'Got access',
     lesson:
       'Fingerprints group attacks by their exact command sequence, and so they cannot see anyone who never reached a shell. This view works the other way round. It takes how each observed address behaved (how hard it pushed, at what hour, whether it tried credentials, whether it downloaded anything) and lets the data draw the boundaries. The overwhelming majority only knock. A very small group is the one that gets in and acts.',
     method: (dirs: string, feats: number, groups: number) =>
-      `Unsupervised grouping over ${dirs} addresses and ${feats} behavioural features. The number of groups (${groups}) was chosen by the silhouette criterion, not by hand. The groups are descriptive: there is no external key saying how many kinds of attacker exist, and the names are an interpretation of each profile.`,
+      `Unsupervised grouping over ${dirs} addresses and ${feats} behavioral features. The number of groups (${groups}) was chosen by the silhouette criterion, not by hand. The groups are descriptive: there is no external key saying how many kinds of attacker exist, and the names are an interpretation of each profile.`,
     groups: {
       'Intrusión efectiva': {
         name: 'Effective intrusion',
@@ -788,7 +854,9 @@ const en: typeof es = {
     ranHint: 'Reached a shell and did something with it',
     took: 'Pulled something in',
     tookHint: 'Downloaded a file: the mark of a real compromise',
-    survives: (p: string) => `${p}% of the previous step survives`,
+    ofTotal: (p: string) => `${p}% of total`,
+    ofPrevious: (p: string) => `${p}% of previous`,
+    noteDrop: (p: string) => `${p}% drop out here`,
     lesson: (total: string, fin: string, porc: string) =>
       `Out of ${total} addresses that knocked, ${fin} got as far as downloading something: ${porc}%. That drop-off is what automated triage rests on. Treating every event as an alert means reviewing fourteen thousand things to find two hundred, so the engine's job has more to do with discarding well than with detecting more.`,
   },
@@ -797,6 +865,8 @@ const en: typeof es = {
     byAs: 'By network operating the address',
     addresses: 'addresses',
     perAddress: (r: string) => `${r} events per address`,
+    fromAddresses: (d: string) => `from ${d} addresses`,
+    noteLoud: 'few machines, a lot of noise',
     eventsShort: 'events',
     perAddressShort: 'per address',
     ofLocated: 'of located',
@@ -818,7 +888,7 @@ const en: typeof es = {
     perHour: 'events per hour, on average',
     observed: (n: number) => `measured over ${n} ${n === 1 ? 'week' : 'weeks'}`,
     office: 'Office Mon-Fri 9-18',
-    night: 'Small hours 0-6',
+    night: 'Late night 0-6',
     weekend: 'Weekend',
     vsOffice: (r: string) => `${r} times office-hours activity`,
     verdictAutomated:
@@ -890,7 +960,7 @@ const en: typeof es = {
         'Building the context: what this address did before, what else happened in the session and what the engine decided about it.',
       reasoning: 'Reasoning over the context with the language model.',
       copied:
-        'This behaviour was already decided: the reasoned decision is copied without calling the model.',
+        'This behavior was already decided: the reasoned decision is copied without calling the model.',
       noContext:
         'The event has no source address and nothing to correlate: it is stored as inconclusive.',
       waiting: 'Waiting for the next engine decision.',
@@ -915,7 +985,7 @@ const en: typeof es = {
     detail: {
       close: 'Close',
       path: 'How the agent settled it',
-      attributes: 'Normalised event attributes',
+      attributes: 'Normalized event attributes',
       noEvent:
         'The event is no longer in the telemetry indices. The decision keeps its main fields.',
       classification: 'Engine classification',
@@ -926,7 +996,7 @@ const en: typeof es = {
       justification: 'Justification',
       evidence: 'Evidence',
       cycle: 'How it was decided',
-      copiedFrom: 'Copied from the decision on another event with the same behaviour:',
+      copiedFrom: 'Copied from the decision on another event with the same behavior:',
       open: 'open',
       attempts: 'attempts',
       rejections: 'rejections',

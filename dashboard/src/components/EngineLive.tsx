@@ -12,6 +12,7 @@ import {
 import { api, type FilaDecision, type NodoDelGrafo, type ResumenTriaje } from '../lib/api';
 import { dec, duracion, hora, n } from '../lib/format';
 import { useI18n } from '../lib/i18n';
+import { useQuieto } from '../lib/useQuieto';
 
 // El grafo del motor sobre un lienzo de 1000 por 330. Los nodos siguen una curva en el orden en que
 // los recorre un evento, y las tres aristas largas son lo que lo vuelve una máquina de estados y no
@@ -127,33 +128,6 @@ function aristasDe(camino: NodoDelGrafo[]): string[] {
 }
 
 const idDe = (clave: string) => `motor-${clave.replace('>', '-')}`;
-
-function leerQuieto(): boolean {
-  return (
-    document.documentElement.dataset.capture === 'on' ||
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  );
-}
-
-/** Si hay que dibujar quieto: en modo captura o con movimiento reducido. Se entera si cambia. */
-function useQuieto(): boolean {
-  const [quieto, setQuieto] = useState(leerQuieto);
-  useEffect(() => {
-    const actualizar = () => setQuieto(leerQuieto());
-    const observador = new MutationObserver(actualizar);
-    observador.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['data-capture'],
-    });
-    const consulta = window.matchMedia('(prefers-reduced-motion: reduce)');
-    consulta.addEventListener('change', actualizar);
-    return () => {
-      observador.disconnect();
-      consulta.removeEventListener('change', actualizar);
-    };
-  }, []);
-  return quieto;
-}
 
 /**
  * El motor de triaje trabajando: cada decisión que toma recorre en pantalla el camino que siguió
@@ -480,10 +454,10 @@ export default function EngineLive({
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#ff6b35]/60 to-transparent" />
       </div>
 
-      <div className="relative p-5 flex flex-col gap-3">
+      <div className="relative p-4 sm:p-5 flex flex-col gap-3">
         {/* Estado del agente */}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3 rounded-full bg-white/[0.04] ring-1 ring-white/10 backdrop-blur px-3.5 py-1.5">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 rounded-2xl sm:rounded-full bg-white/[0.04] ring-1 ring-white/10 backdrop-blur px-3.5 py-1.5">
             <span className="relative flex w-2.5 h-2.5">
               {activo && (
                 <span className="absolute inline-flex h-full w-full rounded-full bg-[#ff6b35] opacity-60 animate-ping" />
@@ -493,11 +467,11 @@ export default function EngineLive({
                 style={{ background: activo ? '#ff6b35' : '#94a3b8' }}
               />
             </span>
-            <span className="font-mono-display text-[12px] text-white">
+            <span className="font-mono-display text-[12px] text-white whitespace-nowrap">
               {activo ? e.active : e.idle}
             </span>
             {hace !== null && (
-              <span className="font-data text-[10px] text-white/45">
+              <span className="font-data text-[10px] text-white/45 whitespace-nowrap">
                 {e.lastAgo(duracion(hace))}
               </span>
             )}
@@ -522,374 +496,380 @@ export default function EngineLive({
           </div>
         </div>
 
-        {/* El grafo */}
-        <div className="relative w-full" style={{ aspectRatio: `${ANCHO} / ${ALTO}` }}>
-          <svg viewBox={`0 0 ${ANCHO} ${ALTO}`} className="absolute inset-0 w-full h-full">
-            <defs>
-              <linearGradient id="motor-ia" x1="0" y1="0" x2="1" y2="1">
-                {IRIDISCENTE.map((c, i) => (
-                  <stop key={c} offset={i / (IRIDISCENTE.length - 1)} stopColor={c} />
+        {/* El grafo. En un teléfono conserva un ancho mínimo y se desliza de costado: achicado al
+            ancho de la pantalla, los nombres de los nodos quedarían ilegibles. */}
+        <div className="overflow-x-auto sin-barra -mx-4 px-4 sm:mx-0 sm:px-0">
+          <div
+            className="relative w-full min-w-[640px]"
+            style={{ aspectRatio: `${ANCHO} / ${ALTO}` }}
+          >
+            <svg viewBox={`0 0 ${ANCHO} ${ALTO}`} className="absolute inset-0 w-full h-full">
+              <defs>
+                <linearGradient id="motor-ia" x1="0" y1="0" x2="1" y2="1">
+                  {IRIDISCENTE.map((c, i) => (
+                    <stop key={c} offset={i / (IRIDISCENTE.length - 1)} stopColor={c} />
+                  ))}
+                </linearGradient>
+                <linearGradient id="motor-vidrio" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stopColor="#1c2635" />
+                  <stop offset="1" stopColor="#0b1018" />
+                </linearGradient>
+                <linearGradient id="motor-energia" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0" stopColor="#ff6b35" stopOpacity="0.35" />
+                  <stop offset="0.5" stopColor="#ff8a5c" />
+                  <stop offset="1" stopColor="#ffd2bd" />
+                </linearGradient>
+                {NODOS.map((nodo) => (
+                  <radialGradient key={nodo.id} id={`motor-halo-${nodo.id}`}>
+                    <stop offset="0" stopColor={nodo.color} stopOpacity="0.45" />
+                    <stop offset="1" stopColor={nodo.color} stopOpacity="0" />
+                  </radialGradient>
                 ))}
-              </linearGradient>
-              <linearGradient id="motor-vidrio" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stopColor="#1c2635" />
-                <stop offset="1" stopColor="#0b1018" />
-              </linearGradient>
-              <linearGradient id="motor-energia" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0" stopColor="#ff6b35" stopOpacity="0.35" />
-                <stop offset="0.5" stopColor="#ff8a5c" />
-                <stop offset="1" stopColor="#ffd2bd" />
-              </linearGradient>
-              {NODOS.map((nodo) => (
-                <radialGradient key={nodo.id} id={`motor-halo-${nodo.id}`}>
-                  <stop offset="0" stopColor={nodo.color} stopOpacity="0.45" />
-                  <stop offset="1" stopColor={nodo.color} stopOpacity="0" />
+                <radialGradient id="motor-cabeza">
+                  <stop offset="0" stopColor="#ffffff" />
+                  <stop offset="0.35" stopColor="#ffd2bd" />
+                  <stop offset="1" stopColor="#ff6b35" stopOpacity="0" />
                 </radialGradient>
-              ))}
-              <radialGradient id="motor-cabeza">
-                <stop offset="0" stopColor="#ffffff" />
-                <stop offset="0.35" stopColor="#ffd2bd" />
-                <stop offset="1" stopColor="#ff6b35" stopOpacity="0" />
-              </radialGradient>
-              <filter id="motor-brillo" x="-50%" y="-50%" width="200%" height="200%">
-                <feGaussianBlur stdDeviation="4" result="difuso" />
-                <feMerge>
-                  <feMergeNode in="difuso" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
-              <filter id="motor-difuso" x="-100%" y="-100%" width="300%" height="300%">
-                <feGaussianBlur stdDeviation="7" />
-              </filter>
-            </defs>
+                <filter id="motor-brillo" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="4" result="difuso" />
+                  <feMerge>
+                    <feMergeNode in="difuso" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+                <filter id="motor-difuso" x="-100%" y="-100%" width="300%" height="300%">
+                  <feGaussianBlur stdDeviation="7" />
+                </filter>
+              </defs>
 
-            {/* Aristas: la base, y el flujo que corre por ellas mientras el agente trabaja */}
-            {Object.entries(ARISTAS).map(([clave, d]) => {
-              const encendida = recorridas.has(clave);
-              const larga = LARGAS.has(clave);
-              return (
-                <g key={clave}>
-                  <path
-                    id={idDe(clave)}
-                    ref={(el) => {
-                      trazos.current[clave] = el;
-                    }}
-                    d={d}
-                    fill="none"
-                    stroke="rgba(255,255,255,0.10)"
-                    strokeWidth={larga ? 1.2 : 1.6}
-                    strokeDasharray={larga ? '3 7' : undefined}
-                  />
-                  <path
-                    d={d}
-                    fill="none"
-                    className="motor-flujo"
-                    stroke={encendida ? 'url(#motor-energia)' : 'rgba(148,163,184,0.35)'}
-                    strokeWidth={encendida ? 2.4 : 1.2}
-                    strokeDasharray="2 12"
-                    strokeLinecap="round"
-                    filter={encendida ? 'url(#motor-brillo)' : undefined}
-                    opacity={encendida ? 1 : activo ? 0.6 : 0}
-                    style={{ transition: 'opacity 0.6s, stroke-width 0.4s' }}
-                  />
-                </g>
-              );
-            })}
-
-            {/* Partículas que viajan por las aristas mientras el agente está activo, más densas
-                donde más decisiones pasan */}
-            {activo &&
-              !quieto &&
-              Object.keys(ARISTAS).map((clave) => {
-                const cuantas = Math.round((porArista(clave) / total) * 3);
-                const dur = LARGAS.has(clave) ? 7 : 3.2;
-                return Array.from({ length: cuantas }, (_, k) => (
-                  <circle
-                    key={`${clave}-${k}`}
-                    r={1.8}
-                    fill={clave === 'memoria>persistencia' ? '#00b894' : '#cbd5e1'}
-                    opacity={0.55}
-                  >
-                    <animateMotion
-                      dur={`${dur}s`}
-                      begin={`${(k * dur) / cuantas}s`}
-                      repeatCount="indefinite"
-                    >
-                      <mpath href={`#${idDe(clave)}`} />
-                    </animateMotion>
-                  </circle>
-                ));
+              {/* Aristas: la base, y el flujo que corre por ellas mientras el agente trabaja */}
+              {Object.entries(ARISTAS).map(([clave, d]) => {
+                const encendida = recorridas.has(clave);
+                const larga = LARGAS.has(clave);
+                return (
+                  <g key={clave}>
+                    <path
+                      id={idDe(clave)}
+                      ref={(el) => {
+                        trazos.current[clave] = el;
+                      }}
+                      d={d}
+                      fill="none"
+                      stroke="rgba(255,255,255,0.10)"
+                      strokeWidth={larga ? 1.2 : 1.6}
+                      strokeDasharray={larga ? '3 7' : undefined}
+                    />
+                    <path
+                      d={d}
+                      fill="none"
+                      className="motor-flujo"
+                      stroke={encendida ? 'url(#motor-energia)' : 'rgba(148,163,184,0.35)'}
+                      strokeWidth={encendida ? 2.4 : 1.2}
+                      strokeDasharray="2 12"
+                      strokeLinecap="round"
+                      filter={encendida ? 'url(#motor-brillo)' : undefined}
+                      opacity={encendida ? 1 : activo ? 0.6 : 0}
+                      style={{ transition: 'opacity 0.6s, stroke-width 0.4s' }}
+                    />
+                  </g>
+                );
               })}
 
-            {/* El contexto que entra al modelo mientras razona */}
-            {SINAPSIS.map((d, k) => (
-              <g key={d} opacity={pensando ? 1 : 0} style={{ transition: 'opacity 0.5s' }}>
-                <path
-                  id={`motor-sinapsis-${k}`}
-                  d={d}
-                  fill="none"
-                  stroke="url(#motor-ia)"
-                  strokeWidth={1.6}
-                  strokeDasharray="3 9"
-                  className="motor-flujo"
-                  filter="url(#motor-brillo)"
-                />
-                {pensando &&
-                  !quieto &&
-                  [0, 1, 2].map((j) => (
-                    <circle key={j} r={2.4} fill={IRIDISCENTE[(j + k * 2) % IRIDISCENTE.length]}>
-                      <animateMotion dur="1.1s" begin={`${j * 0.36}s`} repeatCount="indefinite">
-                        <mpath href={`#motor-sinapsis-${k}`} />
+              {/* Partículas que viajan por las aristas mientras el agente está activo, más densas
+                donde más decisiones pasan */}
+              {activo &&
+                !quieto &&
+                Object.keys(ARISTAS).map((clave) => {
+                  const cuantas = Math.round((porArista(clave) / total) * 3);
+                  const dur = LARGAS.has(clave) ? 7 : 3.2;
+                  return Array.from({ length: cuantas }, (_, k) => (
+                    <circle
+                      key={`${clave}-${k}`}
+                      r={1.8}
+                      fill={clave === 'memoria>persistencia' ? '#00b894' : '#cbd5e1'}
+                      opacity={0.55}
+                    >
+                      <animateMotion
+                        dur={`${dur}s`}
+                        begin={`${(k * dur) / cuantas}s`}
+                        repeatCount="indefinite"
+                      >
+                        <mpath href={`#${idDe(clave)}`} />
                       </animateMotion>
                     </circle>
-                  ))}
-              </g>
-            ))}
+                  ));
+                })}
 
-            {/* Rótulos de los tres caminos largos, apoyados sobre la línea */}
-            {rotulos.map((r) => {
-              const etiqueta = `${r.texto} ${n(porArista(r.arista))}/${n(recientes.length)}`;
-              const ancho = etiqueta.length * 6.1 + 24;
-              const encendida = recorridas.has(r.arista);
-              return (
-                <g key={r.arista}>
-                  <rect
-                    x={r.x - ancho / 2}
-                    y={r.y - 10}
-                    width={ancho}
-                    height={20}
-                    rx={10}
-                    fill="#0b1018"
-                    stroke={encendida ? '#ff6b35' : r.color}
-                    strokeOpacity={encendida ? 0.9 : 0.35}
-                    style={{ transition: 'stroke 0.4s' }}
+              {/* El contexto que entra al modelo mientras razona */}
+              {SINAPSIS.map((d, k) => (
+                <g key={d} opacity={pensando ? 1 : 0} style={{ transition: 'opacity 0.5s' }}>
+                  <path
+                    id={`motor-sinapsis-${k}`}
+                    d={d}
+                    fill="none"
+                    stroke="url(#motor-ia)"
+                    strokeWidth={1.6}
+                    strokeDasharray="3 9"
+                    className="motor-flujo"
+                    filter="url(#motor-brillo)"
                   />
-                  <circle cx={r.x - ancho / 2 + 11} cy={r.y} r={2.5} fill={r.color} />
-                  <text
-                    x={r.x + 5}
-                    y={r.y + 3.6}
-                    textAnchor="middle"
-                    fontSize={10.5}
-                    fill="rgba(255,255,255,0.62)"
-                  >
-                    {etiqueta}
-                  </text>
+                  {pensando &&
+                    !quieto &&
+                    [0, 1, 2].map((j) => (
+                      <circle key={j} r={2.4} fill={IRIDISCENTE[(j + k * 2) % IRIDISCENTE.length]}>
+                        <animateMotion dur="1.1s" begin={`${j * 0.36}s`} repeatCount="indefinite">
+                          <mpath href={`#motor-sinapsis-${k}`} />
+                        </animateMotion>
+                      </circle>
+                    ))}
                 </g>
-              );
-            })}
+              ))}
 
-            {/* Los nodos */}
-            {NODOS.map((nodo) => {
-              const activoAca = nodoActivo === nodo.id;
-              const esIA = nodo.id === 'inferencia';
-              const circunferencia = 2 * Math.PI * 45;
-              return (
-                <g key={nodo.id} className="motor-nodo" data-activo={activoAca ? 'si' : 'no'}>
-                  <circle
-                    cx={nodo.x}
-                    cy={nodo.y}
-                    r={62}
-                    fill={`url(#motor-halo-${nodo.id})`}
-                    opacity={activoAca ? 1 : 0.28}
-                    style={{ transition: 'opacity 0.5s' }}
-                  />
-                  {/* El aura del modelo: tenue siempre, encendida cuando razona */}
-                  {esIA && (
-                    <circle
-                      cx={nodo.x}
-                      cy={nodo.y}
-                      r={49}
-                      fill="none"
-                      stroke="url(#motor-ia)"
-                      strokeWidth={pensando ? 5 : 2}
-                      opacity={pensando ? 0.95 : 0.22}
-                      filter="url(#motor-difuso)"
-                      className="motor-giro-rapido"
-                      style={{ transition: 'opacity 0.5s, stroke-width 0.5s' }}
+              {/* Rótulos de los tres caminos largos, apoyados sobre la línea */}
+              {rotulos.map((r) => {
+                const etiqueta = `${r.texto} ${n(porArista(r.arista))}/${n(recientes.length)}`;
+                const ancho = etiqueta.length * 6.1 + 24;
+                const encendida = recorridas.has(r.arista);
+                return (
+                  <g key={r.arista}>
+                    <rect
+                      x={r.x - ancho / 2}
+                      y={r.y - 10}
+                      width={ancho}
+                      height={20}
+                      rx={10}
+                      fill="#0b1018"
+                      stroke={encendida ? '#ff6b35' : r.color}
+                      strokeOpacity={encendida ? 0.9 : 0.35}
+                      style={{ transition: 'stroke 0.4s' }}
                     />
-                  )}
-                  {/* Anillo de uso: qué parte de las últimas decisiones pasó por acá */}
-                  <circle
-                    cx={nodo.x}
-                    cy={nodo.y}
-                    r={45}
-                    fill="none"
-                    stroke="rgba(255,255,255,0.06)"
-                    strokeWidth={2}
-                  />
-                  <circle
-                    cx={nodo.x}
-                    cy={nodo.y}
-                    r={45}
-                    fill="none"
-                    stroke={esIA ? 'url(#motor-ia)' : nodo.color}
-                    strokeWidth={2}
-                    strokeLinecap="round"
-                    strokeDasharray={`${(pasaron(nodo.id) / total) * circunferencia} ${circunferencia}`}
-                    transform={`rotate(-90 ${nodo.x} ${nodo.y})`}
-                    opacity={0.75}
-                    style={{ transition: 'stroke-dasharray 0.9s ease' }}
-                  >
-                    <title>{e.ring(pasaron(nodo.id), recientes.length)}</title>
-                  </circle>
-                  {activoAca && (
+                    <circle cx={r.x - ancho / 2 + 11} cy={r.y} r={2.5} fill={r.color} />
+                    <text
+                      x={r.x + 5}
+                      y={r.y + 3.6}
+                      textAnchor="middle"
+                      fontSize={10.5}
+                      fill="rgba(255,255,255,0.62)"
+                    >
+                      {etiqueta}
+                    </text>
+                  </g>
+                );
+              })}
+
+              {/* Los nodos */}
+              {NODOS.map((nodo) => {
+                const activoAca = nodoActivo === nodo.id;
+                const esIA = nodo.id === 'inferencia';
+                const circunferencia = 2 * Math.PI * 45;
+                return (
+                  <g key={nodo.id} className="motor-nodo" data-activo={activoAca ? 'si' : 'no'}>
                     <circle
                       cx={nodo.x}
                       cy={nodo.y}
-                      r={39}
+                      r={62}
+                      fill={`url(#motor-halo-${nodo.id})`}
+                      opacity={activoAca ? 1 : 0.28}
+                      style={{ transition: 'opacity 0.5s' }}
+                    />
+                    {/* El aura del modelo: tenue siempre, encendida cuando razona */}
+                    {esIA && (
+                      <circle
+                        cx={nodo.x}
+                        cy={nodo.y}
+                        r={49}
+                        fill="none"
+                        stroke="url(#motor-ia)"
+                        strokeWidth={pensando ? 5 : 2}
+                        opacity={pensando ? 0.95 : 0.22}
+                        filter="url(#motor-difuso)"
+                        className="motor-giro-rapido"
+                        style={{ transition: 'opacity 0.5s, stroke-width 0.5s' }}
+                      />
+                    )}
+                    {/* Anillo de uso: qué parte de las últimas decisiones pasó por acá */}
+                    <circle
+                      cx={nodo.x}
+                      cy={nodo.y}
+                      r={45}
                       fill="none"
+                      stroke="rgba(255,255,255,0.06)"
+                      strokeWidth={2}
+                    />
+                    <circle
+                      cx={nodo.x}
+                      cy={nodo.y}
+                      r={45}
+                      fill="none"
+                      stroke={esIA ? 'url(#motor-ia)' : nodo.color}
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeDasharray={`${(pasaron(nodo.id) / total) * circunferencia} ${circunferencia}`}
+                      transform={`rotate(-90 ${nodo.x} ${nodo.y})`}
+                      opacity={0.75}
+                      style={{ transition: 'stroke-dasharray 0.9s ease' }}
+                    >
+                      <title>{e.ring(pasaron(nodo.id), recientes.length)}</title>
+                    </circle>
+                    {activoAca && (
+                      <circle
+                        cx={nodo.x}
+                        cy={nodo.y}
+                        r={39}
+                        fill="none"
+                        stroke={esIA && pensando ? 'url(#motor-ia)' : nodo.color}
+                        strokeWidth={1.2}
+                        strokeDasharray="2 6"
+                        className="motor-giro"
+                      />
+                    )}
+                    <polygon
+                      points={hexagono(nodo.x, nodo.y, R)}
+                      fill="url(#motor-vidrio)"
                       stroke={esIA && pensando ? 'url(#motor-ia)' : nodo.color}
-                      strokeWidth={1.2}
-                      strokeDasharray="2 6"
-                      className="motor-giro"
+                      strokeOpacity={activoAca ? 1 : 0.55}
+                      strokeWidth={activoAca ? 2.4 : 1.4}
+                      style={{ transition: 'stroke-opacity 0.4s, stroke-width 0.4s' }}
                     />
-                  )}
-                  <polygon
-                    points={hexagono(nodo.x, nodo.y, R)}
-                    fill="url(#motor-vidrio)"
-                    stroke={esIA && pensando ? 'url(#motor-ia)' : nodo.color}
-                    strokeOpacity={activoAca ? 1 : 0.55}
-                    strokeWidth={activoAca ? 2.4 : 1.4}
-                    style={{ transition: 'stroke-opacity 0.4s, stroke-width 0.4s' }}
+                    <polygon
+                      points={hexagono(nodo.x, nodo.y, R * 0.72)}
+                      fill="none"
+                      stroke={nodo.color}
+                      strokeOpacity={0.14}
+                    />
+                  </g>
+                );
+              })}
+
+              {/* Destellos alrededor del modelo mientras razona */}
+              {pensando &&
+                !quieto &&
+                destellos.map(([dx, dy, r, retraso]) => (
+                  <path
+                    key={`${dx}-${dy}`}
+                    d={estrella(P.inferencia.x + dx, P.inferencia.y + dy, r)}
+                    fill="url(#motor-ia)"
+                    className="motor-destello"
+                    style={{ animationDelay: `${retraso}s` }}
                   />
+                ))}
+
+              {/* Ondas: cada llegada a un nodo, y el veredicto de la validación */}
+              {!quieto &&
+                ondas.map((o) => (
                   <polygon
-                    points={hexagono(nodo.x, nodo.y, R * 0.72)}
+                    key={o.clave}
+                    points={hexagono(P[o.nodo].x, P[o.nodo].y, R)}
                     fill="none"
-                    stroke={nodo.color}
-                    strokeOpacity={0.14}
+                    stroke={o.color}
+                    strokeWidth={2}
+                    className="motor-onda"
+                    onAnimationEnd={() =>
+                      setOndas((todas) => todas.filter((x) => x.clave !== o.clave))
+                    }
                   />
-                </g>
-              );
-            })}
+                ))}
 
-            {/* Destellos alrededor del modelo mientras razona */}
-            {pensando &&
-              !quieto &&
-              destellos.map(([dx, dy, r, retraso]) => (
-                <path
-                  key={`${dx}-${dy}`}
-                  d={estrella(P.inferencia.x + dx, P.inferencia.y + dy, r)}
-                  fill="url(#motor-ia)"
-                  className="motor-destello"
-                  style={{ animationDelay: `${retraso}s` }}
-                />
-              ))}
+              {/* El cometa: estela y cabeza */}
+              <path
+                ref={estela}
+                fill="none"
+                stroke="#ff6b35"
+                strokeWidth={7}
+                strokeLinecap="round"
+                opacity={0.45}
+                filter="url(#motor-difuso)"
+                strokeDasharray="0 1"
+              />
+              <path
+                ref={estelaBrillo}
+                fill="none"
+                stroke="url(#motor-energia)"
+                strokeWidth={2.6}
+                strokeLinecap="round"
+                strokeDasharray="0 1"
+              />
+              <g ref={cabeza} opacity={0}>
+                <circle r={14} fill="url(#motor-cabeza)" opacity={0.8} />
+                <circle r={3.6} fill="#fff" />
+              </g>
+            </svg>
 
-            {/* Ondas: cada llegada a un nodo, y el veredicto de la validación */}
-            {!quieto &&
-              ondas.map((o) => (
-                <polygon
-                  key={o.clave}
-                  points={hexagono(P[o.nodo].x, P[o.nodo].y, R)}
-                  fill="none"
-                  stroke={o.color}
-                  strokeWidth={2}
-                  className="motor-onda"
-                  onAnimationEnd={() =>
-                    setOndas((todas) => todas.filter((x) => x.clave !== o.clave))
-                  }
-                />
-              ))}
-
-            {/* El cometa: estela y cabeza */}
-            <path
-              ref={estela}
-              fill="none"
-              stroke="#ff6b35"
-              strokeWidth={7}
-              strokeLinecap="round"
-              opacity={0.45}
-              filter="url(#motor-difuso)"
-              strokeDasharray="0 1"
-            />
-            <path
-              ref={estelaBrillo}
-              fill="none"
-              stroke="url(#motor-energia)"
-              strokeWidth={2.6}
-              strokeLinecap="round"
-              strokeDasharray="0 1"
-            />
-            <g ref={cabeza} opacity={0}>
-              <circle r={14} fill="url(#motor-cabeza)" opacity={0.8} />
-              <circle r={3.6} fill="#fff" />
-            </g>
-          </svg>
-
-          {/* Íconos y nombres de cada nodo, encima del dibujo */}
-          {NODOS.map((nodo) => {
-            const Icono = nodo.icono;
-            const activoAca = nodoActivo === nodo.id;
-            const iridiscente = nodo.id === 'inferencia' && pensando;
-            return (
-              <div key={nodo.id}>
-                <Icono
-                  className="absolute w-5 h-5 -translate-x-1/2 -translate-y-1/2 transition-all duration-300"
-                  style={{
-                    left: `${(nodo.x / ANCHO) * 100}%`,
-                    top: `${(nodo.y / ALTO) * 100}%`,
-                    color: activoAca ? '#ffffff' : nodo.color,
-                    filter: activoAca ? `drop-shadow(0 0 6px ${nodo.color})` : undefined,
-                  }}
-                />
-                <div
-                  className="absolute -translate-x-1/2 flex flex-col items-center"
-                  style={{
-                    left: `${(nodo.x / ANCHO) * 100}%`,
-                    top: `${((nodo.y + R + 17) / ALTO) * 100}%`,
-                  }}
-                >
-                  <span
-                    className={`font-mono-display text-[11px] tracking-wide transition-colors duration-300 ${
-                      iridiscente ? 'motor-iridiscente' : ''
-                    }`}
+            {/* Íconos y nombres de cada nodo, encima del dibujo */}
+            {NODOS.map((nodo) => {
+              const Icono = nodo.icono;
+              const activoAca = nodoActivo === nodo.id;
+              const iridiscente = nodo.id === 'inferencia' && pensando;
+              return (
+                <div key={nodo.id}>
+                  <Icono
+                    className="absolute w-5 h-5 -translate-x-1/2 -translate-y-1/2 transition-all duration-300"
                     style={{
-                      color: iridiscente
-                        ? undefined
-                        : activoAca
-                          ? '#ffffff'
-                          : 'rgba(255,255,255,0.62)',
+                      left: `${(nodo.x / ANCHO) * 100}%`,
+                      top: `${(nodo.y / ALTO) * 100}%`,
+                      color: activoAca ? '#ffffff' : nodo.color,
+                      filter: activoAca ? `drop-shadow(0 0 6px ${nodo.color})` : undefined,
+                    }}
+                  />
+                  <div
+                    className="absolute -translate-x-1/2 flex flex-col items-center"
+                    style={{
+                      left: `${(nodo.x / ANCHO) * 100}%`,
+                      top: `${((nodo.y + R + 17) / ALTO) * 100}%`,
                     }}
                   >
-                    {e.nodes[nodo.id].name}
-                  </span>
-                  {iridiscente && (
-                    <span className="flex items-end gap-[2px] h-2.5 mt-1" aria-hidden>
-                      {IRIDISCENTE.map((color, b) => (
-                        <span
-                          key={color}
-                          className="motor-barra w-[2px] h-full rounded-full"
-                          style={{ background: color, animationDelay: `${b * 0.12}s` }}
-                        />
-                      ))}
+                    <span
+                      className={`font-mono-display text-[11px] tracking-wide transition-colors duration-300 ${
+                        iridiscente ? 'motor-iridiscente' : ''
+                      }`}
+                      style={{
+                        color: iridiscente
+                          ? undefined
+                          : activoAca
+                            ? '#ffffff'
+                            : 'rgba(255,255,255,0.62)',
+                      }}
+                    >
+                      {e.nodes[nodo.id].name}
                     </span>
-                  )}
+                    {iridiscente && (
+                      <span className="flex items-end gap-[2px] h-2.5 mt-1" aria-hidden>
+                        {IRIDISCENTE.map((color, b) => (
+                          <span
+                            key={color}
+                            className="motor-barra w-[2px] h-full rounded-full"
+                            style={{ background: color, animationDelay: `${b * 0.12}s` }}
+                          />
+                        ))}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
 
-          {/* Lo que acaba de guardar la persistencia */}
-          {resultado && (
-            <div
-              key={resultado.doc_id}
-              className="motor-aparece absolute -translate-x-1/2 rounded-lg px-2.5 py-1 text-[10px] font-medium whitespace-nowrap backdrop-blur"
-              style={{
-                left: `${(P.persistencia.x / ANCHO) * 100 - 1}%`,
-                top: `${((P.persistencia.y + R + 44) / ALTO) * 100}%`,
-                color: SEVERITY_COLOR[resultado.severidad ?? ''] ?? 'rgba(255,255,255,0.7)',
-                background: 'rgba(9,13,19,0.85)',
-                boxShadow: `inset 0 0 0 1px ${SEVERITY_COLOR[resultado.severidad ?? ''] ?? '#475569'}, 0 0 18px ${
-                  SEVERITY_COLOR[resultado.severidad ?? ''] ?? '#475569'
-                }55`,
-              }}
-            >
-              {resultado.severidad
-                ? t.severities[resultado.severidad as keyof typeof t.severities]
-                : t.triage.notConcluded}
-              {resultado.tactica_mitre ? `, ${tacticName(resultado.tactica_mitre)}` : ''}
-            </div>
-          )}
+            {/* Lo que acaba de guardar la persistencia */}
+            {resultado && (
+              <div
+                key={resultado.doc_id}
+                className="motor-aparece absolute -translate-x-1/2 rounded-lg px-2.5 py-1 text-[10px] font-medium whitespace-nowrap backdrop-blur"
+                style={{
+                  left: `${(P.persistencia.x / ANCHO) * 100 - 1}%`,
+                  top: `${((P.persistencia.y + R + 44) / ALTO) * 100}%`,
+                  color: SEVERITY_COLOR[resultado.severidad ?? ''] ?? 'rgba(255,255,255,0.7)',
+                  background: 'rgba(9,13,19,0.85)',
+                  boxShadow: `inset 0 0 0 1px ${SEVERITY_COLOR[resultado.severidad ?? ''] ?? '#475569'}, 0 0 18px ${
+                    SEVERITY_COLOR[resultado.severidad ?? ''] ?? '#475569'
+                  }55`,
+                }}
+              >
+                {resultado.severidad
+                  ? t.severities[resultado.severidad as keyof typeof t.severities]
+                  : t.triage.notConcluded}
+                {resultado.tactica_mitre ? `, ${tacticName(resultado.tactica_mitre)}` : ''}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Qué está haciendo el agente, y lo que va llegando */}
@@ -899,7 +879,7 @@ export default function EngineLive({
             data-pensando={pensando && !quieto ? 'si' : 'no'}
           >
             <div className="motor-borde-interior flex-1 rounded-xl bg-[#0b1018] ring-1 ring-white/[0.07] p-3.5 min-h-[138px]">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <span className="flex items-center gap-2 min-w-0">
                   <span
                     className={`text-[9px] uppercase tracking-[0.14em] shrink-0 ${
@@ -972,7 +952,7 @@ export default function EngineLive({
           </div>
 
           <div className="rounded-xl bg-white/[0.02] ring-1 ring-white/[0.07] p-3.5">
-            <div className="text-[9px] uppercase tracking-[0.14em] text-white/35">{e.feed}</div>
+            <div className="rotulo">{e.feed}</div>
             <ul className="mt-2 flex flex-col gap-0.5">
               {recientes.slice(0, 7).map((d) => {
                 const esta = enCurso?.doc_id === d.doc_id;
@@ -987,7 +967,7 @@ export default function EngineLive({
                   <li key={d.doc_id} className="motor-entrada">
                     <button
                       onClick={() => onElegir(d.doc_id)}
-                      className={`relative w-full grid grid-cols-[62px_110px_minmax(0,1fr)_auto] gap-2 items-center rounded-md px-2 py-1 text-left transition ${
+                      className={`relative w-full grid grid-cols-[56px_minmax(0,1fr)_auto] sm:grid-cols-[62px_110px_minmax(0,1fr)_auto] gap-2 items-center rounded-md px-2 py-1 text-left transition ${
                         esta ? 'bg-white/[0.05]' : 'hover:bg-white/[0.03]'
                       }`}
                     >
@@ -1010,7 +990,7 @@ export default function EngineLive({
                       >
                         {tipo}
                       </span>
-                      <span className="font-data text-[10px] text-white/65 truncate">
+                      <span className="hidden sm:block font-data text-[10px] text-white/65 truncate">
                         {d.resumen}
                       </span>
                       <span

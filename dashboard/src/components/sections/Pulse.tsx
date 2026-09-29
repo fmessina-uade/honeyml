@@ -11,7 +11,9 @@ import type { HourPoint, Overview, TimelinePoint, WeeklyRhythm } from '../../lib
 import CountUp from '../CountUp';
 import Reveal from '../Reveal';
 import Tooltip, { useTooltip } from '../Tooltip';
-import { n, pct, dec } from '../../lib/format';
+import ManoAlzada, { type Nota, type Trazo } from '../ManoAlzada';
+import { n, pct, dec, localeActual } from '../../lib/format';
+import { Indicador } from '../Instrumento';
 import { useI18n } from '../../lib/i18n';
 import TimelineControls, {
   ATAJOS,
@@ -34,17 +36,35 @@ const SENSOR_COLOR: Record<string, string> = {
  * de parsear la fecha. Partir la etiqueta entera por guiones deja el día pegado a la hora, que
  * parsea como NaN y hace que los tooltips horarios digan "Invalid Date".
  */
-function longDate(etiqueta: string, lang: 'es' | 'en'): string {
+function longDate(etiqueta: string): string {
   const [fecha, hora] = etiqueta.split(' ');
   const [y, m, d] = fecha.split('-').map(Number);
   if (!y || !m || !d) return etiqueta;
 
-  const texto = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(
-    lang === 'en' ? 'en-GB' : 'es-AR',
-    { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' },
-  );
+  const texto = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(localeActual(), {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'UTC',
+  });
   return hora ? `${texto}, ${hora.padStart(2, '0')}:00 UTC` : texto;
 }
+
+/** Fecha corta para las anotaciones a mano: "3 de junio". */
+function fechaCorta(etiqueta: string): string {
+  const [y, m, d] = etiqueta.split(' ')[0].split('-').map(Number);
+  if (!y || !m || !d) return etiqueta;
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(localeActual(), {
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'UTC',
+  });
+}
+
+// Qué parte de la altura ocupa la barra más alta. El resto queda libre para las anotaciones.
+const ALTURA_BARRAS = 78;
+// En el gráfico por hora las barras son casi iguales, así que la nota necesita más lugar arriba.
+const ALTURA_HORAS = 58;
 
 /**
  * La apertura: la escala cruda. Una máquina que nadie anunció, bajo ataque constante.
@@ -63,7 +83,7 @@ export default function Pulse({
   hourly: HourPoint[];
   weekly?: WeeklyRhythm;
 }) {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const tip = useTooltip();
 
   // La serie del snapshot es la vista por defecto. En cuanto se toca un filtro se pide una serie
@@ -85,13 +105,13 @@ export default function Pulse({
 
   // Un filtro que no se pudo aplicar no cuenta como filtro. Se distingue de `completo` (que es un
   // hecho sobre las fechas y gobierna qué se pide) porque este gobierna qué se dice: sin la
-  // distinción, el encabezado anunciaba el rango elegido sobre un gráfico que seguía mostrando el
-  // período entero.
+  // distinción, el encabezado anunciaría el rango elegido sobre un gráfico que muestra el período
+  // entero.
   const filtroAplicado = !completo && problema === null;
 
   // Cambiar el intervalo ajusta el rango cuando hace falta: por hora sobre los tres meses completos
   // son más de dos mil barras en novecientos píxeles, y solo los huecos entre ellas ya ocupan más
-  // que el ancho disponible, así que el gráfico salía vacío. Volver a día o semana recupera todo.
+  // que el ancho disponible, así que el gráfico saldría vacío. Volver a día o semana recupera todo.
   const cambiarIntervalo = (i: Interval) => {
     setInterval(i);
     if (i === 'hour' && completo) {
@@ -121,7 +141,7 @@ export default function Pulse({
       setHasta(maximo);
       return;
     }
-    // "Ayer" es un día solo, no desde ayer hasta hoy: los dos extremos se mueven juntos.
+    // El atajo del día anterior es un solo día y no un rango: los dos extremos se mueven juntos.
     const fin = a === 'ayer' ? desplazar(1) : maximo;
     setDesde(a === 'ayer' ? fin : desplazar(dias));
     setHasta(fin);
@@ -155,8 +175,8 @@ export default function Pulse({
       })
       .catch((e: Error) => {
         if (!vigente) return;
-        // Antes acá solo se descartaba la serie, y el gráfico volvía en silencio al período
-        // completo con los controles marcando el rango elegido. El motivo lo explica la API.
+        // Sin avisar, el gráfico volvería en silencio al período completo con los controles
+        // marcando el rango elegido. El motivo lo explica la API.
         setSerie(null);
         setProblema(e.message);
       })
@@ -169,9 +189,9 @@ export default function Pulse({
   const timeline = serie ?? timelineBase;
 
   // Las tarjetas describen la captura completa; el gráfico, lo seleccionado. Los números grandes
-  // vienen del resumen y no se filtran, así que mientras lo derivado salía de la serie filtrada,
-  // elegir una semana dejaba "2,7 millones de eventos" arriba y "390.000 por día" abajo, que es un
-  // total dividido por los días de otro rango.
+  // vienen del resumen y no se filtran, así que lo derivado también sale de la serie completa: de
+  // la filtrada, elegir una semana mostraría el total de la captura dividido por los días de otro
+  // rango.
   const days = timelineBase.filter((d) => d.count > 0).length;
   const perDay = days ? Math.round(overview.events / days) : 0;
   const peak = timelineBase.reduce((a, b) => (b.count > a.count ? b : a), timelineBase[0]);
@@ -183,7 +203,7 @@ export default function Pulse({
       value: overview.events,
       sub: t.pulse.perDay(n(perDay)),
       glow: 'var(--honey-amber)',
-      detail: t.pulse.peak(n(peak?.count ?? 0), peak ? longDate(peak.date, lang) : '—'),
+      detail: t.pulse.peak(n(peak?.count ?? 0), peak ? longDate(peak.date) : '—'),
     },
     {
       icon: Fingerprint,
@@ -212,10 +232,45 @@ export default function Pulse({
   ];
 
   const max = Math.max(...timeline.map((d) => d.count), 1);
+
+  // La anotación a mano del gráfico diario: encierra el pico de lo que se está viendo y dice cuándo
+  // fue. Sale de la serie visible, así sigue al filtro.
+  const iPico = timeline.reduce((mejor, d, i) => (d.count > timeline[mejor].count ? i : mejor), 0);
+  const pico = timeline[iPico];
+  const xPico = timeline.length ? ((iPico + 0.5) / timeline.length) * 100 : 50;
+  const aLaIzquierda = xPico > 55;
+  const yPico = 100 - ALTURA_BARRAS;
+  const trazosDelPico: Trazo[] = [
+    {
+      tipo: 'elipse',
+      x: xPico,
+      y: yPico + 7,
+      ancho: Math.max((100 / Math.max(timeline.length, 1)) * 4, 4.5),
+      alto: 28,
+    },
+    {
+      tipo: 'flecha',
+      desde: [aLaIzquierda ? xPico - 12 : xPico + 12, 9],
+      hasta: [aLaIzquierda ? xPico - 3 : xPico + 3, yPico + 1],
+      curva: aLaIzquierda ? -0.35 : 0.35,
+    },
+  ];
+  const notasDelPico: Nota[] = pico
+    ? [
+        {
+          x: aLaIzquierda ? xPico - 13 : xPico + 13,
+          y: -2,
+          texto: t.pulse.notePeak(n(pico.count), fechaCorta(pico.date)),
+          alinear: aLaIzquierda ? 'derecha' : 'izquierda',
+          ancho: 200,
+        },
+      ]
+    : [];
   const maxHour = Math.max(...hourly.map((h) => h.count), 1);
   const minHour = hourly.length ? Math.min(...hourly.map((h) => h.count)) : 0;
   // pico contra valle: un ritmo humano queda bastante por encima de 3x, la automatización cerca de 1
   const ratio = minHour > 0 ? maxHour / minHour : 0;
+  const promedioHora = hourly.length ? hourly.reduce((a, h) => a + h.count, 0) / hourly.length : 0;
 
   const sensors = Object.keys(overview.by_sensor);
 
@@ -232,7 +287,7 @@ export default function Pulse({
 
   // Interrupciones de captura, siempre contadas en días. Siguen la selección pero se leen de la
   // serie diaria: con el intervalo por hora, dos horas seguidas en cero no distinguen un sensor
-  // caído de una madrugada tranquila, y el bloque declaraba cortes que nunca ocurrieron. Un día
+  // caído de una madrugada tranquila, y el bloque declararía cortes que nunca ocurrieron. Un día
   // entero sin un solo evento sí es un corte, porque llegan unos treinta mil por día.
   const outages: { from: string; to: string; days: number }[] = [];
   let run: string[] = [];
@@ -255,8 +310,12 @@ export default function Pulse({
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {tiles.map((tile, i) => (
           <Reveal key={tile.label} delay={i * 80}>
-            <div
-              className="tile rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-4 h-full cursor-default"
+            <Indicador
+              icono={tile.icon}
+              rotulo={tile.label}
+              valor={<CountUp end={tile.value} />}
+              sub={tile.sub}
+              color={tile.glow}
               onMouseMove={(e) =>
                 tip.show(
                   e,
@@ -266,30 +325,16 @@ export default function Pulse({
                 )
               }
               onMouseLeave={tip.hide}
-            >
-              <span className="tile-glow" style={{ background: tile.glow }} />
-              <div className="relative">
-                <div className="flex items-center gap-2 text-white/35">
-                  <tile.icon className="w-3.5 h-3.5" />
-                  <span className="text-[9px] uppercase tracking-wider">{tile.label}</span>
-                </div>
-                <div className="font-data text-2xl text-white mt-2">
-                  <CountUp end={tile.value} />
-                </div>
-                <div className="text-[10px] text-white/40 mt-1">{tile.sub}</div>
-              </div>
-            </div>
+            />
           </Reveal>
         ))}
       </div>
 
       <Reveal delay={200}>
-        <div className="rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-4">
+        <div className="panel p-4">
           <div className="flex items-baseline justify-between mb-1 flex-wrap gap-2">
-            <span className="text-[9px] uppercase tracking-wider text-white/35">
-              {t.pulse.chartTitle}
-            </span>
-            <div className="flex items-center gap-3">
+            <span className="rotulo">{t.pulse.chartTitle}</span>
+            <div className="flex items-center gap-3 flex-wrap">
               {sensors.map((s) => (
                 <span key={s} className="flex items-center gap-1.5 text-[10px] text-white/45">
                   <span
@@ -299,13 +344,12 @@ export default function Pulse({
                   {s}
                 </span>
               ))}
-              {/* El rango que se está viendo, no el de la captura entera.
-                  Estaba atado al resumen, así que elegir "ayer" o mover una fecha dejaba acá el
-                  período completo: el gráfico cambiaba y su encabezado seguía diciendo lo mismo. */}
+              {/* El rango que se está viendo, no el de la captura entera: si no, el gráfico
+                  cambiaría con el filtro y su encabezado seguiría diciendo lo mismo. */}
               <span className="font-data text-[10px] text-white/30">
-                {filtroAplicado ? `${desde} → ${hasta}` : `${minimo} → ${maximo}`}
+                {filtroAplicado ? t.footer.range(desde, hasta) : t.footer.range(minimo, maximo)}
                 {filtroAplicado && (
-                  <span className="text-[var(--honey-amber)]/70"> · {t.pulse.filtered}</span>
+                  <span className="ml-2 text-[var(--honey-amber)]/70">{t.pulse.filtered}</span>
                 )}
               </span>
             </div>
@@ -343,80 +387,89 @@ export default function Pulse({
             </div>
           )}
 
-          <div className="bar-group flex items-end gap-[2px] h-32 mt-3">
-            {timeline.map((d) => {
-              const empty = d.count === 0;
-              return (
-                <div
-                  key={d.date}
-                  className="bar-item flex-1 flex flex-col justify-end h-full transition-opacity duration-200 cursor-default"
-                  onMouseMove={(e) =>
-                    tip.show(
-                      e,
-                      <div className="min-w-[168px]">
-                        <div className="text-[11px] text-white/90 first-letter:uppercase">
-                          {longDate(d.date, lang)}
-                        </div>
-                        {empty ? (
-                          <div className="text-[10px] text-white/45 mt-1.5 max-w-[190px] leading-snug">
-                            {t.pulse.noCapture}
+          <div className="relative mt-3">
+            <div className="bar-group flex items-end gap-px sm:gap-[2px] h-40 sm:h-44">
+              {timeline.map((d) => {
+                const empty = d.count === 0;
+                return (
+                  <div
+                    key={d.date}
+                    className="bar-item flex-1 flex flex-col justify-end h-full transition-opacity duration-200 cursor-default"
+                    onMouseMove={(e) =>
+                      tip.show(
+                        e,
+                        <div className="min-w-[168px]">
+                          <div className="text-[11px] text-white/90 first-letter:uppercase">
+                            {longDate(d.date)}
                           </div>
-                        ) : (
-                          <>
-                            <div className="font-data text-[15px] text-white mt-0.5">
-                              {n(d.count)}
+                          {empty ? (
+                            <div className="text-[10px] text-white/45 mt-1.5 max-w-[190px] leading-snug">
+                              {t.pulse.noCapture}
                             </div>
-                            <div className="flex flex-col gap-0.5 mt-1.5">
-                              {sensors.map((s) => {
-                                const v = (d as unknown as Record<string, number>)[s] ?? 0;
-                                return (
-                                  <span
-                                    key={s}
-                                    className="flex items-center gap-1.5 text-[10px] text-white/55"
-                                  >
+                          ) : (
+                            <>
+                              <div className="font-data text-[15px] text-white mt-0.5">
+                                {n(d.count)}
+                              </div>
+                              <div className="flex flex-col gap-0.5 mt-1.5">
+                                {sensors.map((s) => {
+                                  const v = (d as unknown as Record<string, number>)[s] ?? 0;
+                                  return (
                                     <span
-                                      className="w-1.5 h-1.5 rounded-sm"
-                                      style={{
-                                        background: SENSOR_COLOR[s] ?? 'var(--ghost-slate)',
-                                      }}
-                                    />
-                                    {s}
-                                    <span className="font-data ml-auto text-white/75">{n(v)}</span>
-                                  </span>
-                                );
-                              })}
-                            </div>
-                            <div className="text-[9px] text-white/30 mt-1.5">
-                              {t.pulse.ofTotal(pct(d.count, overview.events))}
-                            </div>
-                          </>
-                        )}
-                      </div>,
-                    )
-                  }
-                  onMouseLeave={tip.hide}
-                >
-                  {empty ? (
-                    <div className="w-full border-b border-dashed border-white/12" />
-                  ) : (
-                    sensors.map((s) => {
-                      const v = (d as unknown as Record<string, number>)[s] ?? 0;
-                      if (!v) return null;
-                      return (
-                        <div
-                          key={s}
-                          className="w-full rounded-[1px]"
-                          style={{
-                            height: `${Math.max((v / max) * 100, 1.5)}%`,
-                            background: SENSOR_COLOR[s] ?? 'var(--ghost-slate)',
-                          }}
-                        />
-                      );
-                    })
-                  )}
-                </div>
-              );
-            })}
+                                      key={s}
+                                      className="flex items-center gap-1.5 text-[10px] text-white/55"
+                                    >
+                                      <span
+                                        className="w-1.5 h-1.5 rounded-sm"
+                                        style={{
+                                          background: SENSOR_COLOR[s] ?? 'var(--ghost-slate)',
+                                        }}
+                                      />
+                                      {s}
+                                      <span className="font-data ml-auto text-white/75">
+                                        {n(v)}
+                                      </span>
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                              <div className="text-[9px] text-white/30 mt-1.5">
+                                {t.pulse.ofTotal(pct(d.count, overview.events))}
+                              </div>
+                            </>
+                          )}
+                        </div>,
+                      )
+                    }
+                    onMouseLeave={tip.hide}
+                  >
+                    {empty ? (
+                      <div className="w-full border-b border-dashed border-white/12" />
+                    ) : (
+                      sensors.map((s) => {
+                        const v = (d as unknown as Record<string, number>)[s] ?? 0;
+                        if (!v) return null;
+                        return (
+                          <div
+                            key={s}
+                            className="w-full rounded-t-[2px]"
+                            style={{
+                              height: `${Math.max((v / max) * ALTURA_BARRAS, 1.2)}%`,
+                              background: `linear-gradient(180deg, ${
+                                SENSOR_COLOR[s] ?? 'var(--ghost-slate)'
+                              }, color-mix(in srgb, ${SENSOR_COLOR[s] ?? 'var(--ghost-slate)'} 35%, transparent))`,
+                            }}
+                          />
+                        );
+                      })
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {pico && pico.count > 0 && !cargando && (
+              <ManoAlzada trazos={trazosDelPico} notas={notasDelPico} />
+            )}
           </div>
 
           <div className="text-[10px] text-white/35 mt-2.5 leading-relaxed">
@@ -425,52 +478,76 @@ export default function Pulse({
         </div>
       </Reveal>
 
-      {/* Hour of day: the flat curve is the finding. Human traffic has office hours; this does
-          not, because there is nobody on the other side. */}
+      {/* La hora del día: lo que se encuentra es que la curva es plana. El tráfico humano tiene
+          horario de oficina; este no, porque del otro lado no hay nadie. */}
       <Reveal delay={260}>
         <div className="grid lg:grid-cols-[1fr_320px] gap-3">
-          <div className="rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-4">
+          <div className="panel p-4">
             <div className="flex items-baseline justify-between gap-3 flex-wrap">
-              <span className="text-[9px] uppercase tracking-wider text-white/35">
-                {t.pulse.busiest}
-              </span>
+              <span className="rotulo">{t.pulse.busiest}</span>
               <span className="font-data text-[10px] text-white/30">
                 {t.pulse.ratio(dec(ratio))}
               </span>
             </div>
 
-            <div className="bar-group flex items-end gap-[3px] h-20 mt-3">
-              {hourly.map((h) => (
-                <div
-                  key={h.hour}
-                  className="bar-item flex-1 flex flex-col justify-end h-full transition-opacity duration-200 cursor-default"
-                  onMouseMove={(e) =>
-                    tip.show(
-                      e,
-                      <div className="min-w-[150px]">
-                        <div className="font-data text-[11px] text-white/90">
-                          {String(h.hour).padStart(2, '0')}:00 UTC
-                        </div>
-                        <div className="font-data text-[15px] text-white mt-0.5">{n(h.count)}</div>
-                        <div className="text-[10px] text-white/45">{t.pulse.events_short}</div>
-                        <div className="text-[10px] text-white/40 mt-1.5 pt-1.5 border-t border-white/8">
-                          {n(h.logins)} {t.pulse.loginsAtThisHour}
-                        </div>
-                      </div>,
-                    )
-                  }
-                  onMouseLeave={tip.hide}
-                >
+            <div className="relative mt-3">
+              <div className="bar-group flex items-end gap-[2px] sm:gap-[3px] h-28">
+                {hourly.map((h) => (
                   <div
-                    className="w-full rounded-sm transition-all duration-700"
-                    style={{
-                      height: `${(h.count / maxHour) * 100}%`,
-                      background: 'var(--honey-amber)',
-                      opacity: 0.55 + (h.count / maxHour) * 0.45,
-                    }}
-                  />
-                </div>
-              ))}
+                    key={h.hour}
+                    className="bar-item flex-1 flex flex-col justify-end h-full transition-opacity duration-200 cursor-default"
+                    onMouseMove={(e) =>
+                      tip.show(
+                        e,
+                        <div className="min-w-[150px]">
+                          <div className="font-data text-[11px] text-white/90">
+                            {String(h.hour).padStart(2, '0')}:00 UTC
+                          </div>
+                          <div className="font-data text-[15px] text-white mt-0.5">
+                            {n(h.count)}
+                          </div>
+                          <div className="text-[10px] text-white/45">{t.pulse.events_short}</div>
+                          <div className="text-[10px] text-white/40 mt-1.5 pt-1.5 border-t border-white/8">
+                            {n(h.logins)} {t.pulse.loginsAtThisHour}
+                          </div>
+                        </div>,
+                      )
+                    }
+                    onMouseLeave={tip.hide}
+                  >
+                    <div
+                      className="w-full rounded-sm transition-all duration-700"
+                      style={{
+                        height: `${(h.count / maxHour) * ALTURA_HORAS}%`,
+                        background:
+                          'linear-gradient(180deg, var(--honey-amber), color-mix(in srgb, var(--honey-amber) 30%, transparent))',
+                        opacity: 0.6 + (h.count / maxHour) * 0.4,
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+              {hourly.length > 0 && ratio > 0 && (
+                <ManoAlzada
+                  trazos={[
+                    {
+                      tipo: 'subrayado',
+                      x1: 1,
+                      x2: 99,
+                      y: 100 - (promedioHora / maxHour) * ALTURA_HORAS - 6,
+                    },
+                  ]}
+                  notas={[
+                    {
+                      x: 99,
+                      y: 0,
+                      texto: t.pulse.noteFlat(dec(ratio)),
+                      alinear: 'derecha',
+                      ancho: 470,
+                    },
+                  ]}
+                />
+              )}
             </div>
             <div className="flex justify-between font-data text-[9px] text-white/25 mt-1.5">
               <span>00</span>
@@ -484,11 +561,9 @@ export default function Pulse({
             </div>
           </div>
 
-          {/* Outages, derived from the gaps in the timeline itself */}
-          <div className="rounded-xl ring-1 ring-white/5 bg-white/[0.03] p-4">
-            <div className="text-[9px] uppercase tracking-wider text-white/35">
-              {t.pulse.outages}
-            </div>
+          {/* Los cortes de captura, deducidos de los huecos de la propia serie */}
+          <div className="panel p-4">
+            <div className="rotulo">{t.pulse.outages}</div>
             {outages.length > 0 ? (
               <>
                 <div className="flex flex-col gap-2 mt-3">
@@ -498,7 +573,7 @@ export default function Pulse({
                       className="flex items-center justify-between gap-2 rounded-lg bg-white/[0.02] ring-1 ring-white/5 px-2.5 py-2"
                     >
                       <span className="font-data text-[10px] text-white/60">
-                        {o.from.slice(5)} → {o.to.slice(5)}
+                        {t.footer.range(o.from.slice(5), o.to.slice(5))}
                       </span>
                       <span className="text-[10px] text-white/35">{t.pulse.days(o.days)}</span>
                     </div>

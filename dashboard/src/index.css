@@ -2,16 +2,75 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Cuatro voces y ninguna más. Inter para la interfaz y la prosa, JetBrains Mono para los nombres
+   propios de las cosas (secciones, servicios, nodos), Fira Code para todo lo que es un dato
+   (cifras, direcciones, comandos, fechas) y Caveat para las anotaciones a mano alzada. */
 * {
   font-family: 'Inter', sans-serif;
 }
 .font-mono-display,
 .font-mono-display * {
   font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
 }
 .font-data,
 .font-data * {
   font-family: 'Fira Code', monospace;
+  font-variant-ligatures: none;
+}
+/* La letra de las anotaciones a mano alzada: la voz de quien explica, no la de los datos. */
+.font-mano,
+.font-mano * {
+  font-family: 'Caveat', cursive;
+  font-weight: 600;
+}
+
+/* El rótulo de cada bloque y cada cifra, iguales en todo el panel: con un tamaño distinto por
+   sección, el salto se nota al pasar de una a otra. */
+.rotulo {
+  font-size: 9px;
+  line-height: 1.4;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+}
+/* La regla de Inter va sobre todos los elementos y no se hereda, así que cada voz se declara
+   también para lo que lleva adentro: una cifra que envuelve un contador sigue siendo una cifra. */
+.cifra,
+.cifra * {
+  font-family: 'Fira Code', monospace;
+  font-variant-ligatures: none;
+}
+.cifra-chica,
+.cifra-chica * {
+  font-family: 'Fira Code', monospace;
+  font-variant-ligatures: none;
+}
+.titulo,
+.titulo * {
+  font-family: 'JetBrains Mono', monospace;
+}
+.cifra {
+  font-size: 24px;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+.cifra-chica {
+  font-size: 15px;
+  line-height: 1.25;
+  color: rgba(255, 255, 255, 0.9);
+}
+.titulo {
+  font-weight: 500;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.9);
+}
+/* Texto de interfaz dentro de una cifra o de un dato, como la unidad al lado de un número. */
+.prosa,
+.prosa * {
+  font-family: 'Inter', sans-serif;
+  letter-spacing: normal;
 }
 
 :root {
@@ -27,23 +86,51 @@ body {
   color: #fff;
 }
 
-@keyframes rowEnter {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-.row-enter {
-  animation: rowEnter 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+/* El papel del instrumento: una grilla de puntos muy tenue detrás de todo, la misma sobre la que
+   se dibujan las anotaciones a mano. */
+.papel {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 22px 22px;
+  background-position: -11px -11px;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .row-enter {
-    animation: none;
+/* La tarjeta de todo el panel. El filo se enciende cerca del puntero, como el bisel de un
+   instrumento cuando le da la luz; la posición la escribe un único oyente en App. */
+.panel {
+  position: relative;
+  border-radius: 0.8rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.02));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+.panel-tenue {
+  background: rgba(255, 255, 255, 0.015);
+}
+.panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: radial-gradient(
+    240px circle at var(--mx, -400px) var(--my, -400px),
+    rgba(212, 134, 10, 0.55),
+    transparent 70%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+}
+.panel:hover::before {
+  opacity: 1;
+}
+@media (hover: none) {
+  .panel::before {
+    display: none;
   }
 }
 
@@ -60,28 +147,9 @@ body {
   transform: none;
 }
 
-/* Resplandor detrás de las tarjetas de números, con el degradado de marca. */
+/* Resplandor detrás de las tarjetas de números, en el color de cada una. */
 .tile {
   position: relative;
-}
-.tile::before {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  border-radius: 0.75rem;
-  padding: 1px;
-  background: linear-gradient(140deg, rgba(212, 134, 10, 0.35), transparent 55%);
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  opacity: 0;
-  transition: opacity 0.5s ease;
-  pointer-events: none;
-}
-.tile:hover::before {
-  opacity: 1;
 }
 .tile-glow {
   position: absolute;
@@ -103,7 +171,7 @@ body {
     transition: none;
   }
   .tile-glow,
-  .tile::before {
+  .panel::before {
     transition: none;
   }
 }
@@ -214,6 +282,15 @@ body {
 }
 .thin-scroll::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.22);
+}
+
+/* La fila de secciones del teléfono se desliza con el dedo; la barra de desplazamiento solo
+   ocuparía lugar. */
+.sin-barra {
+  scrollbar-width: none;
+}
+.sin-barra::-webkit-scrollbar {
+  display: none;
 }
 
 /* Hover sobre una barra: se levanta la barra y se atenúan las vecinas. */
@@ -441,12 +518,14 @@ body {
    puntero saldría resaltado y distinto del resto. Apagar los eventos de puntero lo evita sin tener
    que enumerar cada estilo de hover, que son decenas de utilidades distintas.
 
-   El desplazamiento con la rueda sigue funcionando: el evento no encuentra destino acá y sube
-   hasta el documento, que es quien desplaza. Lo que se pierde es poder hacer clic mientras el modo
-   está activo, que para un modo pensado para sacar capturas es el comportamiento correcto. */
+   El contenedor principal queda exceptuado porque es el que desplaza: sin puntero, la rueda no
+   encontraría qué mover. Él no tiene estilos de hover propios, así que no deja rastro en la
+   captura. Lo que se pierde es poder hacer clic mientras el modo está activo, que para un modo
+   pensado para sacar capturas es el comportamiento correcto. */
 :root[data-capture='on'] body * {
   pointer-events: none !important;
 }
+:root[data-capture='on'] main,
 :root[data-capture='on'] [data-capture-toggle],
 :root[data-capture='on'] [data-capture-toggle] * {
   pointer-events: auto !important;

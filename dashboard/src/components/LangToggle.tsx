@@ -1,7 +1,6 @@
 import { useI18n } from '../lib/i18n';
 import type { Lang } from '../lib/translations';
 
-// Las mismas banderas que el sitio público, así el control se lee como el mismo producto.
 function FlagAR() {
   return (
     <svg viewBox="0 0 20 14" className="w-5 h-3.5 rounded-[2px]" aria-hidden="true">
@@ -12,28 +11,41 @@ function FlagAR() {
   );
 }
 
-function FlagGB() {
+// Trece franjas y el cantón azul. A este tamaño las cincuenta estrellas son una trama de puntos:
+// dibujadas una por una no se distinguirían y solo ensuciarían el cantón.
+const FRANJA = 14 / 13;
+
+function FlagUS() {
   return (
     <svg viewBox="0 0 20 14" className="w-5 h-3.5 rounded-[2px]" aria-hidden="true">
-      <rect width="20" height="14" fill="#012169" />
-      <path d="M0 0l20 14M20 0L0 14" stroke="#fff" strokeWidth="2.8" />
-      <path d="M0 0l20 14M20 0L0 14" stroke="#C8102E" strokeWidth="1.2" />
-      <rect x="8.3" width="3.4" height="14" fill="#fff" />
-      <rect y="5.3" width="20" height="3.4" fill="#fff" />
-      <rect x="9.1" width="1.8" height="14" fill="#C8102E" />
-      <rect y="6.1" width="20" height="1.8" fill="#C8102E" />
+      <rect width="20" height="14" fill="#fff" />
+      {Array.from({ length: 7 }, (_, i) => (
+        <rect key={i} y={i * 2 * FRANJA} width="20" height={FRANJA} fill="#B22234" />
+      ))}
+      <rect width="8" height={7 * FRANJA} fill="#3C3B6E" />
+      {Array.from({ length: 4 }, (_, fila) =>
+        Array.from({ length: 5 }, (_, col) => (
+          <circle
+            key={`${fila}-${col}`}
+            cx={0.9 + col * 1.55}
+            cy={0.95 + fila * 1.8}
+            r="0.32"
+            fill="#fff"
+          />
+        )),
+      )}
     </svg>
   );
 }
 
 const ACTIVE_RING: Record<Lang, string> = {
   es: 'ring-1 ring-[#74ACDF] bg-[#74ACDF]/15',
-  en: 'ring-1 ring-[#C8102E] bg-[#C8102E]/15',
+  en: 'ring-1 ring-[#B22234] bg-[#B22234]/15',
 };
 
 const OPTIONS: { code: Lang; flag: () => JSX.Element; label: string }[] = [
   { code: 'es', flag: FlagAR, label: 'Español' },
-  { code: 'en', flag: FlagGB, label: 'English' },
+  { code: 'en', flag: FlagUS, label: 'English' },
 ];
 
 export default function LangToggle() {
