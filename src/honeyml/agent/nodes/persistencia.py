@@ -129,6 +129,7 @@ def documento(estado: EstadoTriaje) -> dict[str, Any]:
             "reutilizada_de": estado.get("reutilizada_de") or None,
             "consultas_fallidas": fallidas,
             "requiere_revision": motivo is not None or bool(fallidas),
+            "retriaje": bool(estado.get("retriaje")),
         },
         "modelo": estado.get("consumo") or {},
     }

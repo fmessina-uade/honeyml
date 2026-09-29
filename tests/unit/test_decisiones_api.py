@@ -222,3 +222,23 @@ def test_revisar_un_evento_sin_decision_contesta_404(monkeypatch: pytest.MonkeyP
     _con_decision(monkeypatch, None)
     r = TestClient(app).put("/api/decisiones/zz/revision", json={"veredicto": "confirma"})
     assert r.status_code == 404
+
+
+def test_el_tiempo_de_conclusion_deja_afuera_lo_vuelto_a_triar(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Una tanda de retriaje sobre eventos viejos lleva la mediana a días."""
+    capturado: dict[str, Any] = {}
+
+    def falsa(body: dict[str, Any], es_url: str = "", index: str = "") -> dict[str, Any]:
+        if index == decisiones.REVISIONES:
+            return {"hits": {"hits": []}, "aggregations": {"v": {"buckets": []}}}
+        capturado.update(body)
+        raise RuntimeError("alcanza con el pedido")
+
+    monkeypatch.setattr(queries, "_search", falsa)
+    with pytest.raises(RuntimeError):
+        decisiones.resumen()
+
+    filtro = capturado["aggs"]["conclusion"]["filter"]["bool"]
+    assert {"term": {"ciclo.retriaje": True}} in filtro["must_not"]

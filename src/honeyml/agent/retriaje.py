@@ -104,7 +104,9 @@ def main() -> int:
     razonadas = copiadas = 0
     for i, evento in enumerate(eventos, start=1):
         try:
-            final: Any = ejecutar(compilado, estado_inicial(evento))
+            estado = estado_inicial(evento)
+            estado["retriaje"] = True
+            final: Any = ejecutar(compilado, estado)
         except CuotaAgotadaError as exc:
             print(f"\n  Se agotó la cuota del proveedor en el evento {i}: {exc}")
             print("  Lo ya reescrito queda; volver a correrlo retoma desde el principio.")

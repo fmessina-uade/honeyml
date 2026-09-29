@@ -220,6 +220,15 @@ def test_un_ciclo_que_no_concluye_va_a_revision() -> None:
     assert doc["ciclo"]["requiere_revision"] is True
 
 
+def test_una_decision_del_motor_en_vivo_no_es_retriaje() -> None:
+    assert nodo.documento(_estado())["ciclo"]["retriaje"] is False
+
+
+def test_una_decision_vuelta_a_triar_queda_marcada() -> None:
+    """Su marca temporal no mide cuánto tardó el motor, y el tiempo de conclusión la descarta."""
+    assert nodo.documento(_estado(retriaje=True))["ciclo"]["retriaje"] is True
+
+
 def test_sin_decision_igual_se_guardan_los_limites() -> None:
     """Dicen qué se esperaba de ese evento, que es la mitad del diagnóstico."""
     doc = nodo.documento(_estado(decision=None, motivo_de_corte="esquema_invalido"))

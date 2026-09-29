@@ -141,6 +141,10 @@ class EstadoTriaje(TypedDict, total=False):
     # Que la decisión de este evento ya estaba guardada y no se tocó. Lo pone la persistencia, y el
     # motor lo usa para que el consumidor cuente el evento como repetido y no como procesado.
     ya_existia: bool
+    # Que esta decisión reemplaza a otra, porque se volvió a triar a propósito tras cambiar el
+    # criterio. Se guarda porque su marca temporal ya no mide cuánto tardó el motor: el evento pudo
+    # haber ocurrido semanas antes de que se lo volviera a decidir.
+    retriaje: bool
 
 
 def estado_inicial(evento: EventoDelBus) -> EstadoTriaje:

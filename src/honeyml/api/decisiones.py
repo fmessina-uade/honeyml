@@ -188,8 +188,16 @@ def resumen(es_url: str = queries.ES_URL) -> dict[str, Any]:
                 "filter": {"term": {"ciclo.requiere_revision": True}},
                 "aggs": {"ya_revisadas": {"filter": {"ids": {"values": revisados}}}},
             },
+            # Solo lo que decidió el motor al consumir el bus. Una decisión que se volvió a triar
+            # tiene la marca temporal del retriaje sobre un evento que pudo ocurrir semanas antes,
+            # y una sola tanda así lleva la mediana a días.
             "conclusion": {
-                "filter": {"range": {"@timestamp": {"gte": VENTANA_CONCLUSION}}},
+                "filter": {
+                    "bool": {
+                        "filter": [{"range": {"@timestamp": {"gte": VENTANA_CONCLUSION}}}],
+                        "must_not": [{"term": {"ciclo.retriaje": True}}],
+                    }
+                },
                 "aggs": {
                     "percentiles": {"percentiles": {"field": "demora_ms", "percents": [50, 90]}}
                 },
