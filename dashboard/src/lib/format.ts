@@ -54,5 +54,19 @@ export function fechaHora(iso: string | null | undefined): string {
 export function duracion(segundos: number): string {
   if (segundos < 60) return `${dec(segundos, 0)} s`;
   if (segundos < 3600) return `${dec(segundos / 60)} min`;
-  return `${dec(segundos / 3600)} h`;
+  if (segundos < 172800) return `${dec(segundos / 3600)} h`;
+  return `${dec(segundos / 86400)} d`;
+}
+
+/** Hora, minutos y segundos en el locale activo, para seguir al motor en vivo. */
+export function hora(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString(locale, {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  });
 }

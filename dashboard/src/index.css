@@ -47,7 +47,7 @@ body {
   }
 }
 
-/* ---- aparición al hacer scroll, la misma curva que el sitio público ---- */
+/* Aparición al hacer scroll, la misma curva que el sitio público. */
 .reveal {
   opacity: 0;
   transform: translateY(28px);
@@ -60,7 +60,7 @@ body {
   transform: none;
 }
 
-/* ---- resplandor detrás de las tarjetas de números, con el degradado de marca ---- */
+/* Resplandor detrás de las tarjetas de números, con el degradado de marca. */
 .tile {
   position: relative;
 }
@@ -108,7 +108,7 @@ body {
   }
 }
 
-/* ---- entrada de una línea de terminal: destello ámbar y después se asienta ---- */
+/* Entrada de una línea de terminal: destello ámbar y después se asienta. */
 @keyframes rowEnter {
   from {
     opacity: 0;
@@ -125,7 +125,7 @@ body {
   animation: rowEnter 0.6s ease-out;
 }
 
-/* ---- cursor de terminal titilando ---- */
+/* Cursor de terminal titilando. */
 @keyframes cursorBlink {
   0%,
   49% {
@@ -145,7 +145,7 @@ body {
   animation: cursorBlink 1s step-end infinite;
 }
 
-/* ---- entrada de sección al cambiar de pestaña: la misma curva que el hero del sitio ---- */
+/* Entrada de sección al cambiar de pestaña: la misma curva que el hero del sitio. */
 @keyframes sectionIn {
   0% {
     opacity: 0;
@@ -162,7 +162,7 @@ body {
   animation: sectionIn 0.55s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* ---- etiqueta de país sobre el globo: entra mientras el globo todavía gira hacia él ---- */
+/* Etiqueta de país sobre el globo: entra mientras el globo todavía gira hacia él. */
 @keyframes paisRotulo {
   0% {
     opacity: 0;
@@ -179,7 +179,7 @@ body {
   animation: paisRotulo 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.35s backwards;
 }
 
-/* ---- barrido de brillo, se usa una vez sobre el ítem de navegación activo ---- */
+/* Barrido de brillo, se usa una vez sobre el ítem de navegación activo. */
 @keyframes navSheen {
   from {
     transform: translateX(-160%) skewX(-12deg);
@@ -197,7 +197,7 @@ body {
   pointer-events: none;
 }
 
-/* ---- barras de desplazamiento: la del navegador rompe la superficie oscura ---- */
+/* Barras de desplazamiento: la del navegador rompe la superficie oscura. */
 .thin-scroll {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
@@ -216,7 +216,7 @@ body {
   background: rgba(255, 255, 255, 0.22);
 }
 
-/* ---- hover sobre una barra: se levanta la barra y se atenúan las vecinas ---- */
+/* Hover sobre una barra: se levanta la barra y se atenúan las vecinas. */
 .bar-group:hover .bar-item {
   opacity: 0.32;
 }
@@ -233,7 +233,195 @@ body {
   }
 }
 
-/* ---- modo captura: se congela todo para que las capturas de pantalla se repitan igual ---- */
+/* El motor de triaje en vivo. Las animaciones responden a lo que el motor está haciendo: el
+   aura iridiscente, los destellos y el flujo hacia inferencia aparecen solo cuando una decisión
+   pasó de verdad por el modelo. */
+@keyframes motor-onda {
+  from {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  to {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+.motor-onda {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: motor-onda 1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@keyframes motor-giro {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.motor-giro {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: motor-giro 8s linear infinite;
+}
+.motor-giro-rapido {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: motor-giro 2.4s linear infinite;
+}
+@keyframes motor-flujo {
+  to {
+    stroke-dashoffset: -28;
+  }
+}
+.motor-flujo {
+  animation: motor-flujo 0.9s linear infinite;
+}
+@keyframes motor-destello {
+  0%,
+  100% {
+    transform: scale(0.2) rotate(0deg);
+    opacity: 0;
+  }
+  45% {
+    transform: scale(1) rotate(45deg);
+    opacity: 1;
+  }
+}
+.motor-destello {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: motor-destello 1.6s ease-in-out infinite;
+}
+@keyframes motor-aurora {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(60px, -24px) scale(1.2);
+  }
+}
+.motor-aurora {
+  animation: motor-aurora 18s ease-in-out infinite alternate;
+}
+@keyframes motor-aparece {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.9);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+.motor-aparece {
+  animation: motor-aparece 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes motor-entrada {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+.motor-entrada {
+  animation: motor-entrada 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes motor-token {
+  from {
+    opacity: 0;
+    filter: blur(5px);
+  }
+  to {
+    opacity: 1;
+    filter: none;
+  }
+}
+.motor-token {
+  animation: motor-token 0.45s ease-out;
+}
+@keyframes motor-barrido {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+.motor-iridiscente {
+  background: linear-gradient(90deg, #ff6b35, #f472b6, #a78bfa, #38bdf8, #00b894, #ff6b35);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: motor-barrido 4s linear infinite;
+}
+@keyframes motor-barra {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+.motor-barra {
+  transform-origin: bottom;
+  animation: motor-barra 0.9s ease-in-out infinite;
+}
+.motor-nodo {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.motor-nodo[data-activo='si'] {
+  transform: scale(1.14);
+}
+/* Borde que gira detrás de la tarjeta del agente mientras el modelo razona. */
+.motor-borde {
+  position: relative;
+  overflow: hidden;
+}
+.motor-borde::before {
+  content: '';
+  position: absolute;
+  inset: -150%;
+  background: conic-gradient(from 0deg, #ff6b35, #f472b6, #a78bfa, #38bdf8, #00b894, #ff6b35);
+  opacity: 0;
+  transition: opacity 0.6s ease;
+  animation: motor-giro 3.5s linear infinite;
+}
+.motor-borde[data-pensando='si']::before {
+  opacity: 0.9;
+}
+.motor-borde > .motor-borde-interior {
+  position: relative;
+  margin: 1px;
+  border-radius: inherit;
+}
+@media (prefers-reduced-motion: reduce) {
+  .motor-onda,
+  .motor-giro,
+  .motor-giro-rapido,
+  .motor-flujo,
+  .motor-destello,
+  .motor-aurora,
+  .motor-aparece,
+  .motor-entrada,
+  .motor-token,
+  .motor-iridiscente,
+  .motor-barra,
+  .motor-borde::before {
+    animation: none;
+  }
+}
+
+/* Modo captura: se congela todo para que las capturas de pantalla se repitan igual. */
 :root[data-capture='on'] .reveal {
   opacity: 1 !important;
   transform: none !important;
@@ -249,10 +437,9 @@ body {
   opacity: 1;
 }
 
-/* El cursor dejaba su rastro en la captura: congelar las animaciones no apaga los estados de
-   hover, así que el elemento que estuviera debajo del puntero salía resaltado y distinto del
-   resto. Apagar los eventos de puntero es la forma robusta de evitarlo, porque no hay que enumerar
-   cada estilo de hover, que además son decenas de utilidades distintas.
+/* Congelar las animaciones no apaga los estados de hover: el elemento que quede debajo del
+   puntero saldría resaltado y distinto del resto. Apagar los eventos de puntero lo evita sin tener
+   que enumerar cada estilo de hover, que son decenas de utilidades distintas.
 
    El desplazamiento con la rueda sigue funcionando: el evento no encuentra destino acá y sube
    hasta el documento, que es quien desplaza. Lo que se pierde es poder hacer clic mientras el modo

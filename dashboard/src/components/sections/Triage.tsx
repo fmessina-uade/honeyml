@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { AlertCircle, CheckCircle2, Copy, Sparkles, X } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AlertCircle, CheckCircle2, ChevronRight, Copy, Sparkles, X } from 'lucide-react';
 import {
   api,
   type DetalleDecision,
@@ -12,6 +12,7 @@ import {
 import { dec, duracion, fechaHora, n } from '../../lib/format';
 import { useI18n } from '../../lib/i18n';
 import Reveal from '../Reveal';
+import EngineLive from '../EngineLive';
 import { tacticColor } from './SessionReplay';
 import { OBSERVED } from './MitreMatrix';
 
@@ -53,6 +54,16 @@ export default function Triage() {
   const [listado, setListado] = useState<ListadoDecisiones | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [elegida, setElegida] = useState<string | null>(null);
+  const listadoRef = useRef<HTMLDivElement>(null);
+
+  // Una decisión elegida desde el motor en vivo se abre donde está el detalle, más abajo, así que
+  // hay que llevar la vista hasta ahí.
+  const elegirDesdeElMotor = (docId: string) => {
+    setElegida(docId);
+    requestAnimationFrame(() =>
+      listadoRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+    );
+  };
 
   const cargarResumen = useCallback(() => {
     api
@@ -70,6 +81,16 @@ export default function Triage() {
 
   useEffect(cargarResumen, [cargarResumen]);
   useEffect(cargarListado, [cargarListado]);
+
+  // Los números y el listado se refrescan solos mientras la sección está abierta. El listado solo
+  // en la primera página: refrescar la cuarta mientras alguien la lee le movería las filas.
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      cargarResumen();
+      if (filtros.desde === 0) cargarListado();
+    }, 60_000);
+    return () => window.clearInterval(id);
+  }, [cargarResumen, cargarListado, filtros.desde]);
 
   // Cambiar un filtro vuelve a la primera página: quedarse en la cuarta de un listado que ahora
   // tiene dos muestra una lista vacía que parece un error.
@@ -111,6 +132,9 @@ export default function Triage() {
 
   return (
     <section className="flex flex-col gap-4">
+      {/* El motor trabajando, que es lo primero que hay que ver */}
+      <EngineLive resumen={resumen} tacticName={tacticName} onElegir={elegirDesdeElMotor} />
+
       {/* Los cuatro números del motor */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <Reveal>
@@ -265,7 +289,8 @@ export default function Triage() {
 
       {/* Listado y, al lado, la decisión elegida */}
       <div
-        className={`grid gap-3 items-start ${elegida ? 'xl:grid-cols-[minmax(0,1fr)_460px]' : ''}`}
+        ref={listadoRef}
+        className={`grid gap-3 items-start scroll-mt-4 ${elegida ? 'xl:grid-cols-[minmax(0,1fr)_460px]' : ''}`}
       >
         <Listado
           listado={listado}
@@ -558,6 +583,7 @@ function Detalle({
 
       {detalle && (
         <>
+          <Recorrido detalle={detalle} />
           <Clasificacion detalle={detalle} tacticName={tacticName} />
           <Veredicto
             detalle={detalle}
@@ -902,6 +928,35 @@ function Atributos({ evento }: { evento: DetalleDecision['evento'] }) {
       ) : (
         <p className="text-[11px] text-white/45 mt-1.5">{t.triage.detail.noEvent}</p>
       )}
+    </div>
+  );
+}
+
+function Recorrido({ detalle }: { detalle: DetalleDecision }) {
+  const { t } = useI18n();
+  const e = t.triage.engine;
+  return (
+    <div>
+      <div className={rotulo}>{t.triage.detail.path}</div>
+      <div className="flex flex-wrap items-center gap-1 mt-1.5">
+        {detalle.camino.map((nodo, i) => (
+          <span key={i} className="flex items-center gap-1">
+            {i > 0 && <ChevronRight className="w-3 h-3 text-white/25" />}
+            <span
+              className="rounded px-1.5 py-0.5 text-[10px] font-mono-display ring-1"
+              style={{
+                color: nodo === 'inferencia' ? 'var(--agent-coral)' : 'rgba(255,255,255,0.7)',
+                borderColor: 'transparent',
+                boxShadow: `inset 0 0 0 1px ${
+                  nodo === 'inferencia' ? 'rgba(255,107,53,0.45)' : 'rgba(255,255,255,0.12)'
+                }`,
+              }}
+            >
+              {e.nodes[nodo].name}
+            </span>
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

@@ -286,9 +286,12 @@ def get_decisiones(
     estado: Literal["todas", "pendientes", "revisadas"] = "todas",
     desde: int = 0,
     tamano: int = 25,
+    orden: Literal["evento", "decision"] = "evento",
+    razonadas: bool = False,
 ) -> dict[str, Any]:
     """Las decisiones del motor, filtradas y de a páginas. `tactica=ninguna` trae las que no
-    tienen."""
+    tienen, `orden=decision` las ordena por cuándo decidió el motor, para seguirlo en vivo, y
+    `razonadas` deja solo las que pasaron por el modelo."""
     return _en_vivo(
         lambda: decisiones.listar(
             severidad=severidad,
@@ -297,6 +300,8 @@ def get_decisiones(
             estado=estado,
             desde=desde,
             tamano=tamano,
+            orden=orden,
+            razonadas=razonadas,
         )
     )
 

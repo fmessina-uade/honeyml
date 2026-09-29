@@ -112,12 +112,12 @@ def sin_indice(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         contexto,
         "construir",
-        lambda estado: {"contexto": Contexto(doc_id=DOC_ID, resumen="cowrie/process · uname -a")},
+        lambda estado: {"contexto": Contexto(doc_id=DOC_ID, resumen="cowrie/process: uname -a")},
     )
     monkeypatch.setattr(historial, "recuperar", lambda estado: {})
 
 
-# ---- el camino que funciona ---------------------------------------------------------------------
+# El camino que funciona
 
 
 def test_un_evento_sale_con_su_decision_persistida(sin_indice: None) -> None:
@@ -154,7 +154,7 @@ def test_un_evento_sin_origen_no_gasta_una_llamada() -> None:
     assert doc["decision"]["concluyente"] is False
 
 
-# ---- el contrato con el consumidor: levantar significa "no resuelto" -----------------------------
+# El contrato con el consumidor: levantar significa "no resuelto"
 
 
 def test_si_el_proveedor_no_responde_la_excepcion_sale(sin_indice: None) -> None:
@@ -180,7 +180,7 @@ def test_si_el_almacen_no_responde_la_excepcion_sale(sin_indice: None) -> None:
         triar(_evento())
 
 
-# ---- lo que se arma una sola vez ----------------------------------------------------------------
+# Lo que se arma una sola vez
 
 
 def test_el_grafo_se_compila_una_vez_y_no_por_evento(
@@ -232,7 +232,7 @@ def test_el_adaptador_se_crea_una_vez_y_no_por_evento(
     assert creados == 1
 
 
-# ---- la línea que se imprime por evento ---------------------------------------------------------
+# La línea que se imprime por evento
 
 
 def test_la_linea_dice_el_nivel_y_la_tactica(sin_indice: None) -> None:
@@ -257,7 +257,7 @@ def test_la_linea_de_un_evento_sin_decision_dice_el_motivo() -> None:
     assert "sin_contexto" in motor._linea(_evento(source_ip=""), final)
 
 
-# ---- la guardia de gasto ------------------------------------------------------------------------
+# La guardia de gasto
 
 
 def test_el_costo_estimado_usa_el_modelo_mas_caro() -> None:
@@ -280,7 +280,7 @@ def test_un_reprocesamiento_historico_supera_el_tope() -> None:
     assert motor.costo_estimado(50_000) > 10
 
 
-# ---- la cuota del proveedor ---------------------------------------------------------------------
+# La cuota del proveedor
 
 
 def test_la_cuota_agotada_corta_la_corrida_y_no_persiste(sin_indice: None) -> None:

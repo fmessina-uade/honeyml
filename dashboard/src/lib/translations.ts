@@ -396,8 +396,45 @@ const es = {
     reviewed: 'Revisada',
     notConcluded: 'sin concluir',
     liveOnly: 'Las decisiones del motor se leen solo en vivo, y la API no alcanza a Elasticsearch.',
+    engine: {
+      active: 'Agente activo',
+      idle: 'Agente en espera',
+      lastAgo: (hace: string) => `última decisión hace ${hace}`,
+      lastHour: 'decisiones en la última hora',
+      byMemory: 'resueltas por memoria',
+      toConclusion: 'del evento a la decisión',
+      replay: 'Repetir las últimas',
+      replaying: 'repetición de decisiones ya tomadas',
+      thinking: 'Qué está haciendo el agente',
+      reading:
+        'Armando el contexto: qué hizo antes esta dirección, qué más pasó en la sesión y qué decidió el motor sobre ella.',
+      reasoning: 'Razonando sobre el contexto con el modelo de lenguaje.',
+      copied:
+        'Esta conducta ya se decidió antes: se copia la decisión razonada, sin llamar al modelo.',
+      noContext:
+        'El evento no trae dirección de origen y no hay nada que correlacionar: se guarda como no concluyente.',
+      waiting: 'Esperando la próxima decisión del motor.',
+      feed: 'Decisiones a medida que llegan',
+      ring: (a: number, b: number) => `${a} de las últimas ${b} decisiones pasaron por este nodo`,
+      retries: (n: number) => (n === 1 ? 'con 1 reproche' : `con ${n} reproches`),
+      paths: {
+        memory: 'atajo de memoria',
+        retry: 'vuelta por reproche',
+        noContext: 'sin contexto',
+        full: 'ciclo completo',
+      },
+      nodes: {
+        memoria: { name: 'memoria', what: '¿ya vi esta conducta?' },
+        contexto: { name: 'contexto', what: 'qué es este evento' },
+        historial: { name: 'historial', what: 'qué hizo antes' },
+        inferencia: { name: 'inferencia', what: 'el modelo razona' },
+        validacion: { name: 'validación', what: 'esquema y piso' },
+        persistencia: { name: 'persistencia', what: 'queda guardada' },
+      },
+    },
     detail: {
       close: 'Cerrar',
+      path: 'Cómo la resolvió el agente',
       attributes: 'Atributos normalizados del evento',
       noEvent:
         'El evento ya no está en los índices de telemetría. La decisión conserva sus datos principales.',
@@ -839,8 +876,45 @@ const en: typeof es = {
     reviewed: 'Reviewed',
     notConcluded: 'not concluded',
     liveOnly: 'Engine decisions are only read live, and the API cannot reach Elasticsearch.',
+    engine: {
+      active: 'Agent active',
+      idle: 'Agent idle',
+      lastAgo: (hace: string) => `last decision ${hace} ago`,
+      lastHour: 'decisions in the last hour',
+      byMemory: 'settled from memory',
+      toConclusion: 'from event to decision',
+      replay: 'Replay the latest',
+      replaying: 'replaying decisions already made',
+      thinking: 'What the agent is doing',
+      reading:
+        'Building the context: what this address did before, what else happened in the session and what the engine decided about it.',
+      reasoning: 'Reasoning over the context with the language model.',
+      copied:
+        'This behaviour was already decided: the reasoned decision is copied without calling the model.',
+      noContext:
+        'The event has no source address and nothing to correlate: it is stored as inconclusive.',
+      waiting: 'Waiting for the next engine decision.',
+      feed: 'Decisions as they arrive',
+      ring: (a: number, b: number) => `${a} of the last ${b} decisions went through this node`,
+      retries: (n: number) => (n === 1 ? 'after 1 rejection' : `after ${n} rejections`),
+      paths: {
+        memory: 'memory shortcut',
+        retry: 'retry after rejection',
+        noContext: 'no context',
+        full: 'full cycle',
+      },
+      nodes: {
+        memoria: { name: 'memory', what: 'seen this before?' },
+        contexto: { name: 'context', what: 'what this event is' },
+        historial: { name: 'history', what: 'what it did before' },
+        inferencia: { name: 'inference', what: 'the model reasons' },
+        validacion: { name: 'validation', what: 'schema and floor' },
+        persistencia: { name: 'persistence', what: 'stored for good' },
+      },
+    },
     detail: {
       close: 'Close',
+      path: 'How the agent settled it',
       attributes: 'Normalised event attributes',
       noEvent:
         'The event is no longer in the telemetry indices. The decision keeps its main fields.',

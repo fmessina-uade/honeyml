@@ -22,6 +22,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from ..agent.graph import CONTEXTO, HISTORIAL, INFERENCIA, MEMORIA, PERSISTENCIA, VALIDACION
 from ..agent.severidad import ORDEN, Severidad
 from ..education.annotations import TACTICAS_OBSERVABLES
 from . import queries
@@ -191,6 +192,20 @@ def resumen(es_url: str = queries.ES_URL) -> dict[str, Any]:
             # Solo lo que decidió el motor al consumir el bus. Una decisión que se volvió a triar
             # tiene la marca temporal del retriaje sobre un evento que pudo ocurrir semanas antes,
             # y una sola tanda así lleva la mediana a días.
+            # Si el motor está trabajando: cuándo decidió por última vez y cuánto en la última hora,
+            # sin contar lo vuelto a triar.
+            "en_vivo": {
+                "filter": {"bool": {"must_not": [{"term": {"ciclo.retriaje": True}}]}},
+                "aggs": {
+                    "ultima": {"max": {"field": "@timestamp"}},
+                    "hora": {
+                        "filter": {"range": {"@timestamp": {"gte": "now-1h"}}},
+                        "aggs": {
+                            "copiadas": {"filter": {"exists": {"field": "ciclo.reutilizada_de"}}}
+                        },
+                    },
+                },
+            },
             "conclusion": {
                 "filter": {
                     "bool": {
@@ -239,6 +254,11 @@ def resumen(es_url: str = queries.ES_URL) -> dict[str, Any]:
             "confirmadas": por_veredicto.get("confirma", 0),
             "corregidas": por_veredicto.get("corrige", 0),
         },
+        "actividad": {
+            "ultima": a["en_vivo"]["ultima"].get("value_as_string"),
+            "ultima_hora": a["en_vivo"]["hora"]["doc_count"],
+            "copiadas_ultima_hora": a["en_vivo"]["hora"]["copiadas"]["doc_count"],
+        },
         "conclusion": {
             "ventana_dias": 7,
             "decisiones": a["conclusion"]["doc_count"],
@@ -277,9 +297,27 @@ def _filtros(
     return {"bool": {"filter": filtro, "must_not": excluir}}
 
 
+def camino(d: dict[str, Any]) -> list[str]:
+    """Por qué nodos del grafo pasó esta decisión, en orden, con las vueltas incluidas.
+
+    No se guarda: se deduce de lo que la persistencia ya escribe. Una copia del repertorio salió
+    por el atajo de memoria; un corte por falta de contexto, por el de contexto; y el resto recorrió
+    el ciclo completo, con un par inferencia y validación por cada intento. Es lo que el panel usa
+    para dibujar el recorrido de cada decisión sobre el grafo.
+    """
+    ciclo = d.get("ciclo", {})
+    if ciclo.get("reutilizada_de"):
+        return [MEMORIA, PERSISTENCIA]
+    if ciclo.get("motivo_de_corte") == "sin_contexto":
+        return [MEMORIA, CONTEXTO, PERSISTENCIA]
+    vueltas = max(int(ciclo.get("intentos") or 0), 1)
+    return [MEMORIA, CONTEXTO, HISTORIAL, *[INFERENCIA, VALIDACION] * vueltas, PERSISTENCIA]
+
+
 def _fila(doc_id: str, d: dict[str, Any], revision: dict[str, Any] | None) -> dict[str, Any]:
     """Una decisión como la muestra el listado: lo justo para decidir si abrirla."""
     evento, decision, ciclo = d.get("evento", {}), d.get("decision", {}), d.get("ciclo", {})
+    modelo = d.get("modelo") or {}
     return {
         "doc_id": doc_id,
         "momento": evento.get("momento"),
@@ -297,6 +335,14 @@ def _fila(doc_id: str, d: dict[str, Any], revision: dict[str, Any] | None) -> di
         "copiada": bool(ciclo.get("reutilizada_de")),
         "requiere_revision": bool(ciclo.get("requiere_revision")),
         "consultas_fallidas": ciclo.get("consultas_fallidas") or [],
+        "intentos": int(ciclo.get("intentos") or 0),
+        "rechazos": int(ciclo.get("rechazos") or 0),
+        "motivo_de_corte": ciclo.get("motivo_de_corte"),
+        "retriaje": bool(ciclo.get("retriaje")),
+        "modelo": modelo.get("nombre"),
+        "segundos": modelo.get("segundos"),
+        "costo_usd": modelo.get("costo_usd"),
+        "camino": camino(d),
         "revision": revision,
     }
 
@@ -308,16 +354,33 @@ def listar(
     estado: str = "todas",
     desde: int = 0,
     tamano: int = 25,
+    orden: str = "evento",
+    razonadas: bool = False,
     es_url: str = queries.ES_URL,
 ) -> dict[str, Any]:
-    """Las decisiones, de la más reciente a la más vieja por momento del evento."""
+    """Las decisiones, de la más reciente a la más vieja.
+
+    Por defecto el orden es el del momento del evento, que es como se revisa. Con `orden="decision"`
+    es el de cuándo decidió el motor, que es lo que muestra el panel en vivo, y ahí se dejan afuera
+    las decisiones vueltas a triar: no las tomó el motor al consumir el bus.
+
+    Con `razonadas` quedan solo las que pasaron por el modelo. Son una de cada cien, y sin el filtro
+    el panel casi nunca tendría una para mostrar el ciclo completo.
+    """
     revisados = ids_revisados(es_url)
+    consulta = _filtros(severidad, tactica, sensor, estado, revisados)
+    campo = "evento.momento"
+    if orden == "decision":
+        campo = "@timestamp"
+        consulta["bool"]["must_not"].append({"term": {"ciclo.retriaje": True}})
+    if razonadas:
+        consulta["bool"]["must_not"].append({"exists": {"field": "ciclo.reutilizada_de"}})
     cuerpo = {
         "from": max(desde, 0),
         "size": min(max(tamano, 1), MAX_TAMANO),
         "track_total_hits": True,
-        "query": _filtros(severidad, tactica, sensor, estado, revisados),
-        "sort": [{"evento.momento": {"order": "desc", "missing": "_last"}}],
+        "query": consulta,
+        "sort": [{campo: {"order": "desc", "missing": "_last"}}],
     }
     r = queries._search(cuerpo, es_url, index=DECISIONES)
     hits = r["hits"]["hits"]
@@ -364,6 +427,7 @@ def detalle(doc_id: str, es_url: str = queries.ES_URL) -> dict[str, Any] | None:
     return {
         "doc_id": doc_id,
         "decision": decision,
+        "camino": camino(decision),
         "evento": evento,
         "revision": _documento(REVISIONES, doc_id, es_url),
     }

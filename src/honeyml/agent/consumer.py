@@ -57,10 +57,9 @@ MAX_ENTREGAS = int(os.getenv("BUS_MAX_ENTREGAS", "3"))
 STREAM_MUERTOS = os.getenv("BUS_STREAM_MUERTOS", "honeyml:events:muertos")
 
 # Cuánto tiene que quedarse quieto un mensaje pendiente antes de que otro consumidor lo pueda
-# tomar. Sale del presupuesto de tiempo del ciclo de triaje y no de una corazonada:
-#
-#   una llamada    60 s de timeout × 3 reintentos del cliente + 6 s de espera exponencial = 186 s
-#   un ciclo       186 s × 3 intentos correctivos                                         = 558 s
+# tomar. Sale del presupuesto de tiempo del ciclo de triaje y no de una corazonada. Una llamada
+# puede tardar 186 s (60 s de timeout por 3 reintentos del cliente, más 6 s de espera
+# exponencial), y un ciclo, tres veces eso por los intentos correctivos: 558 s.
 #
 # Una ventana más corta que una sola llamada lenta, como 60 s, hace perder el evento a un ciclo que
 # se demora: otro consumidor lo reclama mientras el primero sigue trabajando, los dos pagan la
@@ -141,7 +140,7 @@ class EventoDelBus:
     def desde_mensaje(
         cls, entry_id: str, campos: dict[str, str], entregas: int = 1
     ) -> EventoDelBus:
-        # `crudo` conserva el mensaje sin tocar: si mañana hay que revisar qué llegó del bus, el
+        # `crudo` conserva el mensaje sin tocar: si después hay que revisar qué llegó del bus, el
         # saneamiento no puede haber borrado la prueba.
         return cls(
             entry_id=entry_id,
@@ -163,7 +162,7 @@ class EventoDelBus:
     def resumen(self) -> str:
         """Una línea para los registros. El evento entero vive en el índice."""
         que = self.command or self.user or self.action
-        return f"{self.honeypot}/{self.category} {self.source_ip} {self.protocol} · {que[:60]}"
+        return f"{self.honeypot}/{self.category} {self.source_ip} {self.protocol}: {que[:60]}"
 
 
 class DetenerConsumo(Exception):  # noqa: N818 - es una señal de control, no un error
@@ -244,7 +243,7 @@ class ConsumidorDelBus:
             host=host, port=puerto, decode_responses=True, socket_timeout=bloqueo_ms / 1000 + 10
         )
 
-    # ---------------------------------------------------------------- ciclo de vida
+    # Ciclo de vida
 
     def asegurar_grupo(self, desde_ahora: bool = False) -> None:
         """Crea el grupo si no está. Es idempotente, así que se puede llamar en cada arranque.
@@ -277,7 +276,7 @@ class ConsumidorDelBus:
         signal.signal(signal.SIGINT, parar)
         signal.signal(signal.SIGTERM, parar)
 
-    # ---------------------------------------------------------------- procesamiento
+    # Procesamiento
 
     def _ya_procesado(self, doc_id: str) -> bool:
         return bool(doc_id) and bool(self.r.exists(PREFIJO_VISTO + doc_id))
@@ -298,7 +297,7 @@ class ConsumidorDelBus:
         self.r.xadd(self.stream_muertos, carga, maxlen=10000, approximate=True)
         self.r.xack(self.stream, self.grupo, evento.entry_id)
         self.contadores.descartados += 1
-        print(f"  ✗ descartado tras {evento.entregas} entregas: {evento.resumen()}")
+        print(f"  descartado tras {evento.entregas} entregas: {evento.resumen()}")
 
     def procesar(self, evento: EventoDelBus) -> None:
         """Pasa un evento por el manejador y lo resuelve según cómo haya salido."""
@@ -345,7 +344,7 @@ class ConsumidorDelBus:
         else:
             self.contadores.procesados += 1
 
-    # ---------------------------------------------------------------- lectura
+    # Lectura
 
     def reclamar_huerfanos(self) -> list[EventoDelBus]:
         """Toma los mensajes que dejó pendientes un consumidor que ya no responde.
@@ -387,7 +386,7 @@ class ConsumidorDelBus:
 
         if rescatados:
             self.contadores.reclamados += len(rescatados)
-            print(f"  ↻ {len(rescatados)} evento(s) huérfano(s) reclamado(s)")
+            print(f"  {len(rescatados)} evento(s) huérfano(s) reclamado(s)")
         return rescatados
 
     def leer_nuevos(self) -> list[EventoDelBus]:
@@ -479,7 +478,7 @@ def manejador_de_registro(evento: EventoDelBus) -> None:
     está revisando el pipeline y no el motor. Sirve también para probar el ciclo de confirmación
     sin el grafo de por medio.
     """
-    print(f"  · {evento.resumen()}")
+    print(f"  {evento.resumen()}")
 
 
 def main() -> int:

@@ -167,6 +167,10 @@ def test_el_resumen_descuenta_de_pendientes_lo_ya_revisado(
                 "no_concluyentes": {"doc_count": 0},
                 "costo": {"value": 0.001},
                 "requieren_revision": {"doc_count": 2, "ya_revisadas": {"doc_count": 1}},
+                "en_vivo": {
+                    "ultima": {"value_as_string": "2026-09-24T12:00:05.000Z"},
+                    "hora": {"doc_count": 7, "copiadas": {"doc_count": 6}},
+                },
                 "conclusion": {
                     "doc_count": 5,
                     "percentiles": {"values": {"50.0": 4000.0, "90.0": 12000.0}},
@@ -186,6 +190,11 @@ def test_el_resumen_descuenta_de_pendientes_lo_ya_revisado(
     }
     assert [c["key"] for c in r["por_severidad"]] == ["bajo", "alto"]  # en el orden de la escala
     assert r["conclusion"]["mediana_s"] == 4.0
+    assert r["actividad"] == {
+        "ultima": "2026-09-24T12:00:05.000Z",
+        "ultima_hora": 7,
+        "copiadas_ultima_hora": 6,
+    }
 
 
 # Las rutas
@@ -242,3 +251,64 @@ def test_el_tiempo_de_conclusion_deja_afuera_lo_vuelto_a_triar(
 
     filtro = capturado["aggs"]["conclusion"]["filter"]["bool"]
     assert {"term": {"ciclo.retriaje": True}} in filtro["must_not"]
+
+
+# El camino por el grafo
+
+
+def test_una_copia_sale_por_el_atajo_de_memoria() -> None:
+    d = {"ciclo": {"reutilizada_de": "otro", "intentos": 0}}
+    assert decisiones.camino(d) == ["memoria", "persistencia"]
+
+
+def test_sin_contexto_corta_despues_de_contexto() -> None:
+    d = {"ciclo": {"motivo_de_corte": "sin_contexto", "intentos": 0}}
+    assert decisiones.camino(d) == ["memoria", "contexto", "persistencia"]
+
+
+def test_cada_intento_es_una_vuelta_por_inferencia_y_validacion() -> None:
+    """Un rechazo de la validación devuelve el borrador a inferencia: dos intentos, dos vueltas."""
+    d = {"ciclo": {"intentos": 2, "rechazos": 1}}
+    assert decisiones.camino(d) == [
+        "memoria",
+        "contexto",
+        "historial",
+        "inferencia",
+        "validacion",
+        "inferencia",
+        "validacion",
+        "persistencia",
+    ]
+
+
+def test_el_listado_en_vivo_ordena_por_decision_y_deja_afuera_el_retriaje(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    capturado: dict[str, Any] = {}
+
+    def falsa(body: dict[str, Any], es_url: str = "", index: str = "") -> dict[str, Any]:
+        if index == decisiones.REVISIONES:
+            return {"hits": {"hits": []}}
+        capturado.update(body)
+        return {"hits": {"total": {"value": 1}, "hits": [{"_id": "d1", "_source": DECISION}]}}
+
+    monkeypatch.setattr(queries, "_search", falsa)
+    r = decisiones.listar(orden="decision")
+
+    assert capturado["sort"] == [{"@timestamp": {"order": "desc", "missing": "_last"}}]
+    assert {"term": {"ciclo.retriaje": True}} in capturado["query"]["bool"]["must_not"]
+    assert r["items"][0]["camino"][0] == "memoria"
+
+
+def test_razonadas_deja_afuera_las_copias(monkeypatch: pytest.MonkeyPatch) -> None:
+    capturado: dict[str, Any] = {}
+
+    def falsa(body: dict[str, Any], es_url: str = "", index: str = "") -> dict[str, Any]:
+        if index == decisiones.REVISIONES:
+            return {"hits": {"hits": []}}
+        capturado.update(body)
+        return {"hits": {"total": {"value": 0}, "hits": []}}
+
+    monkeypatch.setattr(queries, "_search", falsa)
+    decisiones.listar(orden="decision", razonadas=True)
+    assert {"exists": {"field": "ciclo.reutilizada_de"}} in capturado["query"]["bool"]["must_not"]

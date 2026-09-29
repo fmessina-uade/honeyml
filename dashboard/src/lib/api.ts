@@ -188,6 +188,12 @@ export interface ResumenTriaje {
     confirmadas: number;
     corregidas: number;
   };
+  /** Si el motor está trabajando: su última decisión y cuántas tomó en la última hora. */
+  actividad: {
+    ultima: string | null;
+    ultima_hora: number;
+    copiadas_ultima_hora: number;
+  };
   /** Desde que ocurrió el evento hasta que su decisión quedó guardada, en segundos. */
   conclusion: {
     ventana_dias: number;
@@ -233,8 +239,20 @@ export interface FilaDecision {
   copiada: boolean;
   requiere_revision: boolean;
   consultas_fallidas: string[];
+  intentos: number;
+  rechazos: number;
+  motivo_de_corte: string | null;
+  retriaje: boolean;
+  modelo: string | null;
+  segundos: number | null;
+  costo_usd: number | null;
+  /** Los nodos del grafo por los que pasó, en orden y con las vueltas por reproche incluidas. */
+  camino: NodoDelGrafo[];
   revision: Revision | null;
 }
+
+export type NodoDelGrafo =
+  'memoria' | 'contexto' | 'historial' | 'inferencia' | 'validacion' | 'persistencia';
 
 export interface ListadoDecisiones {
   total: number;
@@ -275,6 +293,7 @@ export interface DocumentoDecision {
     reutilizada_de: string | null;
     consultas_fallidas?: string[];
     requiere_revision?: boolean;
+    retriaje?: boolean;
   };
   modelo: {
     nombre?: string;
@@ -289,6 +308,7 @@ export interface DocumentoDecision {
 export interface DetalleDecision {
   doc_id: string;
   decision: DocumentoDecision;
+  camino: NodoDelGrafo[];
   /** Los atributos normalizados del evento, o null si su índice de telemetría ya se rotó. */
   evento: Record<string, string | number | string[]> | null;
   revision: Revision | null;
@@ -301,6 +321,10 @@ export interface FiltrosDecisiones {
   sensor?: string;
   desde: number;
   tamano: number;
+  /** Por defecto, por momento del evento; `decision` sigue al motor en vivo. */
+  orden?: 'evento' | 'decision';
+  /** Solo las que pasaron por el modelo, sin las copias del repertorio. */
+  razonadas?: boolean;
 }
 
 export interface VeredictoNuevo {
@@ -368,6 +392,8 @@ export const api = {
     if (f.severidad) q.set('severidad', f.severidad);
     if (f.tactica) q.set('tactica', f.tactica);
     if (f.sensor) q.set('sensor', f.sensor);
+    if (f.orden) q.set('orden', f.orden);
+    if (f.razonadas) q.set('razonadas', 'true');
     return get<ListadoDecisiones>(`/decisiones?${q}`);
   },
   decision: (docId: string) => get<DetalleDecision>(`/decisiones/${encodeURIComponent(docId)}`),
