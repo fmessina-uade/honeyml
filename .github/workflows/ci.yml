@@ -82,10 +82,11 @@ jobs:
       # El proyecto con los extras que las pruebas importan de verdad, no solo pytest.
       #
       # `[agent]` trae langgraph, redis y pydantic; `[analysis]` trae numpy, pandas y scikit-learn,
-      # que entran por la cadena `agent/tools.py` -> `features/arquetipos.py`. Con pytest suelto,
-      # una prueba que importe el paquete falla por dependencias faltantes y no por el código.
+      # que entran por la cadena `agent/tools.py` a `features/arquetipos.py`; `[api]` trae FastAPI,
+      # que usan las pruebas de la API con su cliente de pruebas. Con pytest suelto, una prueba que
+      # importe el paquete falla por dependencias faltantes y no por el código.
       - name: install
-        run: pip install -e ".[agent,analysis,dev]"
+        run: pip install -e ".[agent,analysis,api,dev]"
 
       - name: pytest
         run: pytest tests/unit/ -v --tb=short
