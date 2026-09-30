@@ -1,9 +1,7 @@
 #!/bin/bash
-# 02_firewall.sh
-# Firewall UFW y reglas de aislamiento con iptables para HoneyML.
-# Se corre DESPUÉS de 01_hardening.sh y de confirmar el acceso SSH por el puerto 2200.
-#
-# Uso: sudo bash 02_firewall.sh
+# Firewall UFW y reglas de aislamiento con iptables para HoneyML. Se corre con sudo, después de
+# 01_hardening.sh y de confirmar que el acceso SSH por el puerto 2200 anda: si se corre antes, la
+# sesión de administración puede quedar afuera.
 
 set -euo pipefail
 
@@ -61,8 +59,6 @@ ufw allow 443/tcp  comment 'Dionaea HTTPS'
 ufw allow 445/tcp  comment 'Dionaea SMB'
 ufw allow 135/tcp  comment 'Dionaea MSRPC'
 ufw allow 3306/tcp comment 'Dionaea MySQL honeypot'
-ufw allow 5060/tcp comment 'Dionaea SIP TCP'
-ufw allow 5060/udp comment 'Dionaea SIP UDP'
 ufw allow 1433/tcp comment 'Dionaea MSSQL honeypot'
 
 # 4. habilitar UFW con registro
@@ -146,6 +142,6 @@ log ""
 log "Resumen de configuración:"
 log "  Puerto SSH admin : $SSH_ADMIN_PORT (rate limited)"
 log "  Red honeypots    : $HONEYPOT_NET (salida y tráfico entre sensores bloqueados)"
-log "  Honeypots expuestos en: 22, 23, 21, 80, 443, 445, 135, 3306, 5060, 1433"
+log "  Honeypots expuestos en: 22, 23, 21, 80, 443, 445, 135, 3306, 1433"
 log ""
 log "Próximo paso: bash 03_monitoring.sh"

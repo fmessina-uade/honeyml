@@ -1,13 +1,9 @@
-# docker-compose.dev.yml: override para desarrollo local (macOS/Linux)
+# Ajustes para desarrollo local en macOS o Linux, que se suman a la composición de producción. Se
+# levanta con `make dev-up`, o con docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 #
-# Uso: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
-#      o directamente: make dev-up
-#
-# Por qué cambian los puertos:
-#   Puerto 22   -> macOS corre su propio sshd en el 22
-#   Puerto 445  -> macOS tiene SMB nativo (Compartir archivos)
-#   Puerto 3306 -> puede haber un MySQL local corriendo
-#   Puerto 80   -> puede haber un servidor web local
+# Los puertos cambian porque en la máquina de desarrollo los reales suelen estar ocupados: macOS corre
+# su propio sshd en el 22 y comparte archivos por SMB en el 445, y puede haber un MySQL en el 3306 o
+# un servidor web en el 80.
 
 services:
   cowrie:
@@ -27,6 +23,4 @@ services:
       - "127.0.0.1:1350:135/tcp"    # MSRPC
       - "127.0.0.1:14330:1433/tcp"  # MSSQL
       - "127.0.0.1:13306:3306/tcp"  # MySQL
-      - "127.0.0.1:15060:5060/tcp"  # SIP TCP
-      - "127.0.0.1:15060:5060/udp"  # SIP UDP
     mem_limit: 512m

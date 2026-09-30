@@ -46,7 +46,8 @@ services:
         max-size: "10m"
         max-file: "5"
 
-  # Dionaea multiprotocolo - SMB, HTTP, FTP, MySQL, MSSQL, SIP
+  # Dionaea multiprotocolo: SMB, HTTP, FTP, MySQL y MSSQL. SIP está apagado en la imagen, así que su
+  # puerto no se publica: aceptaría conexiones sin nadie detrás.
   dionaea:
     build:
       context: ./dionaea
@@ -64,8 +65,6 @@ services:
       - "0.0.0.0:135:135/tcp"    # MSRPC
       - "0.0.0.0:1433:1433/tcp"  # MSSQL
       - "0.0.0.0:3306:3306/tcp"  # MySQL
-      - "0.0.0.0:5060:5060/tcp"  # SIP TCP
-      - "0.0.0.0:5060:5060/udp"  # SIP UDP
     volumes:
       # Se monta todo /opt/dionaea/var/: init_lib e init_log del entrypoint necesitan encontrar el
       # directorio vacío para armar la estructura con dueño dionaea:dionaea.

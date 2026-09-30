@@ -28,8 +28,11 @@ MaxSessions 5
 # Solo el usuario administrador del proyecto
 AllowUsers honeyml
 
-# Sin reenvío de puertos ni túneles, salvo la excepción del final
+# Sin reenvío de puertos ni túneles, salvo la excepción del final. Tampoco se reenvía el agente SSH:
+# con el agente de la estación disponible en el servidor, quien tuviera el control del servidor
+# podría usar esa clave para entrar a otros lados mientras dura la sesión.
 AllowTcpForwarding no
+AllowAgentForwarding no
 AllowStreamLocalForwarding no
 GatewayPorts no
 X11Forwarding no
