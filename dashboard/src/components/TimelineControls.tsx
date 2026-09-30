@@ -87,8 +87,7 @@ function Grupo<T extends string>({
 }
 
 const fecha =
-  'bg-transparent text-[10px] text-white/70 font-data outline-none ' +
-  '[color-scheme:dark] disabled:opacity-40';
+  'bg-transparent text-[10px] text-white/70 font-data outline-none ' + 'disabled:opacity-40';
 
 export default function TimelineControls({
   interval,

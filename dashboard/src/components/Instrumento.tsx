@@ -8,7 +8,7 @@ export function Hexagono({ color, children }: { color: string; children: ReactNo
       <svg viewBox="0 0 28 28" className="absolute inset-0 w-full h-full" aria-hidden>
         <polygon
           points="14,1.5 25,7.75 25,20.25 14,26.5 3,20.25 3,7.75"
-          style={{ fill: 'rgba(255,255,255,0.03)', stroke: color, strokeOpacity: 0.7 }}
+          style={{ fill: 'rgb(var(--tinta) / 0.03)', stroke: color, strokeOpacity: 0.7 }}
           strokeWidth={1.2}
         />
       </svg>

@@ -34,7 +34,7 @@ const PROTOCOL_INFO: Record<string, { name: string; what: string; why: string; c
     name: 'MSSQL',
     what: 'Base de datos de Microsoft en el puerto 1433.',
     why: 'El usuario "sa" es el administrador y existe en toda instalación. Es el equivalente a root: no hay que adivinar el nombre.',
-    color: '#a78bfa',
+    color: 'var(--violeta)',
   },
   ftpd: {
     name: 'FTP',
@@ -46,7 +46,7 @@ const PROTOCOL_INFO: Record<string, { name: string; what: string; why: string; c
     name: 'MSRPC',
     what: 'Localizador de servicios remotos de Windows, puerto 135.',
     why: 'Sirve para enumerar qué servicios corren en el equipo. Es reconocimiento previo a elegir un exploit.',
-    color: '#60a5fa',
+    color: 'var(--celeste)',
   },
   ftpdatalisten: {
     name: 'FTP (canal de datos)',
@@ -80,7 +80,7 @@ const PROTOCOL_INFO_EN: Record<string, { name: string; what: string; why: string
       name: 'MSSQL',
       what: "Microsoft's database on port 1433.",
       why: 'The "sa" user is the administrator and exists on every install. It is the equivalent of root: there is no name to guess.',
-      color: '#a78bfa',
+      color: 'var(--violeta)',
     },
     ftpd: {
       name: 'FTP',
@@ -92,7 +92,7 @@ const PROTOCOL_INFO_EN: Record<string, { name: string; what: string; why: string
       name: 'MSRPC',
       what: "Windows' remote service locator, port 135.",
       why: 'It is used to enumerate which services run on the machine. This is reconnaissance before choosing an exploit.',
-      color: '#60a5fa',
+      color: 'var(--celeste)',
     },
     ftpdatalisten: {
       name: 'FTP (data channel)',
@@ -103,6 +103,9 @@ const PROTOCOL_INFO_EN: Record<string, { name: string; what: string; why: string
   };
 
 type Info = { name: string; what: string; why: string; color: string };
+
+/** El nombre con que se conoce un servicio del sensor ("smbd" es SMB). */
+export const nombreDelServicio = (protocolo: string) => PROTOCOL_INFO[protocolo]?.name ?? protocolo;
 
 /**
  * Direcciones contra eventos por dirección, las dos en escala logarítmica, con una burbuja por
@@ -233,7 +236,7 @@ function Dispersion({
                 x2={sx(k)}
                 y1={M.arr}
                 y2={alto - M.aba}
-                stroke="rgba(255,255,255,0.05)"
+                stroke="rgb(var(--tinta) / 0.05)"
               />
               <text
                 x={sx(k)}
@@ -241,7 +244,7 @@ function Dispersion({
                 textAnchor="middle"
                 className="font-data"
                 fontSize={9}
-                fill="rgba(255,255,255,0.3)"
+                fill="rgb(var(--tinta) / 0.3)"
               >
                 {compacto(10 ** k)}
               </text>
@@ -254,7 +257,7 @@ function Dispersion({
                 x2={ancho - M.der}
                 y1={sy(k)}
                 y2={sy(k)}
-                stroke="rgba(255,255,255,0.05)"
+                stroke="rgb(var(--tinta) / 0.05)"
               />
               <text
                 x={M.izq - 8}
@@ -262,7 +265,7 @@ function Dispersion({
                 textAnchor="end"
                 className="font-data"
                 fontSize={9}
-                fill="rgba(255,255,255,0.3)"
+                fill="rgb(var(--tinta) / 0.3)"
               >
                 {compacto(10 ** k)}
               </text>
@@ -312,11 +315,11 @@ function Dispersion({
             y={alto - 4}
             textAnchor="end"
             fontSize={9.5}
-            fill="rgba(255,255,255,0.4)"
+            fill="rgb(var(--tinta) / 0.4)"
           >
             {t.protocols.axisX}
           </text>
-          <text x={M.izq + 4} y={M.arr + 10} fontSize={9.5} fill="rgba(255,255,255,0.4)">
+          <text x={M.izq + 4} y={M.arr + 10} fontSize={9.5} fill="rgb(var(--tinta) / 0.4)">
             {t.protocols.axisY}
           </text>
 
@@ -351,7 +354,7 @@ function Dispersion({
                     textAnchor={etiqueta?.ancla ?? 'start'}
                     className="font-mono-display"
                     fontSize={11}
-                    fill="rgba(255,255,255,0.85)"
+                    fill="rgb(var(--tinta) / 0.85)"
                   >
                     {i.name}
                   </text>

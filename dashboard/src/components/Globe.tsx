@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as EventoPuntero } from 'react';
 import type { CountryOrigin } from '../lib/api';
 import { WORLD } from '../lib/world';
+import { nombreDePais } from '../lib/format';
 
 /**
  * Globo que rota, con las fronteras de los países y un marcador por país de origen.
@@ -11,7 +12,7 @@ import { WORLD } from '../lib/world';
  * Está dibujado como una proyección ortográfica en SVG y no con una biblioteca 3D. Las fronteras
  * salen de Natural Earth, decodificadas y simplificadas de antemano por scripts/build_world_map.py:
  * 28 KB de pares de coordenadas pelados, contra el megabyte que una biblioteca de globos le sumaría
- * a un bundle que hoy pesa 250 KB.
+ * al panel.
  *
  * Las coordenadas de cada marcador son el centroide de las direcciones efectivamente observadas en
  * ese país, calculado por Elasticsearch sobre los eventos capturados. No son el centro geográfico
@@ -163,7 +164,7 @@ function sinAnimacion(): boolean {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches || document.hidden;
 }
 
-/** La distancia angular más corta, así ir de 170° a −170° son 20° y no 340°. */
+/** La distancia angular más corta: de 170 grados a menos 170 hay 20 grados, no 340. */
 function deltaAngular(desde: number, hasta: number): number {
   return ((((hasta - desde) % 360) + 540) % 360) - 180;
 }
@@ -353,8 +354,8 @@ export default function Globe({ countries, selected, onSelect }: Props) {
         </radialGradient>
         {/* Sombreado del cuerpo: iluminado desde arriba a la izquierda, para dar volumen. */}
         <radialGradient id="g-cuerpo" cx="36%" cy="30%">
-          <stop offset="0%" stopColor="#1b2836" />
-          <stop offset="100%" stopColor="#0c1219" />
+          <stop offset="0%" stopColor="var(--globo-luz)" />
+          <stop offset="100%" stopColor="var(--globo-sombra)" />
         </radialGradient>
         <filter id="f-costa">
           <feGaussianBlur stdDeviation="1.4" />
@@ -373,7 +374,7 @@ export default function Globe({ countries, selected, onSelect }: Props) {
 
       {/* La retícula va debajo y más tenue: da la forma de la esfera, pero lo que se lee son los
           contornos. Dos tramas del mismo peso compiten y ninguna se distingue. */}
-      <g stroke="rgba(148,163,184,0.10)" strokeWidth="0.35" fill="none">
+      <g stroke="rgb(var(--tinta) / 0.09)" strokeWidth="0.35" fill="none">
         {lineas.map((d, i) => (
           <path key={i} d={d} />
         ))}
@@ -443,7 +444,7 @@ export default function Globe({ countries, selected, onSelect }: Props) {
               </circle>
             )}
             <circle cx={p.x} cy={p.y} r={r} fill={color} filter="url(#f-brillo)" />
-            <title>{c.country}</title>
+            <title>{nombreDePais(c.iso, c.country)}</title>
           </g>
         );
       })}

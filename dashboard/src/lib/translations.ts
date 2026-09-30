@@ -21,7 +21,22 @@ const es = {
     title: 'No se pudo cargar la telemetría',
     hint: 'Verificá que la API esté corriendo:',
   },
+  navGroups: {
+    operacion: 'Operación',
+    aprender: 'Aprender',
+  },
+  menu: {
+    open: 'Abrir el menú',
+    close: 'Cerrar el menú',
+  },
+  theme: {
+    title: 'Tema',
+    sistema: 'Como el sistema',
+    claro: 'Claro',
+    oscuro: 'Oscuro',
+  },
   nav: {
+    inicio: 'Resumen',
     pulso: 'El pulso',
     anatomia: 'Anatomía de un ataque',
     protocolos: 'Más allá de SSH',
@@ -33,6 +48,8 @@ const es = {
     triaje: 'Triaje del motor',
   },
   lead: {
+    inicio:
+      'Todo HoneyML en una pantalla: lo que llega al señuelo, lo que decide el motor y por dónde seguir.',
     pulso:
       'Un equipo que nadie publicó en ningún lado, expuesto a internet. Esto es lo que recibe.',
     anatomia: 'Una intrusión real capturada, reproducida paso a paso. Cada comando, explicado.',
@@ -48,6 +65,29 @@ const es = {
     mitre: 'El marco con el que se clasifica cada acción, iluminado con las capturas propias.',
     triaje:
       'Lo que el motor decidió sobre cada evento, con qué evidencia y a qué costo. Lo que no pudo cerrar solo lo termina de decidir quien opera el panel.',
+  },
+  home: {
+    engineTitle: 'Motor de triaje',
+    lastHour: 'decisiones en la última hora',
+    toDecision: 'del evento a la decisión',
+    pending: 'esperan al analista',
+    engineLine: (total: string, copiadas: string, costo: string) =>
+      `${total} decisiones sobre tráfico real. El ${copiadas}% se resolvió copiando una decisión anterior sobre la misma conducta, sin consultar al modelo. Costo total: USD ${costo}.`,
+    openEngine: 'Ver el motor trabajando',
+    distinctOrigins: 'orígenes distintos, ninguno invitado',
+    learnTitle: 'Para entender qué pasa',
+    learnHint: 'Cada tarjeta lleva a su sección.',
+    cards: {
+      pulso: (dias: number) => `eventos en ${dias} días de captura`,
+      anatomia: 'intrusiones reales, reproducidas comando por comando',
+      protocolos: (servicio: string) =>
+        `eventos por dirección en ${servicio}: pocas máquinas insistiendo`,
+      diccionario: (usuario: string) => `intentos con el usuario ${usuario}`,
+      huellas: 'de las sesiones con comandos es un solo guion',
+      arquetipos: 'de las direcciones llega a una intrusión efectiva',
+      origen: (pais: string) => `eventos por dirección desde ${pais}`,
+      mitre: 'tácticas del marco que el señuelo puede observar',
+    },
   },
   pulse: {
     notePeak: (eventos: string, fecha: string) => `el pico: ${eventos} eventos el ${fecha}`,
@@ -404,6 +444,69 @@ const es = {
     correctedByEngine: 'corregidas tras un rechazo de la validación',
     conclusion: 'Tiempo de conclusión',
     conclusionNote: (d: number) => `del evento a la decisión guardada, últimos ${d} días`,
+    conclusionP90: (p90: string, d: number) =>
+      `nueve de cada diez, en menos de ${p90}. Últimos ${d} días`,
+    pendingNone: (r: string) => `el motor cerró todo solo; ${r} con veredicto`,
+    inbox: 'Decisiones',
+    live: 'en vivo',
+    newOnes: (c: number) => (c === 1 ? '1 nueva' : `${c} nuevas`),
+    allTactics: 'Todas las tácticas',
+    allSensors: 'Los dos sensores',
+    emptyPendingTitle: 'Nada pendiente de revisión',
+    emptyPendingText:
+      'El motor cerró todas sus decisiones sin consultas fallidas. Igual podés revisar cualquiera desde "Todas": tu veredicto queda al lado de la decisión.',
+    guide: {
+      title: 'Cómo se usa esta sección',
+      ok: 'Entendido',
+      show: 'Cómo se usa',
+      steps: [
+        {
+          title: 'El motor decide solo',
+          text: 'Cada evento recorre el grafo de arriba. Si la conducta ya se decidió, se copia; si no, razona el modelo.',
+        },
+        {
+          title: 'Elegí una decisión',
+          text: 'En la lista de abajo, o tocando el evento que está procesando el motor. Se abre con su porqué.',
+        },
+        {
+          title: 'Confirmala o corregila',
+          text: 'Tu veredicto se guarda al lado. La decisión del motor no se modifica, así después se mide en qué se equivocó.',
+        },
+      ],
+    },
+    modal: {
+      title: 'Revisar la decisión del motor',
+      engineSays: 'Lo que decidió el motor',
+      alreadyReviewed: (que: string, cuando: string) =>
+        `Ya tiene un veredicto: ${que} el ${cuando}. Guardar uno nuevo lo reemplaza.`,
+      confirmedShort: 'la confirmaste',
+      correctedShort: 'la corregiste',
+      question: '¿La clasificación del motor es correcta?',
+      yes: 'Sí, es correcta',
+      yesHint: 'Queda confirmada tal como está.',
+      no: 'No, hay que corregirla',
+      noHint: 'Elegís la severidad y la táctica que corresponden.',
+      severityQ: '¿Qué severidad corresponde?',
+      rangeHint: (piso: string, techo: string) =>
+        piso === techo
+          ? `Con la evidencia sola, el motor solo podía decir ${piso}. Vos podés elegir otra.`
+          : `Con la evidencia sola, el motor podía ir de ${piso} a ${techo}. Vos podés salir de ese rango.`,
+      outOfRange: 'Fuera de lo que la evidencia sola sostiene',
+      engineTag: 'motor',
+      tacticQ: '¿Qué táctica corresponde?',
+      none: 'Ninguna',
+      noneHint: 'El evento no se corresponde con ninguna de las tácticas que el señuelo observa.',
+      noteLabel: 'Nota (opcional)',
+      notePlaceholder:
+        'Por qué, en una línea: sirve para medir después en qué se equivoca el motor.',
+      save: 'Guardar veredicto',
+      saved: 'Veredicto guardado',
+      savedHint:
+        'La decisión del motor queda intacta y tu veredicto se guarda al lado, con una copia de lo que decía el motor.',
+      close: 'Cerrar',
+      sameAsEngine: 'Es igual a lo que dijo el motor: en ese caso, confirmala.',
+      untouched: 'La decisión del motor no se modifica.',
+    },
     median: 'mediana',
     p90: 'p90',
     noData: 'sin datos',
@@ -449,6 +552,19 @@ const es = {
       noContext:
         'El evento no trae dirección de origen y no hay nada que correlacionar: se guarda como no concluyente.',
       waiting: 'Esperando la próxima decisión del motor.',
+      open: 'ver la decisión',
+      pulseTitle: 'Decisiones por minuto, última hora',
+      pulseCopied: 'por memoria',
+      pulseReasoned: 'razonadas',
+      pulseTotals: (total: string, razonadas: string) =>
+        `${total} en la hora, ${razonadas} razonadas`,
+      pulseMinute: (c: number, copiadas: number) =>
+        c === 0
+          ? 'sin decisiones'
+          : `${c} ${c === 1 ? 'decisión' : 'decisiones'}, ${copiadas} por memoria`,
+      pulseNow: 'ahora',
+      pulseMissing:
+        'El gráfico por minuto necesita la versión nueva de la interfaz de programación.',
       feed: 'Decisiones a medida que llegan',
       ring: (a: number, b: number) => `${a} de las últimas ${b} decisiones pasaron por este nodo`,
       retries: (n: number) => (n === 1 ? 'con 1 reproche' : `con ${n} reproches`),
@@ -468,6 +584,27 @@ const es = {
       },
     },
     detail: {
+      title: 'Decisión del motor',
+      review: 'Revisar esta decisión',
+      stateReviewed: 'Revisada por el analista',
+      statePending: 'Pendiente de revisión',
+      stateEngine: 'Resuelta por el motor, sin revisar',
+      eventAt: (x: string) => `evento ${x}`,
+      decidedAt: (x: string) => `decidida ${x}`,
+      took: (x: string) => `${x} después`,
+      why: 'Por qué lo decidió',
+      seeOriginal: 'ver la original',
+      pathMemory:
+        'Salió por el atajo de memoria: la misma conducta ya tenía una decisión, y se copió sin consultar al modelo.',
+      pathNoContext:
+        'El evento no traía dirección de origen: sin nada que correlacionar, se guardó sin pasar por el modelo.',
+      pathRetry: (r: number) =>
+        `Hizo el ciclo completo, y la validación le devolvió la respuesta al modelo ${r === 1 ? 'una vez' : `${r} veces`} antes de aceptarla.`,
+      pathFull:
+        'Hizo el ciclo completo: armó el contexto, razonó con el modelo y la validación aceptó la respuesta.',
+      cost: 'Costo',
+      seconds: 'Duración de la llamada',
+      signature: 'Firma de conducta',
       close: 'Cerrar',
       path: 'Cómo la resolvió el agente',
       attributes: 'Atributos normalizados del evento',
@@ -477,7 +614,9 @@ const es = {
       notConcluded: 'El motor no llegó a una clasificación.',
       confidence: 'confianza',
       bounds: (piso: string, techo: string) =>
-        `La escala admite de ${piso} a ${techo} para este evento.`,
+        piso === techo
+          ? `Para este evento la escala solo admite ${piso}.`
+          : `La escala admite de ${piso} a ${techo} para este evento.`,
       justification: 'Justificación',
       evidence: 'Evidencia',
       cycle: 'Cómo se decidió',
@@ -542,7 +681,22 @@ const en: typeof es = {
     title: 'Could not load telemetry',
     hint: 'Check that the API is running:',
   },
+  navGroups: {
+    operacion: 'Operations',
+    aprender: 'Learn',
+  },
+  menu: {
+    open: 'Open the menu',
+    close: 'Close the menu',
+  },
+  theme: {
+    title: 'Theme',
+    sistema: 'Match the system',
+    claro: 'Light',
+    oscuro: 'Dark',
+  },
   nav: {
+    inicio: 'Overview',
     pulso: 'The pulse',
     anatomia: 'Anatomy of an attack',
     protocolos: 'Beyond SSH',
@@ -554,6 +708,8 @@ const en: typeof es = {
     triaje: 'Engine triage',
   },
   lead: {
+    inicio:
+      'All of HoneyML on one screen: what reaches the decoy, what the engine decides and where to go next.',
     pulso: 'A machine nobody advertised anywhere, exposed to the internet. This is what it gets.',
     anatomia: 'A real captured intrusion, replayed step by step. Every command, explained.',
     protocolos:
@@ -568,6 +724,29 @@ const en: typeof es = {
     mitre: 'The framework used to classify each action, lit up with our own captures.',
     triaje:
       'What the engine decided about each event, on what evidence and at what cost. Whatever it could not settle on its own is decided by whoever operates the panel.',
+  },
+  home: {
+    engineTitle: 'Triage engine',
+    lastHour: 'decisions in the last hour',
+    toDecision: 'from event to decision',
+    pending: 'waiting for the analyst',
+    engineLine: (total: string, copiadas: string, costo: string) =>
+      `${total} decisions on real traffic. ${copiadas}% were settled by copying an earlier decision on the same behavior, without asking the model. Total cost: USD ${costo}.`,
+    openEngine: 'See the engine at work',
+    distinctOrigins: 'distinct origins, none of them invited',
+    learnTitle: 'To understand what is going on',
+    learnHint: 'Each card opens its section.',
+    cards: {
+      pulso: (dias: number) => `events over ${dias} days of capture`,
+      anatomia: 'real intrusions, replayed command by command',
+      protocolos: (servicio: string) =>
+        `events per address on ${servicio}: a few machines pushing hard`,
+      diccionario: (usuario: string) => `attempts with the username ${usuario}`,
+      huellas: 'of sessions with commands are a single script',
+      arquetipos: 'of addresses reach an effective intrusion',
+      origen: (pais: string) => `events per address from ${pais}`,
+      mitre: 'framework tactics the decoy can observe',
+    },
   },
   pulse: {
     notePeak: (eventos: string, fecha: string) => `the peak: ${eventos} events on ${fecha}`,
@@ -919,6 +1098,67 @@ const en: typeof es = {
     correctedByEngine: 'corrected after a validation rejection',
     conclusion: 'Time to conclusion',
     conclusionNote: (d: number) => `from the event to the stored decision, last ${d} days`,
+    conclusionP90: (p90: string, d: number) => `nine out of ten in under ${p90}. Last ${d} days`,
+    pendingNone: (r: string) => `the engine settled everything on its own; ${r} with a verdict`,
+    inbox: 'Decisions',
+    live: 'live',
+    newOnes: (c: number) => (c === 1 ? '1 new' : `${c} new`),
+    allTactics: 'All tactics',
+    allSensors: 'Both sensors',
+    emptyPendingTitle: 'Nothing waiting for review',
+    emptyPendingText:
+      'The engine closed every decision without failed queries. You can still review any of them from "All": your verdict is stored next to the decision.',
+    guide: {
+      title: 'How this section works',
+      ok: 'Got it',
+      show: 'How it works',
+      steps: [
+        {
+          title: 'The engine decides on its own',
+          text: 'Every event travels the graph above. If the behavior was already decided, it is copied; otherwise the model reasons.',
+        },
+        {
+          title: 'Pick a decision',
+          text: 'From the list below, or by clicking the event the engine is processing. It opens with its reasoning.',
+        },
+        {
+          title: 'Confirm or correct it',
+          text: "Your verdict is stored next to it. The engine's decision is left untouched, so its mistakes can be measured later.",
+        },
+      ],
+    },
+    modal: {
+      title: "Review the engine's decision",
+      engineSays: 'What the engine decided',
+      alreadyReviewed: (que: string, cuando: string) =>
+        `It already has a verdict: ${que} on ${cuando}. Saving a new one replaces it.`,
+      confirmedShort: 'you confirmed it',
+      correctedShort: 'you corrected it',
+      question: "Is the engine's classification right?",
+      yes: 'Yes, it is right',
+      yesHint: 'It is confirmed as it stands.',
+      no: 'No, it needs a correction',
+      noHint: 'You choose the severity and the tactic that apply.',
+      severityQ: 'Which severity applies?',
+      rangeHint: (piso: string, techo: string) =>
+        piso === techo
+          ? `With the evidence alone, the engine could only say ${piso}. You can choose another.`
+          : `With the evidence alone, the engine could go from ${piso} to ${techo}. You can go outside that range.`,
+      outOfRange: 'Beyond what the evidence alone supports',
+      engineTag: 'engine',
+      tacticQ: 'Which tactic applies?',
+      none: 'None',
+      noneHint: 'The event does not match any of the tactics the decoy observes.',
+      noteLabel: 'Note (optional)',
+      notePlaceholder: 'Why, in one line: it helps measure later where the engine goes wrong.',
+      save: 'Save verdict',
+      saved: 'Verdict saved',
+      savedHint:
+        "The engine's decision is left untouched and your verdict is stored next to it, with a copy of what the engine said.",
+      close: 'Close',
+      sameAsEngine: 'This matches what the engine said: confirm it instead.',
+      untouched: "The engine's decision is not modified.",
+    },
     median: 'median',
     p90: 'p90',
     noData: 'no data',
@@ -964,6 +1204,18 @@ const en: typeof es = {
       noContext:
         'The event has no source address and nothing to correlate: it is stored as inconclusive.',
       waiting: 'Waiting for the next engine decision.',
+      open: 'open the decision',
+      pulseTitle: 'Decisions per minute, last hour',
+      pulseCopied: 'from memory',
+      pulseReasoned: 'reasoned',
+      pulseTotals: (total: string, razonadas: string) =>
+        `${total} this hour, ${razonadas} reasoned`,
+      pulseMinute: (c: number, copiadas: number) =>
+        c === 0
+          ? 'no decisions'
+          : `${c} ${c === 1 ? 'decision' : 'decisions'}, ${copiadas} from memory`,
+      pulseNow: 'now',
+      pulseMissing: 'The per-minute chart needs the new version of the API.',
       feed: 'Decisions as they arrive',
       ring: (a: number, b: number) => `${a} of the last ${b} decisions went through this node`,
       retries: (n: number) => (n === 1 ? 'after 1 rejection' : `after ${n} rejections`),
@@ -983,6 +1235,27 @@ const en: typeof es = {
       },
     },
     detail: {
+      title: 'Engine decision',
+      review: 'Review this decision',
+      stateReviewed: 'Reviewed by the analyst',
+      statePending: 'Waiting for review',
+      stateEngine: 'Settled by the engine, not reviewed',
+      eventAt: (x: string) => `event ${x}`,
+      decidedAt: (x: string) => `decided ${x}`,
+      took: (x: string) => `${x} later`,
+      why: 'Why it decided this',
+      seeOriginal: 'open the original',
+      pathMemory:
+        'It took the memory shortcut: the same behavior already had a decision, which was copied without asking the model.',
+      pathNoContext:
+        'The event had no source address: with nothing to correlate, it was stored without going through the model.',
+      pathRetry: (r: number) =>
+        `It ran the full cycle, and validation sent the answer back to the model ${r === 1 ? 'once' : `${r} times`} before accepting it.`,
+      pathFull:
+        'It ran the full cycle: built the context, reasoned with the model and validation accepted the answer.',
+      cost: 'Cost',
+      seconds: 'Call duration',
+      signature: 'Behavior signature',
       close: 'Close',
       path: 'How the agent settled it',
       attributes: 'Normalized event attributes',
@@ -992,7 +1265,9 @@ const en: typeof es = {
       notConcluded: 'The engine did not reach a classification.',
       confidence: 'confidence',
       bounds: (piso: string, techo: string) =>
-        `The scale allows ${piso} to ${techo} for this event.`,
+        piso === techo
+          ? `For this event the scale only allows ${piso}.`
+          : `The scale allows ${piso} to ${techo} for this event.`,
       justification: 'Justification',
       evidence: 'Evidence',
       cycle: 'How it was decided',

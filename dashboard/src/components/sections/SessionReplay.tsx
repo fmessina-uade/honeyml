@@ -10,9 +10,9 @@ const TACTIC_COLOR: Record<string, string> = {
   Descubrimiento: 'var(--honey-amber)',
   Ejecución: 'var(--agent-coral)',
   Persistencia: 'var(--neural-teal)',
-  'Evasión de defensas': '#a78bfa',
-  'Acceso a credenciales': '#60a5fa',
-  'Acceso inicial': '#f472b6',
+  'Evasión de defensas': 'var(--violeta)',
+  'Acceso a credenciales': 'var(--celeste)',
+  'Acceso inicial': 'var(--rosa)',
 };
 
 export function tacticColor(tactic: string): string {
@@ -132,8 +132,8 @@ export default function SessionReplay({ replays }: { replays: Replay[] }) {
       onKeyDown={onKeyDown}
     >
       {/* La terminal */}
-      <div className="rounded-xl overflow-hidden ring-1 ring-white/10 bg-[#0b0f15] min-w-0">
-        <div className="flex items-center justify-between bg-[#131922] border-b border-white/5 px-3 sm:px-4 py-2.5 gap-2 flex-wrap">
+      <div className="impreso rounded-xl overflow-hidden ring-1 ring-white/10 min-w-0">
+        <div className="flex items-center justify-between bg-[var(--impreso-cabecera)] border-b border-white/5 px-3 sm:px-4 py-2.5 gap-2 flex-wrap">
           <div className="flex items-center gap-2 text-[11px] text-white/60 min-w-0">
             <span className="flex gap-1 shrink-0" aria-hidden>
               <span className="w-2 h-2 rounded-full bg-white/10" />

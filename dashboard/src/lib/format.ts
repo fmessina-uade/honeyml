@@ -65,6 +65,21 @@ export function duracion(segundos: number): string {
   return `${dec(segundos / 86400)} d`;
 }
 
+/**
+ * El nombre de un país en el idioma del panel, a partir de su código ISO. La base de geolocalización
+ * trae los nombres en inglés, y "desde Philippines" en medio de una oración en español se lee como
+ * un descuido. Si el código no se reconoce queda el nombre que vino con el dato.
+ */
+export function nombreDePais(iso: string | null | undefined, respaldo: string): string {
+  if (!iso) return respaldo;
+  try {
+    const nombre = new Intl.DisplayNames([locale], { type: 'region' }).of(iso.toUpperCase());
+    return nombre && nombre !== iso.toUpperCase() ? nombre : respaldo;
+  } catch {
+    return respaldo;
+  }
+}
+
 /** Hora, minutos y segundos en el locale activo, para seguir al motor en vivo. */
 export function hora(iso: string | null | undefined): string {
   if (!iso) return '';

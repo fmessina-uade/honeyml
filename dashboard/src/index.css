@@ -32,7 +32,7 @@
   line-height: 1.4;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--rotulo);
 }
 /* La regla de Inter va sobre todos los elementos y no se hereda, así que cada voz se declara
    también para lo que lleva adentro: una cifra que envuelve un contador sigue siendo una cifra. */
@@ -54,17 +54,17 @@
   font-size: 24px;
   line-height: 1.15;
   letter-spacing: -0.02em;
-  color: #fff;
+  color: rgb(var(--tinta));
 }
 .cifra-chica {
   font-size: 15px;
   line-height: 1.25;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgb(var(--tinta) / 0.9);
 }
 .titulo {
   font-weight: 500;
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgb(var(--tinta) / 0.9);
 }
 /* Texto de interfaz dentro de una cifra o de un dato, como la unidad al lado de un número. */
 .prosa,
@@ -73,37 +73,190 @@
   letter-spacing: normal;
 }
 
+/* Los dos temas. La tinta, el fondo y las superficies van como tres números sueltos porque Tailwind
+   les aplica la opacidad de cada clase.
+
+   El oscuro es la pantalla de un instrumento. El claro es la misma consola de día: un gris frío con
+   el panal de la marca muy tenue detrás, tarjetas blancas y el ámbar como acento. La marca se
+   oscurece en el claro porque el ámbar y el verde de la paleta oscura pierden contraste sobre
+   blanco, y por lo mismo la letra de un botón ámbar pasa a blanca. */
 :root {
+  --tinta: 255 255 255;
+  --fondo: 13 17 23;
+  --superficie: 15 20 27;
+  --elevada: 22 27 34;
+  --barra: 15 20 27;
   --abyss-black: #0d1117;
   --honey-amber: #d4860a;
   --neural-teal: #00b894;
   --agent-coral: #ff6b35;
   --ghost-slate: #94a3b8;
+  --violeta: #a78bfa;
+  --celeste: #60a5fa;
+  --rosa: #f472b6;
+  --critico: #e03131;
+  --mano: #ffb38f;
+  --sobre-ambar: #0d1117;
+  --rotulo: rgb(var(--tinta) / 0.4);
+  --globo-luz: #1b2836;
+  --globo-sombra: #0c1219;
+  color-scheme: dark;
+}
+:root[data-tema='claro'] {
+  --tinta: 15 23 42;
+  --fondo: 241 244 247;
+  --superficie: 255 255 255;
+  --elevada: 255 255 255;
+  --barra: 255 255 255;
+  --abyss-black: #f1f4f7;
+  --honey-amber: #b86e00;
+  --neural-teal: #008f73;
+  --agent-coral: #e0520f;
+  --ghost-slate: #56627a;
+  --violeta: #6d4ae0;
+  --celeste: #1c6fd1;
+  --rosa: #c2255c;
+  --critico: #d42a2a;
+  --mano: #d9480f;
+  --sobre-ambar: #ffffff;
+  --rotulo: rgb(71 85 105 / 0.85);
+  --globo-luz: #eef2f6;
+  --globo-sombra: #cdd6df;
+  color-scheme: light;
 }
 
 body {
-  background: var(--abyss-black);
-  color: #fff;
+  background: rgb(var(--fondo));
+  color: rgb(var(--tinta));
 }
 
-/* El papel del instrumento: una grilla de puntos muy tenue detrás de todo, la misma sobre la que
-   se dibujan las anotaciones a mano. */
+/* El fondo del instrumento: una grilla de puntos muy tenue detrás de todo, la misma sobre la que
+   se dibujan las anotaciones a mano. En el claro es el panal de la marca, que es también lo que
+   un honeypot es: celdas que esperan a que alguien entre. Arriba lo tiñen dos luces suaves, ámbar
+   y verde, que se van con el encabezado al desplazar. */
 .papel {
-  background-image: radial-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-image: radial-gradient(rgb(var(--tinta) / 0.045) 1px, transparent 1px);
   background-size: 22px 22px;
   background-position: -11px -11px;
 }
+:root[data-tema='claro'] .papel {
+  background-image:
+    radial-gradient(900px 340px at 12% -60px, rgb(212 134 10 / 0.16), transparent 70%),
+    radial-gradient(700px 300px at 88% -80px, rgb(0 184 148 / 0.1), transparent 70%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='38.105' height='66' viewBox='0 0 38.105 66'%3E%3Cpath d='M19.053 0L38.105 11V33L19.053 44L0 33V11Z M19.053 44V66' fill='none' stroke='%23b86e00' stroke-opacity='0.13'/%3E%3C/svg%3E");
+  background-size:
+    100% 100%,
+    100% 100%,
+    38.105px 66px;
+  background-repeat: no-repeat, no-repeat, repeat;
+  background-position: 0 0;
+  background-attachment: local;
+}
+
+/* La barra lateral y la de arriba en el teléfono. En el claro el panal asoma detrás de la marca y
+   se desvanece hacia abajo. */
+:root[data-tema='claro'] .tapa {
+  background-image:
+    linear-gradient(rgb(255 255 255 / 0.2), rgb(255 255 255) 210px),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='38.105' height='66' viewBox='0 0 38.105 66'%3E%3Cpath d='M19.053 0L38.105 11V33L19.053 44L0 33V11Z M19.053 44V66' fill='none' stroke='%23b86e00' stroke-opacity='0.2'/%3E%3C/svg%3E");
+  background-size:
+    100% 100%,
+    38.105px 66px;
+}
+:root[data-tema='claro'] aside.tapa {
+  box-shadow: inset -1px 0 0 rgb(15 23 42 / 0.08);
+}
+
+/* El título de cada sección lleva debajo un trazo corto de ámbar a coral, el color del agente. En
+   el oscuro no hace falta: el título ya resalta sobre el fondo. */
+:root[data-tema='claro'] .titulo-seccion {
+  padding-bottom: 7px;
+  background: linear-gradient(90deg, var(--honey-amber), var(--agent-coral)) no-repeat left bottom /
+    2.4em 3px;
+}
+
+/* La sección elegida en la navegación, en ámbar. */
+:root[data-tema='claro'] .nav-activa {
+  background: color-mix(in srgb, var(--honey-amber) 11%, transparent);
+  color: var(--honey-amber);
+}
 
 /* La tarjeta de todo el panel. El filo se enciende cerca del puntero, como el bisel de un
-   instrumento cuando le da la luz; la posición la escribe un único oyente en App. */
+   instrumento cuando le da la luz; la posición la escribe un único oyente en App. En el claro es
+   una tarjeta blanca con borde nítido y una sombra corta. */
 .panel {
   position: relative;
   border-radius: 0.8rem;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.02));
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  background: linear-gradient(180deg, rgb(var(--tinta) / 0.035), rgb(var(--tinta) / 0.02));
+  box-shadow: inset 0 0 0 1px rgb(var(--tinta) / 0.06);
+}
+:root[data-tema='claro'] .panel {
+  background: rgb(var(--superficie));
+  box-shadow:
+    inset 0 0 0 1px rgb(15 23 42 / 0.08),
+    0 1px 2px rgb(15 23 42 / 0.04),
+    0 10px 24px -18px rgb(15 23 42 / 0.28);
+}
+
+/* Las pantallas del motor: la del instrumento en el oscuro y, en el claro, una superficie fría
+   con su grilla de puntos que la separa de las tarjetas. Todo lo que dibuja el motor toma sus
+   colores de acá, así un tema no le deja al otro un blanco o un negro fijo. */
+.motor {
+  --motor-fondo: #090d13;
+  --motor-rejilla: rgb(255 255 255 / 0.07);
+  --motor-vidrio-alto: #1c2635;
+  --motor-vidrio-bajo: #0b1018;
+  --motor-tarjeta: #0b1018;
+  --motor-arista: rgb(255 255 255 / 0.1);
+  --motor-flujo: rgb(148 163 184 / 0.35);
+  --motor-particula: #cbd5e1;
+  --motor-anillo: rgb(255 255 255 / 0.06);
+  --motor-texto: rgb(255 255 255 / 0.62);
+  --motor-foco: #ffffff;
+  --motor-acento: #ffb38f;
+  --motor-nucleo: #ffffff;
+  --motor-estela: #ffd2bd;
+  --motor-apagado: #94a3b8;
+  --motor-guardado: #e2e8f0;
+  background-color: var(--motor-fondo);
+}
+:root[data-tema='claro'] .motor {
+  --motor-fondo: #edf3f5;
+  --motor-rejilla: rgb(28 70 110 / 0.13);
+  --motor-vidrio-alto: #ffffff;
+  --motor-vidrio-bajo: #e4edf1;
+  --motor-tarjeta: #ffffff;
+  --motor-arista: rgb(27 35 58 / 0.18);
+  --motor-flujo: rgb(71 85 105 / 0.5);
+  --motor-particula: #475569;
+  --motor-anillo: rgb(27 35 58 / 0.09);
+  --motor-texto: rgb(27 35 58 / 0.72);
+  --motor-foco: #1b233a;
+  --motor-acento: #c2410c;
+  --motor-nucleo: #d9480f;
+  --motor-estela: #e8590c;
+  --motor-apagado: #64748b;
+  --motor-guardado: #334155;
+  box-shadow:
+    inset 0 0 0 1px rgb(28 70 110 / 0.18),
+    0 14px 30px -22px rgb(28 70 110 / 0.55);
+}
+
+/* La salida de una terminal o de un guion capturado: la pantalla en el oscuro y, en el claro, la
+   misma superficie fría del motor, con su grilla de puntos. */
+.impreso {
+  --impreso-fondo: #0b0f15;
+  --impreso-cabecera: #131922;
+  background-color: var(--impreso-fondo);
+}
+:root[data-tema='claro'] .impreso {
+  --impreso-fondo: #f5f8fa;
+  --impreso-cabecera: #e8eef2;
+  background-image: radial-gradient(rgb(28 70 110 / 0.1) 1px, transparent 1px);
+  background-size: 18px 18px;
 }
 .panel-tenue {
-  background: rgba(255, 255, 255, 0.015);
+  background: rgb(var(--tinta) / 0.015);
 }
 .panel::before {
   content: '';
@@ -260,7 +413,7 @@ body {
   position: absolute;
   inset: 0 auto 0 0;
   width: 45%;
-  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.07), transparent);
+  background: linear-gradient(to right, transparent, rgb(var(--tinta) / 0.07), transparent);
   animation: navSheen 2.4s ease-out;
   pointer-events: none;
 }
@@ -268,7 +421,7 @@ body {
 /* Barras de desplazamiento: la del navegador rompe la superficie oscura. */
 .thin-scroll {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+  scrollbar-color: rgb(var(--tinta) / 0.14) transparent;
 }
 .thin-scroll::-webkit-scrollbar {
   width: 8px;
@@ -277,11 +430,11 @@ body {
   background: transparent;
 }
 .thin-scroll::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgb(var(--tinta) / 0.12);
   border-radius: 4px;
 }
 .thin-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.22);
+  background: rgb(var(--tinta) / 0.22);
 }
 
 /* La fila de secciones del teléfono se desliza con el dedo; la barra de desplazamiento solo
@@ -494,6 +647,80 @@ body {
   .motor-iridiscente,
   .motor-barra,
   .motor-borde::before {
+    animation: none;
+  }
+}
+
+/* El menú del teléfono, el panel lateral y el diálogo: el velo aparece y la caja entra desde su
+   lado. En el teléfono el diálogo sube desde abajo, que es donde está el pulgar. */
+@keyframes velo {
+  from {
+    opacity: 0;
+  }
+}
+.menu-velo {
+  animation: velo 0.25s ease-out;
+}
+@keyframes desdeLaIzquierda {
+  from {
+    transform: translateX(-100%);
+  }
+}
+.menu-cajon {
+  animation: desdeLaIzquierda 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes desdeLaDerecha {
+  from {
+    transform: translateX(100%);
+  }
+}
+.cajon-cuerpo {
+  animation: desdeLaDerecha 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes desdeAbajo {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+.modal-cuerpo {
+  animation: desdeAbajo 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Una decisión que acaba de llegar a la bandeja se enciende un momento y se apaga. */
+@keyframes filaNueva {
+  0% {
+    background: color-mix(in srgb, var(--honey-amber) 18%, transparent);
+  }
+  100% {
+    background: transparent;
+  }
+}
+.fila-nueva {
+  animation: filaNueva 3.5s ease-out;
+}
+
+/* El minuto que está corriendo en el pulso del motor late mientras llegan decisiones. */
+@keyframes latidoAhora {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.45);
+  }
+}
+.latido-ahora {
+  animation: latidoAhora 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-velo,
+  .menu-cajon,
+  .cajon-cuerpo,
+  .modal-cuerpo,
+  .fila-nueva,
+  .latido-ahora {
     animation: none;
   }
 }

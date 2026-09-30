@@ -193,6 +193,9 @@ export interface ResumenTriaje {
     ultima: string | null;
     ultima_hora: number;
     copiadas_ultima_hora: number;
+    /** La última hora, minuto a minuto, con los minutos vacíos incluidos. Opcional porque una API
+     *  anterior no lo trae, y el panel tiene que seguir andando contra ella. */
+    por_minuto?: { minuto: string | null; decisiones: number; copiadas: number }[];
   };
   /** Desde que ocurrió el evento hasta que su decisión quedó guardada, en segundos. */
   conclusion: {

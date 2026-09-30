@@ -114,7 +114,7 @@ export default function PasswordCheck() {
               className="flex-1 h-5 rounded-md ring-1 ring-white/10 flex items-center px-2 text-[9px] text-white/35 truncate"
               style={{
                 background:
-                  'repeating-linear-gradient(135deg, rgba(255,255,255,0.05) 0 4px, transparent 4px 8px)',
+                  'repeating-linear-gradient(135deg, rgb(var(--tinta) / 0.06) 0 4px, transparent 4px 8px)',
               }}
             >
               {t.passcheck.restStays(64 - PREFIJO)}

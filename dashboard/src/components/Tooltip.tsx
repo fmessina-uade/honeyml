@@ -46,7 +46,7 @@ export default function Tooltip({ content, at }: { content: ReactNode; at: Ancho
     <div
       ref={ref}
       className="fixed z-50 pointer-events-none rounded-lg px-3 py-2 ring-1 ring-white/10
-                 bg-[#161b22]/95 backdrop-blur-sm shadow-xl shadow-black/40"
+                 bg-elevada/95 backdrop-blur-sm shadow-xl shadow-black/40"
       style={{ left: at.x + offset.dx, top: at.y + offset.dy }}
     >
       {content}

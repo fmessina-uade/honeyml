@@ -5,7 +5,7 @@ import type { Geography as GeoData } from '../../lib/api';
 import Reveal from '../Reveal';
 import ManoAlzada from '../ManoAlzada';
 import { Hexagono } from '../Instrumento';
-import { n, pct } from '../../lib/format';
+import { n, nombreDePais, pct } from '../../lib/format';
 import { useI18n } from '../../lib/i18n';
 
 /**
@@ -79,14 +79,14 @@ export default function Geography({ data }: { data: GeoData }) {
                 <div
                   key={elegido.country}
                   className="pais-rotulo pointer-events-none absolute inset-x-0 bottom-0 px-3 pb-3 pt-10
-                             bg-gradient-to-t from-[#0f141b] via-[#0f141b]/85 to-transparent
+                             bg-gradient-to-t from-superficie via-superficie/85 to-transparent
                              rounded-b-xl text-center"
                 >
                   <div className="mb-1.5">
                     <Codigo iso={elegido.iso} />
                   </div>
                   <div className="text-2xl leading-none text-white font-mono-display text-balance">
-                    {elegido.country}
+                    {nombreDePais(elegido.iso, elegido.country)}
                   </div>
                   <div className="font-data text-[11px] text-[var(--agent-coral)] mt-1.5">
                     {n(elegido.count)}{' '}
@@ -117,7 +117,7 @@ export default function Geography({ data }: { data: GeoData }) {
                       </div>
                     ))}
                   </div>
-                  {t.geography.selected(elegido.country)}
+                  {t.geography.selected(nombreDePais(elegido.iso, elegido.country))}
                 </>
               ) : (
                 t.geography.pickHint
@@ -154,7 +154,7 @@ export default function Geography({ data }: { data: GeoData }) {
                         className={`flex items-center gap-2 text-[11px] min-w-0 ${activo ? 'text-white' : 'text-white/80'}`}
                       >
                         <Codigo iso={c.iso} />
-                        <span className="truncate">{c.country}</span>
+                        <span className="truncate">{nombreDePais(c.iso, c.country)}</span>
                       </span>
                       <span className="font-data text-[10px] text-white/45 shrink-0">
                         {n(c.count)}

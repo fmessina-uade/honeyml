@@ -36,7 +36,7 @@ const RAMPA: [number, number, number][] = [
 ];
 
 function color(v: number, max: number): string {
-  if (max <= 0) return 'rgba(255,255,255,0.03)';
+  if (max <= 0) return 'rgb(var(--tinta) / 0.03)';
   // Raíz cuadrada y no lineal: con la escala lineal, un pico aplasta al resto y la grilla queda
   // casi toda del mismo tono, que es justamente lo que se quiere poder comparar.
   const t = Math.min(1, Math.sqrt(Math.max(0, v) / max));

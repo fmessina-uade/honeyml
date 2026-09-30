@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0D1117" />
-      <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -14,7 +14,23 @@
     <title>HoneyML - Panel Analítico</title>
     <style>
       html { background: #0d1117; }
+      html[data-tema='claro'] { background: #f4f1ea; }
     </style>
+    <script>
+      // El tema se decide antes de pintar: si esperara a React, el panel aparecería un instante
+      // con el tema equivocado. La preferencia guardada manda; si no hay, el del sistema.
+      (function () {
+        var preferencia = 'sistema';
+        try {
+          preferencia = localStorage.getItem('honeyml-panel-tema') || 'sistema';
+        } catch (e) {}
+        var claro =
+          preferencia === 'claro' ||
+          (preferencia === 'sistema' &&
+            window.matchMedia('(prefers-color-scheme: light)').matches);
+        document.documentElement.dataset.tema = claro ? 'claro' : 'oscuro';
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -32,7 +32,7 @@ const ACCESS_TECHNIQUE: Record<(typeof ACCESS)[number], string> = {
 // Las que un señuelo de baja interacción estructuralmente no puede ver. Mostrarlas es la gracia: el
 // hueco es una propiedad del sensor y no una omisión del panel, y decirlo es lo que convierte un
 // gráfico de cobertura en una explicación.
-const NOT_OBSERVED = ['Movimiento lateral', 'Impacto'] as const;
+export const NOT_OBSERVED = ['Movimiento lateral', 'Impacto'] as const;
 
 const CADENA = [...OBSERVED, ...NOT_OBSERVED];
 
@@ -222,7 +222,7 @@ export default function MitreMatrix({
                           <path
                             d={HEX}
                             style={{
-                              fill: `color-mix(in srgb, ${color(tac)} ${activo ? 30 : 16}%, #0d1117)`,
+                              fill: `color-mix(in srgb, ${color(tac)} ${activo ? 30 : 16}%, rgb(var(--fondo)))`,
                               stroke: color(tac),
                               filter: activo
                                 ? `drop-shadow(0 0 8px color-mix(in srgb, ${color(tac)} 70%, transparent))`

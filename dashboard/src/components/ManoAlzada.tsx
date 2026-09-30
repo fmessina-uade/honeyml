@@ -33,7 +33,7 @@ const ENTRE_TRAZOS_MS = 260;
 export default function ManoAlzada({
   trazos,
   notas,
-  color = '#ffb38f',
+  color = 'var(--mano)',
   acotar = true,
 }: {
   trazos: Trazo[];

@@ -17,7 +17,7 @@ const TONOS = [
   'color-mix(in srgb, var(--agent-coral) 62%, transparent)',
   'color-mix(in srgb, var(--agent-coral) 38%, transparent)',
   'color-mix(in srgb, var(--honey-amber) 45%, transparent)',
-  'rgba(255,255,255,0.07)',
+  'rgb(var(--tinta) / 0.07)',
 ];
 
 /**
@@ -343,7 +343,7 @@ export default function Fingerprints({ data }: { data: FingerprintData }) {
                 </button>
 
                 {isOpen && (
-                  <div className="section-in border-t border-white/5 bg-[#0b0f15] p-4">
+                  <div className="impreso section-in border-t border-white/5 p-4">
                     <div className="rotulo mb-2">{t.fingerprints.script}</div>
                     <div className="font-data text-[11px] flex flex-col gap-1.5">
                       {f.commands.map((c, k) => (

@@ -10,9 +10,12 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { api, type FilaDecision, type NodoDelGrafo, type ResumenTriaje } from '../lib/api';
-import { dec, duracion, hora, n } from '../lib/format';
+import type { Llegada } from '../lib/useMotorEnVivo';
+import Latido from './Latido';
+import { dec, duracion, n } from '../lib/format';
 import { useI18n } from '../lib/i18n';
 import { useQuieto } from '../lib/useQuieto';
+import { colorDeSeveridad } from './triaje/comunes';
 
 // El grafo del motor sobre un lienzo de 1000 por 330. Los nodos siguen una curva en el orden en que
 // los recorre un evento, y las tres aristas largas son lo que lo vuelve una máquina de estados y no
@@ -30,12 +33,12 @@ interface Nodo {
 }
 
 const NODOS: Nodo[] = [
-  { id: 'memoria', x: 95, y: 205, icono: Database, color: '#00b894' },
-  { id: 'contexto', x: 255, y: 168, icono: Search, color: '#94a3b8' },
-  { id: 'historial', x: 415, y: 150, icono: History, color: '#94a3b8' },
-  { id: 'inferencia', x: 585, y: 150, icono: Brain, color: '#ff6b35' },
-  { id: 'validacion', x: 745, y: 168, icono: ShieldCheck, color: '#d4860a' },
-  { id: 'persistencia', x: 905, y: 205, icono: Save, color: '#e2e8f0' },
+  { id: 'memoria', x: 95, y: 205, icono: Database, color: 'var(--neural-teal)' },
+  { id: 'contexto', x: 255, y: 168, icono: Search, color: 'var(--motor-apagado)' },
+  { id: 'historial', x: 415, y: 150, icono: History, color: 'var(--motor-apagado)' },
+  { id: 'inferencia', x: 585, y: 150, icono: Brain, color: 'var(--agent-coral)' },
+  { id: 'validacion', x: 745, y: 168, icono: ShieldCheck, color: 'var(--honey-amber)' },
+  { id: 'persistencia', x: 905, y: 205, icono: Save, color: 'var(--motor-guardado)' },
 ];
 const P = Object.fromEntries(NODOS.map((nodo) => [nodo.id, nodo])) as Record<NodoDelGrafo, Nodo>;
 
@@ -79,17 +82,12 @@ const PAUSA: Record<NodoDelGrafo, number> = {
 const VELOCIDAD = 0.42; // unidades del lienzo por milisegundo
 const ESTELA = 70;
 
-const INTERVALO_MS = 5000;
-const VENTANA = 30;
 const MINUTOS_ACTIVO = 10;
 
-const SEVERITY_COLOR: Record<string, string> = {
-  informativo: '#94a3b8',
-  bajo: '#00b894',
-  medio: '#d4860a',
-  alto: '#ff6b35',
-  critico: '#ef4444',
-};
+// Un color con transparencia. Los colores del grafo son variables del tema, así que la
+// transparencia no se puede pegar al final como en un hexadecimal.
+const velado = (color: string, porcentaje: number) =>
+  `color-mix(in srgb, ${color} ${porcentaje}%, transparent)`;
 
 type Paso =
   { tipo: 'nodo'; nodo: NodoDelGrafo; ms: number } | { tipo: 'arista'; arista: string; ms: number };
@@ -135,15 +133,22 @@ const idDe = (clave: string) => `motor-${clave.replace('>', '-')}`;
  *
  * Lo que se dibuja no es una ilustración sino lo que el motor guardó. La API deduce el camino de
  * cada decisión (una copia del repertorio salió por el atajo de memoria, una con reproches dio
- * vueltas entre inferencia y validación) y este componente lo reproduce en el mismo orden. Cuando
- * no llega nada nuevo, se puede repetir lo último que decidió, y el panel lo dice.
+ * vueltas entre inferencia y validación) y este componente lo reproduce en el mismo orden. Las
+ * decisiones llegan del sondeo de la sección, el mismo que actualiza los números y el listado.
+ * Cuando no llega nada nuevo, se puede repetir lo último que decidió, y el panel lo dice.
  */
 export default function EngineLive({
   resumen,
+  recientes,
+  llegada,
+  error,
   tacticName,
   onElegir,
 }: {
   resumen: ResumenTriaje;
+  recientes: FilaDecision[];
+  llegada: Llegada;
+  error: string | null;
   tacticName: (key: string) => string;
   onElegir: (docId: string) => void;
 }) {
@@ -157,7 +162,6 @@ export default function EngineLive({
   const quietoRef = useRef(quieto);
   quietoRef.current = quieto;
 
-  const [recientes, setRecientes] = useState<FilaDecision[]>([]);
   const [actual, setActual] = useState<EnCola | null>(null);
   // La última que recorrió el grafo. Queda en pantalla hasta que empieza la siguiente, así la
   // tarjeta del agente no se vacía entre una decisión y otra.
@@ -169,9 +173,7 @@ export default function EngineLive({
   const [pensamiento, setPensamiento] = useState('');
   const [palabras, setPalabras] = useState(0);
   const [ahora, setAhora] = useState(() => Date.now());
-  const [error, setError] = useState<string | null>(null);
 
-  const conocidas = useRef<Set<string>>(new Set());
   const cola = useRef<EnCola[]>([]);
   const trazos = useRef<Record<string, SVGPathElement | null>>({});
   const cabeza = useRef<SVGGElement | null>(null);
@@ -179,6 +181,7 @@ export default function EngineLive({
   const estelaBrillo = useRef<SVGPathElement | null>(null);
   const justificacion = useRef<Record<string, string>>({});
   const contadorDeOndas = useRef(0);
+  const deslizable = useRef<HTMLDivElement | null>(null);
 
   // La decisión en curso vive también en una referencia: sacar de la cola es un efecto, y no puede
   // ir dentro de la función que actualiza el estado, que React puede ejecutar dos veces.
@@ -207,33 +210,24 @@ export default function EngineLive({
     setOndas((o) => [...o.slice(-5), { clave, nodo, color }]);
   }, []);
 
-  // Sondeo del motor: lo que decidió desde la última vez entra a la cola del recorrido.
+  // Al abrir la sección se repite la última, así el grafo no arranca quieto. Se la marca como
+  // repetición para que el panel no la presente como recién llegada.
+  const arrancado = useRef(false);
   useEffect(() => {
-    let vivo = true;
-    const traer = (primera: boolean) =>
-      api
-        .decisiones({ estado: 'todas', desde: 0, tamano: VENTANA, orden: 'decision' })
-        .then((l) => {
-          if (!vivo) return;
-          setError(null);
-          setRecientes(l.items);
-          const nuevas = l.items.filter((d) => !conocidas.current.has(d.doc_id));
-          nuevas.forEach((d) => conocidas.current.add(d.doc_id));
-          // Al abrir la sección se repite la última, así el grafo no arranca quieto. Se la marca
-          // como repetición para que el panel no la presente como recién llegada.
-          if (primera) encolar(l.items.slice(0, 1), true);
-          else if (nuevas.length) encolar(nuevas, false);
-        })
-        .catch((err) => vivo && setError(String(err.message ?? err)));
-    traer(true);
-    const id = window.setInterval(() => traer(false), INTERVALO_MS);
+    if (arrancado.current || !recientes.length) return;
+    arrancado.current = true;
+    encolar(recientes.slice(0, 1), true);
+  }, [recientes, encolar]);
+
+  // Lo que el sondeo trae de nuevo entra a la cola del recorrido.
+  useEffect(() => {
+    if (llegada.serie > 0) encolar(llegada.filas, false);
+  }, [llegada, encolar]);
+
+  useEffect(() => {
     const reloj = window.setInterval(() => setAhora(Date.now()), 1000);
-    return () => {
-      vivo = false;
-      window.clearInterval(id);
-      window.clearInterval(reloj);
-    };
-  }, [encolar]);
+    return () => window.clearInterval(reloj);
+  }, []);
 
   // El recorrido de la decisión en curso, paso a paso.
   useEffect(() => {
@@ -284,7 +278,7 @@ export default function EngineLive({
     const empezarPaso = (paso: Paso, anterior: Paso | undefined) => {
       if (paso.tipo === 'nodo') {
         setNodoActivo(paso.nodo);
-        const severidad = SEVERITY_COLOR[fila.severidad ?? ''] ?? '#e2e8f0';
+        const severidad = fila.severidad ? colorDeSeveridad(fila.severidad) : P.persistencia.color;
         ondear(paso.nodo, paso.nodo === 'persistencia' ? severidad : P[paso.nodo].color);
         // Desde inferencia en adelante, lo que razonó. Se vuelve a pedir en cada paso porque la
         // justificación puede llegar de la API cuando el recorrido ya pasó por inferencia.
@@ -297,7 +291,10 @@ export default function EngineLive({
         setRecorridas((r) => new Set(r).add(paso.arista));
         // Al salir de validación se ve el veredicto: una vuelta a inferencia es un reproche.
         if (anterior?.tipo === 'nodo' && anterior.nodo === 'validacion') {
-          ondear('validacion', paso.arista === 'validacion>inferencia' ? '#ef4444' : '#00b894');
+          ondear(
+            'validacion',
+            paso.arista === 'validacion>inferencia' ? 'var(--critico)' : 'var(--neural-teal)',
+          );
         }
       }
     };
@@ -349,6 +346,19 @@ export default function EngineLive({
     };
   }, [actual, siguiente, ondear]);
 
+  // Donde el grafo no entra entero y se desliza de costado, la vista acompaña al nodo en el que está
+  // el agente. Sin esto, en un teléfono la decisión llega a validación fuera de pantalla y nada avisa
+  // que el recorrido siguió.
+  useEffect(() => {
+    const caja = deslizable.current;
+    if (!caja || !nodoActivo || caja.scrollWidth <= caja.clientWidth) return;
+    const x = (P[nodoActivo].x / ANCHO) * caja.scrollWidth;
+    caja.scrollTo({
+      left: x - caja.clientWidth / 2,
+      behavior: quietoRef.current ? 'auto' : 'smooth',
+    });
+  }, [nodoActivo]);
+
   // El razonamiento aparece de a una palabra, como sale de un modelo de lenguaje.
   useEffect(() => {
     const cuantas = pensamiento.split(/(\s+)/).length;
@@ -392,6 +402,9 @@ export default function EngineLive({
   const hace = ultima ? Math.max(0, (ahora - new Date(ultima).getTime()) / 1000) : null;
   const activo = hace !== null && hace < MINUTOS_ACTIVO * 60;
   const enPantalla = actual ?? mostrada;
+  const colorResultado = resultado?.severidad
+    ? colorDeSeveridad(resultado.severidad)
+    : 'var(--motor-apagado)';
   const enCurso = enPantalla?.fila;
   const partes = pensamiento.split(/(\s+)/);
   // El modelo interviene solo en las decisiones razonadas, y solo mientras el recorrido está en
@@ -399,9 +412,27 @@ export default function EngineLive({
   const pensando = nodoActivo === 'inferencia' && !!enCurso?.camino.includes('inferencia');
 
   const rotulos = [
-    { x: 500, y: 21, texto: e.paths.memory, arista: 'memoria>persistencia', color: '#00b894' },
-    { x: 665, y: 87, texto: e.paths.retry, arista: 'validacion>inferencia', color: '#d4860a' },
-    { x: 542, y: 291, texto: e.paths.noContext, arista: 'contexto>persistencia', color: '#94a3b8' },
+    {
+      x: 455,
+      y: 50,
+      texto: e.paths.memory,
+      arista: 'memoria>persistencia',
+      color: P.memoria.color,
+    },
+    {
+      x: 640,
+      y: 67,
+      texto: e.paths.retry,
+      arista: 'validacion>inferencia',
+      color: P.validacion.color,
+    },
+    {
+      x: 545,
+      y: 312,
+      texto: e.paths.noContext,
+      arista: 'contexto>persistencia',
+      color: P.contexto.color,
+    },
   ];
   const destellos = [
     [-44, -30, 7, 0],
@@ -419,10 +450,7 @@ export default function EngineLive({
   }
 
   return (
-    <section
-      className="relative overflow-hidden rounded-2xl ring-1 ring-white/10"
-      style={{ background: '#090d13' }}
-    >
+    <section className="motor relative overflow-hidden rounded-2xl ring-1 ring-white/10">
       {/* Aurora de fondo, que se enciende cuando el modelo razona */}
       <div aria-hidden className="absolute inset-0 pointer-events-none">
         <div
@@ -445,7 +473,7 @@ export default function EngineLive({
         <div
           className="absolute inset-0"
           style={{
-            backgroundImage: 'radial-gradient(rgba(255,255,255,0.07) 1px, transparent 1px)',
+            backgroundImage: 'radial-gradient(var(--motor-rejilla) 1px, transparent 1px)',
             backgroundSize: '22px 22px',
             maskImage: 'radial-gradient(ellipse at 50% 45%, black 30%, transparent 75%)',
             WebkitMaskImage: 'radial-gradient(ellipse at 50% 45%, black 30%, transparent 75%)',
@@ -464,7 +492,7 @@ export default function EngineLive({
               )}
               <span
                 className="relative inline-flex w-2.5 h-2.5 rounded-full"
-                style={{ background: activo ? '#ff6b35' : '#94a3b8' }}
+                style={{ background: activo ? 'var(--agent-coral)' : 'var(--motor-apagado)' }}
               />
             </span>
             <span className="font-mono-display text-[12px] text-white whitespace-nowrap">
@@ -488,7 +516,7 @@ export default function EngineLive({
             <button
               onClick={repetir}
               disabled={!recientes.length}
-              className="group flex items-center gap-1.5 rounded-full px-3 py-1 ring-1 ring-[#ff6b35]/40 bg-[#ff6b35]/10 text-[#ffb38f] hover:bg-[#ff6b35]/20 transition disabled:opacity-30"
+              className="group flex items-center gap-1.5 rounded-full px-3 py-1 ring-1 ring-[#ff6b35]/40 bg-[#ff6b35]/10 text-[var(--motor-acento)] hover:bg-[#ff6b35]/20 transition disabled:opacity-30"
             >
               <RotateCcw className="w-3 h-3 transition-transform duration-500 group-hover:-rotate-180" />
               {e.replay}
@@ -496,9 +524,9 @@ export default function EngineLive({
           </div>
         </div>
 
-        {/* El grafo. En un teléfono conserva un ancho mínimo y se desliza de costado: achicado al
-            ancho de la pantalla, los nombres de los nodos quedarían ilegibles. */}
-        <div className="overflow-x-auto sin-barra -mx-4 px-4 sm:mx-0 sm:px-0">
+        {/* El grafo. En pantallas angostas conserva un ancho mínimo y se desliza de costado:
+            achicado al ancho disponible, los nombres de los nodos quedarían ilegibles. */}
+        <div ref={deslizable} className="overflow-x-auto sin-barra -mx-4 px-4 sm:mx-0 sm:px-0">
           <div
             className="relative w-full min-w-[640px]"
             style={{ aspectRatio: `${ANCHO} / ${ALTO}` }}
@@ -511,13 +539,13 @@ export default function EngineLive({
                   ))}
                 </linearGradient>
                 <linearGradient id="motor-vidrio" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stopColor="#1c2635" />
-                  <stop offset="1" stopColor="#0b1018" />
+                  <stop offset="0" stopColor="var(--motor-vidrio-alto)" />
+                  <stop offset="1" stopColor="var(--motor-vidrio-bajo)" />
                 </linearGradient>
                 <linearGradient id="motor-energia" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0" stopColor="#ff6b35" stopOpacity="0.35" />
+                  <stop offset="0" stopColor="var(--agent-coral)" stopOpacity="0.35" />
                   <stop offset="0.5" stopColor="#ff8a5c" />
-                  <stop offset="1" stopColor="#ffd2bd" />
+                  <stop offset="1" stopColor="var(--motor-estela)" />
                 </linearGradient>
                 {NODOS.map((nodo) => (
                   <radialGradient key={nodo.id} id={`motor-halo-${nodo.id}`}>
@@ -526,9 +554,9 @@ export default function EngineLive({
                   </radialGradient>
                 ))}
                 <radialGradient id="motor-cabeza">
-                  <stop offset="0" stopColor="#ffffff" />
-                  <stop offset="0.35" stopColor="#ffd2bd" />
-                  <stop offset="1" stopColor="#ff6b35" stopOpacity="0" />
+                  <stop offset="0" stopColor="var(--motor-nucleo)" />
+                  <stop offset="0.35" stopColor="var(--motor-estela)" />
+                  <stop offset="1" stopColor="var(--agent-coral)" stopOpacity="0" />
                 </radialGradient>
                 <filter id="motor-brillo" x="-50%" y="-50%" width="200%" height="200%">
                   <feGaussianBlur stdDeviation="4" result="difuso" />
@@ -555,7 +583,7 @@ export default function EngineLive({
                       }}
                       d={d}
                       fill="none"
-                      stroke="rgba(255,255,255,0.10)"
+                      stroke="var(--motor-arista)"
                       strokeWidth={larga ? 1.2 : 1.6}
                       strokeDasharray={larga ? '3 7' : undefined}
                     />
@@ -563,7 +591,7 @@ export default function EngineLive({
                       d={d}
                       fill="none"
                       className="motor-flujo"
-                      stroke={encendida ? 'url(#motor-energia)' : 'rgba(148,163,184,0.35)'}
+                      stroke={encendida ? 'url(#motor-energia)' : 'var(--motor-flujo)'}
                       strokeWidth={encendida ? 2.4 : 1.2}
                       strokeDasharray="2 12"
                       strokeLinecap="round"
@@ -586,7 +614,11 @@ export default function EngineLive({
                     <circle
                       key={`${clave}-${k}`}
                       r={1.8}
-                      fill={clave === 'memoria>persistencia' ? '#00b894' : '#cbd5e1'}
+                      fill={
+                        clave === 'memoria>persistencia'
+                          ? P.memoria.color
+                          : 'var(--motor-particula)'
+                      }
                       opacity={0.55}
                     >
                       <animateMotion
@@ -625,38 +657,6 @@ export default function EngineLive({
                 </g>
               ))}
 
-              {/* Rótulos de los tres caminos largos, apoyados sobre la línea */}
-              {rotulos.map((r) => {
-                const etiqueta = `${r.texto} ${n(porArista(r.arista))}/${n(recientes.length)}`;
-                const ancho = etiqueta.length * 6.1 + 24;
-                const encendida = recorridas.has(r.arista);
-                return (
-                  <g key={r.arista}>
-                    <rect
-                      x={r.x - ancho / 2}
-                      y={r.y - 10}
-                      width={ancho}
-                      height={20}
-                      rx={10}
-                      fill="#0b1018"
-                      stroke={encendida ? '#ff6b35' : r.color}
-                      strokeOpacity={encendida ? 0.9 : 0.35}
-                      style={{ transition: 'stroke 0.4s' }}
-                    />
-                    <circle cx={r.x - ancho / 2 + 11} cy={r.y} r={2.5} fill={r.color} />
-                    <text
-                      x={r.x + 5}
-                      y={r.y + 3.6}
-                      textAnchor="middle"
-                      fontSize={10.5}
-                      fill="rgba(255,255,255,0.62)"
-                    >
-                      {etiqueta}
-                    </text>
-                  </g>
-                );
-              })}
-
               {/* Los nodos */}
               {NODOS.map((nodo) => {
                 const activoAca = nodoActivo === nodo.id;
@@ -693,7 +693,7 @@ export default function EngineLive({
                       cy={nodo.y}
                       r={45}
                       fill="none"
-                      stroke="rgba(255,255,255,0.06)"
+                      stroke="var(--motor-anillo)"
                       strokeWidth={2}
                     />
                     <circle
@@ -774,7 +774,7 @@ export default function EngineLive({
               <path
                 ref={estela}
                 fill="none"
-                stroke="#ff6b35"
+                stroke="var(--agent-coral)"
                 strokeWidth={7}
                 strokeLinecap="round"
                 opacity={0.45}
@@ -791,8 +791,42 @@ export default function EngineLive({
               />
               <g ref={cabeza} opacity={0}>
                 <circle r={14} fill="url(#motor-cabeza)" opacity={0.8} />
-                <circle r={3.6} fill="#fff" />
+                <circle r={3.6} fill="var(--motor-nucleo)" />
               </g>
+
+              {/* Rótulos de los tres caminos largos. Van al costado de su curva y no encima: con la
+                  línea atravesándolos no se leen. Se dibujan al final, así tampoco los tapa el
+                  cometa cuando pasa. */}
+              {rotulos.map((r) => {
+                const etiqueta = `${r.texto} ${n(porArista(r.arista))}/${n(recientes.length)}`;
+                const ancho = etiqueta.length * 6.1 + 24;
+                const encendida = recorridas.has(r.arista);
+                return (
+                  <g key={r.arista}>
+                    <rect
+                      x={r.x - ancho / 2}
+                      y={r.y - 10}
+                      width={ancho}
+                      height={20}
+                      rx={10}
+                      fill="var(--motor-tarjeta)"
+                      stroke={encendida ? 'var(--agent-coral)' : r.color}
+                      strokeOpacity={encendida ? 0.9 : 0.35}
+                      style={{ transition: 'stroke 0.4s' }}
+                    />
+                    <circle cx={r.x - ancho / 2 + 11} cy={r.y} r={2.5} fill={r.color} />
+                    <text
+                      x={r.x + 5}
+                      y={r.y + 3.6}
+                      textAnchor="middle"
+                      fontSize={10.5}
+                      fill="var(--motor-texto)"
+                    >
+                      {etiqueta}
+                    </text>
+                  </g>
+                );
+              })}
             </svg>
 
             {/* Íconos y nombres de cada nodo, encima del dibujo */}
@@ -807,7 +841,7 @@ export default function EngineLive({
                     style={{
                       left: `${(nodo.x / ANCHO) * 100}%`,
                       top: `${(nodo.y / ALTO) * 100}%`,
-                      color: activoAca ? '#ffffff' : nodo.color,
+                      color: activoAca ? 'var(--motor-foco)' : nodo.color,
                       filter: activoAca ? `drop-shadow(0 0 6px ${nodo.color})` : undefined,
                     }}
                   />
@@ -815,7 +849,8 @@ export default function EngineLive({
                     className="absolute -translate-x-1/2 flex flex-col items-center"
                     style={{
                       left: `${(nodo.x / ANCHO) * 100}%`,
-                      top: `${((nodo.y + R + 17) / ALTO) * 100}%`,
+                      // Debajo del anillo de uso aun cuando el nodo activo se agranda.
+                      top: `${((nodo.y + R + 24) / ALTO) * 100}%`,
                     }}
                   >
                     <span
@@ -826,8 +861,8 @@ export default function EngineLive({
                         color: iridiscente
                           ? undefined
                           : activoAca
-                            ? '#ffffff'
-                            : 'rgba(255,255,255,0.62)',
+                            ? 'var(--motor-foco)'
+                            : 'var(--motor-texto)',
                       }}
                     >
                       {e.nodes[nodo.id].name}
@@ -855,12 +890,10 @@ export default function EngineLive({
                 className="motor-aparece absolute -translate-x-1/2 rounded-lg px-2.5 py-1 text-[10px] font-medium whitespace-nowrap backdrop-blur"
                 style={{
                   left: `${(P.persistencia.x / ANCHO) * 100 - 1}%`,
-                  top: `${((P.persistencia.y + R + 44) / ALTO) * 100}%`,
-                  color: SEVERITY_COLOR[resultado.severidad ?? ''] ?? 'rgba(255,255,255,0.7)',
-                  background: 'rgba(9,13,19,0.85)',
-                  boxShadow: `inset 0 0 0 1px ${SEVERITY_COLOR[resultado.severidad ?? ''] ?? '#475569'}, 0 0 18px ${
-                    SEVERITY_COLOR[resultado.severidad ?? ''] ?? '#475569'
-                  }55`,
+                  top: `${((P.persistencia.y + R + 50) / ALTO) * 100}%`,
+                  color: colorResultado,
+                  background: velado('var(--motor-tarjeta)', 88),
+                  boxShadow: `inset 0 0 0 1px ${colorResultado}, 0 0 18px ${velado(colorResultado, 33)}`,
                 }}
               >
                 {resultado.severidad
@@ -872,18 +905,18 @@ export default function EngineLive({
           </div>
         </div>
 
-        {/* Qué está haciendo el agente, y lo que va llegando */}
+        {/* Qué está haciendo el agente, y el pulso de la última hora */}
         <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-3">
           <div
             className="motor-borde rounded-xl flex flex-col"
             data-pensando={pensando && !quieto ? 'si' : 'no'}
           >
-            <div className="motor-borde-interior flex-1 rounded-xl bg-[#0b1018] ring-1 ring-white/[0.07] p-3.5 min-h-[138px]">
+            <div className="motor-borde-interior flex-1 rounded-xl bg-[var(--motor-tarjeta)] ring-1 ring-white/[0.07] p-3.5 min-h-[138px]">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <span className="flex items-center gap-2 min-w-0">
                   <span
                     className={`text-[9px] uppercase tracking-[0.14em] shrink-0 ${
-                      pensando ? 'motor-iridiscente' : 'text-[#ff8a5c]'
+                      pensando ? 'motor-iridiscente' : 'text-[var(--motor-acento)]'
                     }`}
                   >
                     {e.thinking}
@@ -894,7 +927,7 @@ export default function EngineLive({
                       className="motor-aparece truncate rounded-full px-2 py-0.5 text-[9px] font-mono-display"
                       style={{
                         color: P[nodoActivo].color,
-                        boxShadow: `inset 0 0 0 1px ${P[nodoActivo].color}55`,
+                        boxShadow: `inset 0 0 0 1px ${velado(P[nodoActivo].color, 33)}`,
                       }}
                     >
                       {e.nodes[nodoActivo].name}: {e.nodes[nodoActivo].what}
@@ -909,9 +942,18 @@ export default function EngineLive({
               </div>
               {enCurso ? (
                 <>
-                  <div className="font-data text-[11px] text-white/55 mt-2.5 truncate">
-                    {enCurso.resumen}
-                  </div>
+                  <button
+                    onClick={() => onElegir(enCurso.doc_id)}
+                    title={e.open}
+                    className="group flex items-center gap-2 w-full min-w-0 text-left mt-2.5"
+                  >
+                    <span className="font-data text-[11px] text-white/55 truncate group-hover:text-white/80 transition">
+                      {enCurso.resumen}
+                    </span>
+                    <span className="shrink-0 text-[10px] text-[var(--motor-acento)] opacity-0 group-hover:opacity-100 transition">
+                      {e.open}
+                    </span>
+                  </button>
                   <p className="text-[12.5px] text-white/85 mt-2 leading-relaxed">
                     {partes.slice(0, palabras).map((parte, k) => (
                       <span key={k} className="motor-token">
@@ -921,7 +963,9 @@ export default function EngineLive({
                     <span
                       className="terminal-cursor inline-block w-1.5 h-3.5 ml-0.5 align-middle rounded-sm"
                       style={{
-                        background: pensando ? 'linear-gradient(#f472b6, #38bdf8)' : '#ff6b35',
+                        background: pensando
+                          ? 'linear-gradient(#f472b6, #38bdf8)'
+                          : 'var(--agent-coral)',
                       }}
                     />
                   </p>
@@ -951,63 +995,12 @@ export default function EngineLive({
             </div>
           </div>
 
-          <div className="rounded-xl bg-white/[0.02] ring-1 ring-white/[0.07] p-3.5">
-            <div className="rotulo">{e.feed}</div>
-            <ul className="mt-2 flex flex-col gap-0.5">
-              {recientes.slice(0, 7).map((d) => {
-                const esta = enCurso?.doc_id === d.doc_id;
-                const tipo = d.copiada
-                  ? e.paths.memory
-                  : d.motivo_de_corte === 'sin_contexto'
-                    ? e.paths.noContext
-                    : d.rechazos
-                      ? e.retries(d.rechazos)
-                      : e.paths.full;
-                return (
-                  <li key={d.doc_id} className="motor-entrada">
-                    <button
-                      onClick={() => onElegir(d.doc_id)}
-                      className={`relative w-full grid grid-cols-[56px_minmax(0,1fr)_auto] sm:grid-cols-[62px_110px_minmax(0,1fr)_auto] gap-2 items-center rounded-md px-2 py-1 text-left transition ${
-                        esta ? 'bg-white/[0.05]' : 'hover:bg-white/[0.03]'
-                      }`}
-                    >
-                      {esta && (
-                        <span
-                          className="absolute left-0 top-1 bottom-1 w-[2px] rounded-full"
-                          style={{
-                            background: d.copiada
-                              ? '#00b894'
-                              : 'linear-gradient(#ff6b35, #f472b6, #a78bfa)',
-                          }}
-                        />
-                      )}
-                      <span className="font-data text-[10px] text-white/40">
-                        {hora(d.decidida)}
-                      </span>
-                      <span
-                        className={`text-[10px] truncate ${d.copiada ? '' : 'motor-iridiscente'}`}
-                        style={{ color: d.copiada ? '#00b894' : undefined }}
-                      >
-                        {tipo}
-                      </span>
-                      <span className="hidden sm:block font-data text-[10px] text-white/65 truncate">
-                        {d.resumen}
-                      </span>
-                      <span
-                        className="text-[10px] font-medium"
-                        style={{
-                          color: SEVERITY_COLOR[d.severidad ?? ''] ?? 'rgba(255,255,255,0.4)',
-                        }}
-                      >
-                        {d.severidad
-                          ? t.severities[d.severidad as keyof typeof t.severities]
-                          : t.triage.notConcluded}
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+          <div className="rounded-xl bg-white/[0.02] ring-1 ring-white/[0.07] p-3.5 flex flex-col justify-between gap-3">
+            {resumen.actividad.por_minuto?.length ? (
+              <Latido serie={resumen.actividad.por_minuto} alto={78} />
+            ) : (
+              <div className="text-[11px] text-white/40">{e.pulseMissing}</div>
+            )}
           </div>
         </div>
       </div>

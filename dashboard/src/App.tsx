@@ -6,12 +6,15 @@ import {
   Grid3x3,
   Network,
   Fingerprint,
-  Camera,
   AlertTriangle,
   Archive,
   Users,
   Globe,
   ShieldCheck,
+  LayoutDashboard,
+  Menu,
+  X,
+  type LucideIcon,
 } from 'lucide-react';
 import {
   api,
@@ -22,8 +25,9 @@ import {
   type Snapshot,
 } from './lib/api';
 import { useI18n } from './lib/i18n';
-import LangToggle from './components/LangToggle';
+import Preferencias from './components/Preferencias';
 import Descifrado from './components/Descifrado';
+import Inicio from './components/sections/Inicio';
 import Pulse from './components/sections/Pulse';
 import SessionReplay from './components/sections/SessionReplay';
 import Dictionary from './components/sections/Dictionary';
@@ -35,22 +39,36 @@ import Geography from './components/sections/Geography';
 import Triage from './components/sections/Triage';
 import AttackCanvas from './components/AttackCanvas';
 
-// El orden es narrativo: primero la escala, después una intrusión concreta, después toda la
-// superficie, después la evidencia detrás del consejo, después el marco formal, y al final lo que
-// el motor decidió con ese marco.
-const SECTIONS = [
-  { id: 'pulso', icon: Radar },
-  { id: 'anatomia', icon: Terminal },
-  { id: 'protocolos', icon: Network },
-  { id: 'diccionario', icon: BookOpen },
-  { id: 'huellas', icon: Fingerprint },
-  { id: 'arquetipos', icon: Users },
-  { id: 'origen', icon: Globe },
-  { id: 'mitre', icon: Grid3x3 },
-  { id: 'triaje', icon: ShieldCheck },
-] as const;
+// Dos grupos. Arriba lo que se opera: el resumen de todo y el motor, que es lo que distingue al
+// proyecto. Abajo lo que se aprende, en orden narrativo: primero la escala, después una intrusión
+// concreta, después toda la superficie, la evidencia detrás del consejo y al final el marco formal.
+const GRUPOS = [
+  {
+    id: 'operacion',
+    secciones: [
+      { id: 'inicio', icon: LayoutDashboard },
+      { id: 'triaje', icon: ShieldCheck },
+    ],
+  },
+  {
+    id: 'aprender',
+    secciones: [
+      { id: 'pulso', icon: Radar },
+      { id: 'anatomia', icon: Terminal },
+      { id: 'protocolos', icon: Network },
+      { id: 'diccionario', icon: BookOpen },
+      { id: 'huellas', icon: Fingerprint },
+      { id: 'arquetipos', icon: Users },
+      { id: 'origen', icon: Globe },
+      { id: 'mitre', icon: Grid3x3 },
+    ],
+  },
+] as const satisfies readonly {
+  id: string;
+  secciones: readonly { id: string; icon: LucideIcon }[];
+}[];
 
-type SectionId = (typeof SECTIONS)[number]['id'];
+export type SectionId = (typeof GRUPOS)[number]['secciones'][number]['id'];
 
 function SinDatos() {
   const { t } = useI18n();
@@ -63,13 +81,13 @@ export default function App() {
   const [health, setHealth] = useState<Health | null>(null);
   const [replays, setReplays] = useState<Replay[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [active, setActive] = useState<SectionId>('pulso');
+  const [active, setActive] = useState<SectionId>('inicio');
   const [families, setFamilies] = useState<FingerprintData | null>(null);
   const [archetypes, setArchetypes] = useState<ArchetypeData | null>(null);
   // el modo captura congela todas las animaciones, así las capturas de pantalla se repiten igual
   const [capture, setCapture] = useState(false);
+  const [menuAbierto, setMenuAbierto] = useState(false);
   const principal = useRef<HTMLElement>(null);
-  const navAngosta = useRef<HTMLElement>(null);
 
   useEffect(() => {
     Promise.all([api.snapshot(), api.replays()])
@@ -114,39 +132,23 @@ export default function App() {
   }, []);
 
   // Al cambiar de sección se vuelve arriba: si no, en el teléfono la sección nueva abre por la
-  // mitad, a la altura donde había quedado la anterior. En la barra angosta, además, el botón
-  // elegido se corre hasta quedar a la vista.
+  // mitad, a la altura donde había quedado la anterior.
   useEffect(() => {
     principal.current?.scrollTo({ top: 0 });
-    const nav = navAngosta.current;
-    const boton = nav?.querySelector<HTMLElement>(`[data-seccion="${active}"]`);
-    if (nav && boton) {
-      nav.scrollTo({
-        left: boton.offsetLeft - nav.clientWidth / 2 + boton.clientWidth / 2,
-        behavior: 'smooth',
-      });
-    }
   }, [active]);
 
-  const botonCaptura = (
-    <button
-      onClick={() => setCapture((c) => !c)}
-      title={t.capture.hint}
-      aria-label={t.capture.on}
-      aria-pressed={capture}
-      /* El modo captura apaga los eventos de puntero de toda la página para que el cursor no deje
-         un estado de hover en la captura. Este botón queda exceptuado, porque si no, no habría
-         forma de volver a apagarlo. */
-      data-capture-toggle
-      className={`flex items-center justify-center rounded-full p-1.5 transition ${
-        capture
-          ? 'bg-[var(--honey-amber)]/20 text-[var(--honey-amber)] ring-1 ring-[var(--honey-amber)]/40'
-          : 'bg-white/5 text-white/35 ring-1 ring-white/10 hover:text-white/70'
-      }`}
-    >
-      <Camera className="w-3.5 h-3.5" />
-    </button>
-  );
+  // El menú del teléfono se cierra con Escape, como cualquier diálogo.
+  useEffect(() => {
+    if (!menuAbierto) return;
+    const alTeclear = (e: KeyboardEvent) => e.key === 'Escape' && setMenuAbierto(false);
+    document.addEventListener('keydown', alTeclear);
+    return () => document.removeEventListener('keydown', alTeclear);
+  }, [menuAbierto]);
+
+  const ir = (id: SectionId) => {
+    setActive(id);
+    setMenuAbierto(false);
+  };
 
   const marca = (
     <div className="flex items-center gap-2.5">
@@ -165,55 +167,20 @@ export default function App() {
     </div>
   );
 
-  return (
-    <div className="h-[100dvh] flex flex-col md:flex-row overflow-hidden">
-      {/* En pantallas angostas la barra lateral se vuelve una barra de arriba, con las secciones en
-          una fila que se desliza con el dedo. */}
-      <header className="md:hidden shrink-0 border-b border-white/5 bg-[#0f141b]">
-        <div className="flex items-center justify-between gap-3 px-4 pt-3 pb-2">
-          {marca}
-          <div className="flex items-center gap-2">
-            <LangToggle />
-            {botonCaptura}
-          </div>
-        </div>
-        <nav
-          ref={navAngosta}
-          className="flex gap-1 overflow-x-auto px-3 pb-2.5 sin-barra"
-          aria-label={t.brand.name}
-        >
-          {SECTIONS.map((s) => (
+  const navegacion = (
+    <nav className="flex flex-col gap-4" aria-label={t.brand.name}>
+      {GRUPOS.map((grupo) => (
+        <div key={grupo.id} className="flex flex-col gap-1">
+          <div className="rotulo px-2.5 mb-1">{t.navGroups[grupo.id]}</div>
+          {grupo.secciones.map((s) => (
             <button
               key={s.id}
-              data-seccion={s.id}
-              onClick={() => setActive(s.id)}
-              aria-current={active === s.id ? 'page' : undefined}
-              className={`shrink-0 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] whitespace-nowrap transition-colors ${
-                active === s.id
-                  ? 'bg-[var(--honey-amber)]/15 text-[var(--honey-amber)] ring-1 ring-[var(--honey-amber)]/35'
-                  : 'text-white/50 ring-1 ring-white/[0.07]'
-              }`}
-            >
-              <s.icon className="w-3.5 h-3.5" />
-              {t.nav[s.id]}
-            </button>
-          ))}
-        </nav>
-      </header>
-
-      <aside className="hidden md:flex w-56 shrink-0 border-r border-white/5 bg-[#0f141b] p-4 flex-col overflow-y-auto thin-scroll">
-        <div className="mb-6">{marca}</div>
-
-        <nav className="flex flex-col gap-1">
-          {SECTIONS.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => setActive(s.id)}
+              onClick={() => ir(s.id)}
               aria-current={active === s.id ? 'page' : undefined}
               className={`relative overflow-hidden flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[12px] text-left transition-colors duration-200 ${
                 active === s.id
-                  ? 'bg-white/5 text-white/90'
-                  : 'text-white/50 hover:text-white/75 hover:bg-white/[0.03]'
+                  ? 'nav-activa bg-white/5 text-white/90'
+                  : 'text-white/55 hover:text-white/80 hover:bg-white/[0.03]'
               }`}
             >
               {active === s.id && (
@@ -229,41 +196,102 @@ export default function App() {
               {t.nav[s.id]}
             </button>
           ))}
-        </nav>
+        </div>
+      ))}
+    </nav>
+  );
 
-        <div className="mt-auto pt-4 border-t border-white/5 flex flex-col gap-3">
+  const estado =
+    health?.mode === 'snapshot' ? (
+      <div
+        className="flex items-start gap-1.5 text-[10px] text-white/40"
+        title={`${t.footer.frozenTitle} ${health.generated_at?.slice(0, 16).replace('T', ' ')}`}
+      >
+        <Archive className="w-3 h-3 shrink-0 mt-[1px] text-[var(--honey-amber)]" />
+        <span>
+          {t.footer.frozen}
+          <span className="block font-data text-[9px] text-white/25">
+            {health.generated_at?.slice(0, 10)}
+          </span>
+        </span>
+      </div>
+    ) : (
+      <div className="flex items-center gap-1.5 text-[10px] text-white/40">
+        <span className="w-1.5 h-1.5 rounded-full bg-[var(--neural-teal)] animate-pulse" />
+        {t.footer.live}
+      </div>
+    );
+
+  const rango = snapshot && (
+    <div className="font-data text-[9px] text-white/25 -mt-2">
+      {t.footer.range(
+        snapshot.overview.first_event?.slice(0, 10) ?? '',
+        snapshot.overview.last_event?.slice(0, 10) ?? '',
+      )}
+    </div>
+  );
+
+  return (
+    <div className="h-[100dvh] flex flex-col md:flex-row overflow-hidden">
+      {/* En pantallas angostas la barra lateral se vuelve una barra de arriba con un menú que se
+          despliega desde el costado. */}
+      <header className="tapa md:hidden shrink-0 border-b border-white/5 bg-barra">
+        <div className="flex items-center justify-between gap-3 px-4 py-2.5">
+          {marca}
           <div className="flex items-center gap-2">
-            <LangToggle />
-            {botonCaptura}
-          </div>
-
-          {health?.mode === 'snapshot' ? (
-            <div
-              className="flex items-start gap-1.5 text-[10px] text-white/40"
-              title={`${t.footer.frozenTitle} ${health.generated_at?.slice(0, 16).replace('T', ' ')}`}
+            <span className="text-[11px] text-white/60 truncate max-w-[40vw]">{t.nav[active]}</span>
+            <button
+              onClick={() => setMenuAbierto(true)}
+              aria-label={t.menu.open}
+              aria-expanded={menuAbierto}
+              data-capture-toggle
+              className="flex items-center justify-center w-9 h-9 rounded-lg ring-1 ring-white/10 text-white/75 hover:text-white"
             >
-              <Archive className="w-3 h-3 shrink-0 mt-[1px] text-[var(--honey-amber)]" />
-              <span>
-                {t.footer.frozen}
-                <span className="block font-data text-[9px] text-white/25">
-                  {health.generated_at?.slice(0, 10)}
-                </span>
-              </span>
+              <Menu className="w-[18px] h-[18px]" />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {menuAbierto && (
+        <div className="md:hidden fixed inset-0 z-50" role="dialog" aria-modal="true">
+          {/* El velo, el botón de cerrar y el de captura quedan exceptuados del modo captura: si
+              no, con el modo prendido no habría forma de volver a apagarlo desde el teléfono. */}
+          <button
+            aria-label={t.menu.close}
+            onClick={() => setMenuAbierto(false)}
+            data-capture-toggle
+            className="absolute inset-0 bg-black/55 menu-velo"
+          />
+          <div className="tapa menu-cajon absolute inset-y-0 left-0 w-[84%] max-w-[300px] bg-barra ring-1 ring-white/10 p-4 flex flex-col gap-5 overflow-y-auto thin-scroll">
+            <div className="flex items-center justify-between">
+              {marca}
+              <button
+                onClick={() => setMenuAbierto(false)}
+                aria-label={t.menu.close}
+                data-capture-toggle
+                className="flex items-center justify-center w-8 h-8 rounded-lg text-white/60 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
-          ) : (
-            <div className="flex items-center gap-1.5 text-[10px] text-white/40">
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--neural-teal)] animate-pulse" />
-              {t.footer.live}
+            {navegacion}
+            <div className="mt-auto pt-4 border-t border-white/5 flex flex-col gap-3">
+              <Preferencias capture={capture} onCapture={() => setCapture((c) => !c)} />
+              {estado}
+              {rango}
             </div>
-          )}
-          {snapshot && (
-            <div className="font-data text-[9px] text-white/25 -mt-2">
-              {t.footer.range(
-                snapshot.overview.first_event?.slice(0, 10) ?? '',
-                snapshot.overview.last_event?.slice(0, 10) ?? '',
-              )}
-            </div>
-          )}
+          </div>
+        </div>
+      )}
+
+      <aside className="tapa hidden md:flex w-56 shrink-0 border-r border-white/5 bg-barra p-4 flex-col overflow-y-auto thin-scroll">
+        <div className="mb-6">{marca}</div>
+        {navegacion}
+        <div className="mt-auto pt-4 border-t border-white/5 flex flex-col gap-3">
+          <Preferencias capture={capture} onCapture={() => setCapture((c) => !c)} />
+          {estado}
+          {rango}
         </div>
       </aside>
 
@@ -279,9 +307,11 @@ export default function App() {
             {snapshot && <AttackCanvas intensity={snapshot.timeline.map((d) => d.count)} />}
             <div className="relative">
               <h1 className="text-lg md:text-xl text-white font-mono-display">
-                <Descifrado texto={t.nav[active]} />
+                <span className="titulo-seccion inline-block">
+                  <Descifrado texto={t.nav[active]} />
+                </span>
               </h1>
-              <p className="text-[13px] text-white/50 mt-1.5 max-w-2xl leading-relaxed">
+              <p className="text-[13px] text-white/55 mt-1.5 max-w-2xl leading-relaxed">
                 {t.lead[active]}
               </p>
             </div>
@@ -316,6 +346,16 @@ export default function App() {
 
           {snapshot && (
             <div key={active} className="section-in">
+              {active === 'inicio' && (
+                <Inicio
+                  snapshot={snapshot}
+                  familias={families}
+                  arquetipos={archetypes}
+                  sesiones={replays.length}
+                  onIr={ir}
+                />
+              )}
+              {active === 'triaje' && <Triage />}
               {active === 'pulso' && (
                 <Pulse
                   overview={snapshot.overview}
@@ -344,7 +384,6 @@ export default function App() {
                   overview={snapshot.overview}
                 />
               )}
-              {active === 'triaje' && <Triage />}
             </div>
           )}
         </div>
