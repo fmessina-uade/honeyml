@@ -169,7 +169,24 @@ def test_el_resumen_descuenta_de_pendientes_lo_ya_revisado(
                 "requieren_revision": {"doc_count": 2, "ya_revisadas": {"doc_count": 1}},
                 "en_vivo": {
                     "ultima": {"value_as_string": "2026-09-24T12:00:05.000Z"},
-                    "hora": {"doc_count": 7, "copiadas": {"doc_count": 6}},
+                    "hora": {
+                        "doc_count": 7,
+                        "copiadas": {"doc_count": 6},
+                        "por_minuto": {
+                            "buckets": [
+                                {
+                                    "key_as_string": "2026-09-24T11:59:00.000Z",
+                                    "doc_count": 0,
+                                    "copiadas": {"doc_count": 0},
+                                },
+                                {
+                                    "key_as_string": "2026-09-24T12:00:00.000Z",
+                                    "doc_count": 7,
+                                    "copiadas": {"doc_count": 6},
+                                },
+                            ]
+                        },
+                    },
                 },
                 "conclusion": {
                     "doc_count": 5,
@@ -194,6 +211,11 @@ def test_el_resumen_descuenta_de_pendientes_lo_ya_revisado(
         "ultima": "2026-09-24T12:00:05.000Z",
         "ultima_hora": 7,
         "copiadas_ultima_hora": 6,
+        # el minuto sin decisiones viene igual: el gráfico tiene que mostrar el silencio
+        "por_minuto": [
+            {"minuto": "2026-09-24T11:59:00.000Z", "decisiones": 0, "copiadas": 0},
+            {"minuto": "2026-09-24T12:00:00.000Z", "decisiones": 7, "copiadas": 6},
+        ],
     }
 
 

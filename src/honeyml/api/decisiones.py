@@ -189,11 +189,9 @@ def resumen(es_url: str = queries.ES_URL) -> dict[str, Any]:
                 "filter": {"term": {"ciclo.requiere_revision": True}},
                 "aggs": {"ya_revisadas": {"filter": {"ids": {"values": revisados}}}},
             },
-            # Solo lo que decidió el motor al consumir el bus. Una decisión que se volvió a triar
-            # tiene la marca temporal del retriaje sobre un evento que pudo ocurrir semanas antes,
-            # y una sola tanda así lleva la mediana a días.
-            # Si el motor está trabajando: cuándo decidió por última vez y cuánto en la última hora,
-            # sin contar lo vuelto a triar.
+            # Si el motor está trabajando: cuándo decidió por última vez, cuánto en la última hora y
+            # cómo se repartió minuto a minuto, sin contar lo vuelto a triar. Los minutos vacíos
+            # vienen igual, así el gráfico del panel no junta dos ráfagas separadas por un silencio.
             "en_vivo": {
                 "filter": {"bool": {"must_not": [{"term": {"ciclo.retriaje": True}}]}},
                 "aggs": {
@@ -201,11 +199,27 @@ def resumen(es_url: str = queries.ES_URL) -> dict[str, Any]:
                     "hora": {
                         "filter": {"range": {"@timestamp": {"gte": "now-1h"}}},
                         "aggs": {
-                            "copiadas": {"filter": {"exists": {"field": "ciclo.reutilizada_de"}}}
+                            "copiadas": {"filter": {"exists": {"field": "ciclo.reutilizada_de"}}},
+                            "por_minuto": {
+                                "date_histogram": {
+                                    "field": "@timestamp",
+                                    "fixed_interval": "1m",
+                                    "min_doc_count": 0,
+                                    "extended_bounds": {"min": "now-59m/m", "max": "now/m"},
+                                },
+                                "aggs": {
+                                    "copiadas": {
+                                        "filter": {"exists": {"field": "ciclo.reutilizada_de"}}
+                                    }
+                                },
+                            },
                         },
                     },
                 },
             },
+            # Solo lo que decidió el motor al consumir el bus. Una decisión que se volvió a triar
+            # tiene la marca temporal del retriaje sobre un evento que pudo ocurrir semanas antes,
+            # y una sola tanda así lleva la mediana a días.
             "conclusion": {
                 "filter": {
                     "bool": {
@@ -258,6 +272,14 @@ def resumen(es_url: str = queries.ES_URL) -> dict[str, Any]:
             "ultima": a["en_vivo"]["ultima"].get("value_as_string"),
             "ultima_hora": a["en_vivo"]["hora"]["doc_count"],
             "copiadas_ultima_hora": a["en_vivo"]["hora"]["copiadas"]["doc_count"],
+            "por_minuto": [
+                {
+                    "minuto": c.get("key_as_string"),
+                    "decisiones": c["doc_count"],
+                    "copiadas": c["copiadas"]["doc_count"],
+                }
+                for c in a["en_vivo"]["hora"].get("por_minuto", {}).get("buckets", [])
+            ],
         },
         "conclusion": {
             "ventana_dias": 7,
