@@ -139,7 +139,7 @@ def firmas_nuevas(consumidor: bus.ConsumidorDelBus) -> int:
 
 
 def _linea(evento: bus.EventoDelBus, final: EstadoTriaje) -> str:
-    """Una línea por evento, para ver la corrida sin abrir Kibana."""
+    """Una línea por evento, para seguir la corrida desde la consola."""
     if final.get("ya_existia"):
         return f"  ~ ya estaba decidido, no se reescribió: {evento.resumen()}"
 

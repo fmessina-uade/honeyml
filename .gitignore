@@ -100,7 +100,6 @@ infra/honeypots/dionaea/log/
 infra/elastic/data/
 infra/elastic/logs/
 infra/elastic/snapshot/
-infra/kibana/data/
 
 # Logs generales
 *.log

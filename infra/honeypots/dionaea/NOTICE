@@ -1,0 +1,14 @@
+Imagen propia de Dionaea para HoneyML
+
+El contenido de este directorio es obra derivada de Dionaea y se distribuye bajo la Licencia
+Pública General de GNU, versión 2. Comprende el Dockerfile, la configuración y la corrección de
+mssql.py que el Dockerfile aplica sobre el código de Dionaea. El texto completo de la licencia está
+en COPYING.
+
+Dionaea: https://github.com/DinoTools/dionaea
+Imagen base: dinotools/dionaea 0.11.0, fijada por digest en el Dockerfile.
+
+La corrección está entera en el Dockerfile, así que la fuente de la imagen construida se rearma con
+este directorio y el código original de Dionaea.
+
+El resto del repositorio se distribuye bajo la licencia MIT, en LICENSE, en la raíz.

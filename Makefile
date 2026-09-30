@@ -32,7 +32,7 @@ help:
 	@echo ""
 	@echo "  Pipeline de datos (Fase 2 - Elastic Stack + ECS):"
 	@echo "    make pull-logs        Bajar logs reales del VPS a data/logs/"
-	@echo "    make elastic-dev-up   Levantar Elastic Stack en local (ES/Kibana/Logstash/Filebeat)"
+	@echo "    make elastic-dev-up   Levantar Elasticsearch, Logstash y Filebeat en local"
 	@echo "    make elastic-dev-down Detener el stack local"
 	@echo "    make es-bootstrap     Aplicar plantilla componible ECS a Elasticsearch"
 	@echo "    make validate-indexing  Validar indexación y normalización ECS"
@@ -57,7 +57,7 @@ help:
 	@echo "    make deploy-vps  Llevar el último commit al VPS (SECO=1 muestra qué cambiaría)"
 	@echo "    make analisis-up Levantar el motor de triaje y la API en contenedores"
 	@echo "    make publicar-artefactos  Subir los artefactos derivados al VPS"
-	@echo "    make tunel     Kibana y la API del VPS en esta máquina, por túnel SSH"
+	@echo "    make tunel     La API del VPS en esta máquina, por túnel SSH"
 	@echo "    make respaldar-decisiones  Traer los volcados de decisiones del VPS"
 	@echo ""
 	@echo "  Variables:"
@@ -220,13 +220,12 @@ elastic-dev-up:
 	@if [ ! -f infra/elastic/.env ]; then cp infra/elastic/.env.example infra/elastic/.env; echo "Creado infra/elastic/.env desde el ejemplo."; fi
 	# Se levantan almacenamiento y procesamiento, y se aplica la plantilla ECS antes que Filebeat,
 	# así los índices salen con los tipos ECS correctos y no hay carrera con el mapeo.
-	docker compose --env-file infra/elastic/.env -f $(ELASTIC_FILE) -f $(ELASTIC_DEV) up -d elasticsearch logstash kibana
+	docker compose --env-file infra/elastic/.env -f $(ELASTIC_FILE) -f $(ELASTIC_DEV) up -d elasticsearch logstash
 	@ES_URL=http://localhost:9200 bash infra/elastic/scripts/es_bootstrap.sh
 	docker compose --env-file infra/elastic/.env -f $(ELASTIC_FILE) -f $(ELASTIC_DEV) up -d filebeat
 	@echo ""
 	@echo "Elastic Stack local iniciado:"
 	@echo "  Elasticsearch -> http://localhost:9200"
-	@echo "  Kibana        -> http://localhost:5601"
 	@echo ""
 	@echo "Siguiente: make validate-indexing"
 
@@ -241,7 +240,7 @@ elastic-up:
 	@# El orden importa. La plantilla ECS va antes que Filebeat, así los índices salen con los tipos
 	@# correctos. Y el bus va antes que Logstash: un evento que no se logra publicar se indexa igual,
 	@# marcado con _bus_publish_failed, pero el motor no lo recibe nunca.
-	docker compose --env-file infra/elastic/.env -f $(ELASTIC_FILE) up -d elasticsearch kibana
+	docker compose --env-file infra/elastic/.env -f $(ELASTIC_FILE) up -d elasticsearch
 	@ES_URL=http://localhost:9200 bash infra/elastic/scripts/es_bootstrap.sh
 	@$(MAKE) --no-print-directory bus-up
 	docker compose --env-file infra/elastic/.env -f $(ELASTIC_FILE) up -d logstash
@@ -306,14 +305,14 @@ endif
 		-e "ssh -p $(SSH_PORT) -i $(SSH_KEY) -o IdentitiesOnly=yes" \
 		data/processed/ $(SSH_USER)@$(VPS_IP):/opt/honeyml/honeyml/data/processed/
 
-# Kibana y la API del servidor en esta máquina. Usan los mismos puertos que el stack local, así que
-# va con ese stack apagado.
+# La API del servidor en esta máquina. Usa el mismo puerto que la API local, así que va con esa
+# apagada.
 tunel:
 ifndef VPS_IP
 	$(error VPS_IP no definido. Crear archivo .vps_ip o exportar: export VPS_IP=<ip>)
 endif
-	@echo "Kibana en http://localhost:5601 y la API en http://localhost:8000. Ctrl+C para cerrar."
-	@ssh -N -L 5601:127.0.0.1:5601 -L 8000:127.0.0.1:8000 \
+	@echo "La API en http://localhost:8000. Ctrl+C para cerrar."
+	@ssh -N -L 8000:127.0.0.1:8000 \
 		-p $(SSH_PORT) -i $(SSH_KEY) -o IdentitiesOnly=yes $(SSH_USER)@$(VPS_IP)
 
 # Saca del servidor los volcados diarios de decisiones y de veredictos del analista. El respaldo del

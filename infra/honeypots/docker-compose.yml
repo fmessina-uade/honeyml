@@ -2,7 +2,10 @@ services:
 
   # Honeypot Cowrie de SSH y Telnet: captura credenciales y las TTP de los atacantes
   cowrie:
-    image: cowrie/cowrie:latest
+    # Cowrie 3.0.0, fijada por digest. Con latest, el primer arranque después de una versión nueva
+    # cambiaría el sensor sin que nadie lo decida, y lo capturado antes y después dejaría de ser
+    # comparable.
+    image: cowrie/cowrie@sha256:f5ee0f7d0171cb5d924ae9a96eeb7a3fef876f0217b4052ea22dc3f779691ebe
     container_name: cowrie
     hostname: cowrie-sensor
     restart: unless-stopped
@@ -71,7 +74,7 @@ services:
       # /opt/dionaea/etc: rompe init_etc.
       - dionaea_var:/opt/dionaea/var
     healthcheck:
-      # NO es una sonda de puerto. Por dos motivos que acá no la dejan funcionar:
+      # No es una sonda de puerto, porque acá una no puede funcionar, por dos motivos:
       #  - Dionaea escucha con listen.mode=getifaddrs, que saltea loopback, así que 127.0.0.1 lo
       #    rechaza.
       #  - Bajo carga sostenida clava un núcleo y tarda más de dos minutos en completar un
@@ -124,7 +127,7 @@ networks:
       com.docker.network.bridge.enable_icc: "false"
       com.docker.network.bridge.enable_ip_masquerade: "true"
 
-# IMPORTANTE: estos volúmenes pueden contener malware capturado, nunca se versionan
+# Estos volúmenes pueden contener malware capturado: nunca se versionan.
 volumes:
   cowrie_logs:
     name: honeypots_cowrie_logs

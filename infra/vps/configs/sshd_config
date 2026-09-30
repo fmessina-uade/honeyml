@@ -57,10 +57,10 @@ AcceptEnv LANG LC_*
 # SFTP deshabilitado
 # Subsystem sftp /usr/lib/openssh/sftp-server
 
-# La excepción: el túnel con que la estación de administración alcanza Kibana y la API, que escuchan
-# solo en loopback. Reenvío local (-L, nunca -R), solo para el usuario del proyecto y solo hacia esos
-# dos puertos. Ese usuario ya tiene sudo, así que el túnel no le abre nada que no tuviera.
+# La excepción: el túnel con que la estación de administración alcanza la API, que escucha solo en
+# loopback. Reenvío local (-L, nunca -R), solo para el usuario del proyecto y solo hacia ese puerto.
+# Ese usuario ya tiene sudo, así que el túnel no le abre nada que no tuviera.
 # Un bloque Match vale hasta el final del archivo: tiene que quedar último.
 Match User honeyml
     AllowTcpForwarding local
-    PermitOpen 127.0.0.1:5601 127.0.0.1:8000
+    PermitOpen 127.0.0.1:8000

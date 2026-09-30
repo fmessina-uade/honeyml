@@ -63,16 +63,9 @@ send_alert() {
     log_entry "ALERT [\$severity]: \$message"
 
     if [[ -n "\$WEBHOOK_URL" ]]; then
-        local emoji
-        case "\$severity" in
-            CRITICAL) emoji="🚨" ;;
-            WARNING)  emoji="⚠️" ;;
-            INFO)     emoji="ℹ️" ;;
-            *)        emoji="📋" ;;
-        esac
         curl -s -X POST "\$WEBHOOK_URL" \
             -H 'Content-Type: application/json' \
-            -d "{\"text\":\"\${emoji} *HoneyML VPS Alert* [\${severity}]\\n*Host:* \${HOSTNAME}\\n*Tiempo:* \${TIMESTAMP}\\n*Detalle:* \${message}\"}" \
+            -d "{\"text\":\"HoneyML [\${severity}] en \${HOSTNAME}, \${TIMESTAMP}\\n\${message}\"}" \
             > /dev/null 2>&1 || true
     fi
 }
@@ -107,7 +100,7 @@ done < <(df -h | tail -n +2 | grep -v tmpfs)
 # 'docker ps' un contenedor frenado no figura en la lista, así que la comprobación se salteaba justo
 # en el caso que tiene que avisar. Uno que no existe se omite, para que el mismo chequeo sirva en un
 # anfitrión que solo tiene los sensores y en uno que además corre el análisis.
-for container in cowrie dionaea elasticsearch logstash kibana filebeat redis motor api; do
+for container in cowrie dionaea elasticsearch logstash filebeat redis motor api; do
     STATUS=\$(docker inspect --format='{{.State.Status}}' "\$container" 2>/dev/null || echo "")
     if [[ -z "\$STATUS" ]]; then
         continue
@@ -142,7 +135,7 @@ fi
 
 # el servicio SSH de administración
 if ! ss -tlnp | grep -q ":2200 "; then
-    send_alert "CRITICAL" "sshd no escucha en puerto 2200 - pérdida de acceso administrativo"
+    send_alert "CRITICAL" "sshd no escucha en el puerto 2200: se pierde el acceso de administración"
 fi
 
 log_entry "Health check completado - CPU:\${CPU_USED}% MEM:\${MEM_PCT}% OK"
@@ -178,9 +171,9 @@ UPTIME=$(uptime -p 2>/dev/null || uptime)
 MEM_FREE=$(free -h | grep Mem | awk '{print $4}')
 DISK_FREE=$(df -h / | tail -1 | awk '{print $4}')
 
-REPORT="📊 *HoneyML Reporte Diario - ${DATE}*
-*Sistema:* Uptime: ${UPTIME} | RAM libre: ${MEM_FREE} | Disco libre: ${DISK_FREE}
-*Cowrie (SSH):* Intentos fallidos: ${SSH_ATTEMPTS} | Logins exitosos: ${SUCCESSFUL_LOGINS} | IPs únicas: ${UNIQUE_IPS}"
+REPORT="HoneyML, reporte del ${DATE}
+Sistema: en marcha ${UPTIME}, memoria libre ${MEM_FREE}, disco libre ${DISK_FREE}
+Cowrie: ${SSH_ATTEMPTS} ingresos fallidos, ${SUCCESSFUL_LOGINS} exitosos, ${UNIQUE_IPS} direcciones distintas"
 
 echo "$REPORT"
 
@@ -249,6 +242,6 @@ log ""
 log "Para probar manualmente: bash $HEALTHCHECK_SCRIPT"
 if [[ -z "$WEBHOOK_URL" ]]; then
     log ""
-    log "NOTA: No se configuró WEBHOOK_URL. Las alertas solo se registrarán en log."
-    log "Para habilitar alertas, editar $HEALTHCHECK_SCRIPT y actualizar WEBHOOK_URL."
+    log "No se configuró WEBHOOK_URL: las alertas quedan solo en el registro."
+    log "Para mandarlas afuera, cargar WEBHOOK_URL en $HEALTHCHECK_SCRIPT."
 fi

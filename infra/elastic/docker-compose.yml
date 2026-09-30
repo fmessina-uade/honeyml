@@ -85,38 +85,6 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Kibana: tablero analítico para enseñar. Acceso privado por túnel SSH.
-  kibana:
-    image: docker.elastic.co/kibana/kibana:${ELASTIC_VERSION:-8.17.3}
-    container_name: kibana
-    hostname: kibana
-    restart: unless-stopped
-    depends_on:
-      elasticsearch:
-        condition: service_healthy
-    environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-      - SERVER_HOST=0.0.0.0
-      - SERVER_PUBLICBASEURL=http://localhost:5601
-      - TELEMETRY_OPTIN=false
-      - TELEMETRY_ENABLED=false
-    ports:
-      - "127.0.0.1:5601:5601"
-    networks:
-      - elastic_net
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:5601/api/status | grep -q '\"level\":\"available\"' || exit 1"]
-      interval: 20s
-      timeout: 10s
-      retries: 15
-      start_period: 90s
-    mem_limit: ${KB_MEM_LIMIT:-1g}
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
   # Transportador Filebeat: sigue los registros JSON de los honeypots y los manda a Logstash
   filebeat:
     image: docker.elastic.co/beats/filebeat:${ELASTIC_VERSION:-8.17.3}

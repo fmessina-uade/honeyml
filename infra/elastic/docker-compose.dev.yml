@@ -1,13 +1,11 @@
-# Override para desarrollo local.
+# Ajustes para desarrollo local, que se suman a la composición de producción.
 #
-# Diferencias con producción:
-#   - heaps más chicos, así corre en la Mac junto con todo lo demás.
-#   - Filebeat NO lee los volúmenes de los honeypots: lee un directorio local (data/logs/) con
-#     datos reales bajados del VPS, así podemos iterar la normalización ECS sin honeypot
-#     contenedores corriendo en la máquina local.
+# En la Mac los heaps van más chicos, para que el stack corra junto con todo lo demás. Y Filebeat no
+# lee los volúmenes de los honeypots sino data/logs/, con datos reales bajados del VPS, así la
+# normalización ECS se puede iterar sin sensores corriendo en la máquina local.
 #
-# Uso:    docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
-#         (o `make elastic-dev-up` desde la raíz del repositorio)
+# Se levanta con `make elastic-dev-up` desde la raíz del repositorio, o con
+# docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
 services:
 
@@ -24,9 +22,6 @@ services:
     # los 850m. Un tope de 768m o de 1g lo deja sin margen; con 1536m el margen pasa del medio giga.
     # Queda igual que en producción.
     mem_limit: 1536m
-
-  kibana:
-    mem_limit: 900m
 
   filebeat:
     depends_on:

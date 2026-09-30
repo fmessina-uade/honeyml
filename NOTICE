@@ -1,0 +1,5 @@
+HoneyML se distribuye bajo la licencia MIT, en LICENSE.
+
+La excepción es infra/honeypots/dionaea/: contiene una imagen derivada de Dionaea, con una
+corrección a su código, y se distribuye bajo la Licencia Pública General de GNU, versión 2. Los
+detalles están en NOTICE y COPYING, dentro de ese directorio.
