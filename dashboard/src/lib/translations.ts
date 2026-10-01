@@ -403,7 +403,7 @@ const es = {
     lesson:
       'Un ataque lanzado desde un servidor alquilado y otro desde una conexión hogareña pueden compartir bandera y ser cosas distintas. Por eso al país lo acompaña el sistema autónomo, que nombra a la red que realmente opera la dirección: cuando aparece un proveedor de nube o de alojamiento, no hay una persona en ese país, hay una máquina rentada. Y conviene mirar los eventos por dirección: un país puede liderar en volumen y ser apenas un puñado de máquinas insistiendo.',
     coverage: (geo: string, asn: string) =>
-      `Se resolvió el país del ${geo}% de los eventos y la red operadora del ${asn}%. Las bases usadas son las gratuitas de MaxMind, que no conocen todas las direcciones. Además, quien usa una VPN o una cadena de equipos comprometidos aparece donde está el último salto: el dato sirve para agrupar y comparar, no para atribuir.`,
+      `Se resolvió el país del ${geo}% de los eventos y la red operadora del ${asn}%. Las bases son las GeoLite2 gratuitas de MaxMind, de 2019: no conocen todas las direcciones, y una dirección que cambió de manos desde entonces aparece con su dueño de aquel momento. Además, quien usa una VPN o una cadena de equipos comprometidos aparece donde está el último salto: el dato sirve para agrupar y comparar, no para atribuir. Incluye datos GeoLite2 creados por MaxMind (maxmind.com), bajo licencia CC BY-SA 4.0.`,
   },
   week: {
     title: 'La semana completa, hora por hora',
@@ -1057,7 +1057,7 @@ const en: typeof es = {
     lesson:
       'An attack launched from a rented server and one from a home connection can share a flag and be entirely different things. That is why the country comes paired with the autonomous system, which names the network actually operating the address: when a cloud or hosting provider shows up, there is no person in that country, there is a rented machine. It is also worth reading events per address: a country can lead on volume and be just a handful of machines pushing hard.',
     coverage: (geo: string, asn: string) =>
-      `The country resolved for ${geo}% of events and the operating network for ${asn}%. The databases used are the free MaxMind ones, which do not know every address. On top of that, anyone behind a VPN or a chain of compromised machines shows up wherever the last hop is: the data is for grouping and comparing, not for attribution.`,
+      `The country resolved for ${geo}% of events and the operating network for ${asn}%. The databases are MaxMind's free GeoLite2 ones, from 2019: they do not know every address, and an address that changed hands since then shows up with its owner at the time. On top of that, anyone behind a VPN or a chain of compromised machines shows up wherever the last hop is: the data is for grouping and comparing, not for attribution. Includes GeoLite2 data created by MaxMind (maxmind.com), under the CC BY-SA 4.0 license.`,
   },
   week: {
     title: 'The full week, hour by hour',

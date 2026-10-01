@@ -46,9 +46,11 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Logstash: normalización semántica de los eventos de los honeypots al Elastic Common Schema
+  # Logstash: normalización semántica de los eventos de los honeypots al Elastic Common Schema.
+  # Va en su edición abierta, bajo Apache 2.0: el pipeline no usa nada de la edición por defecto, y la
+  # salida de las dos es idéntica sobre los mismos eventos.
   logstash:
-    image: docker.elastic.co/logstash/logstash:${ELASTIC_VERSION:-8.17.3}
+    image: docker.elastic.co/logstash/logstash-oss:${ELASTIC_VERSION:-8.17.3}
     container_name: logstash
     hostname: logstash
     restart: unless-stopped
@@ -85,9 +87,10 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Transportador Filebeat: sigue los registros JSON de los honeypots y los manda a Logstash
+  # Transportador Filebeat: sigue los registros JSON de los honeypots y los manda a Logstash. También
+  # en su edición abierta, bajo Apache 2.0.
   filebeat:
-    image: docker.elastic.co/beats/filebeat:${ELASTIC_VERSION:-8.17.3}
+    image: docker.elastic.co/beats/filebeat-oss:${ELASTIC_VERSION:-8.17.3}
     container_name: filebeat
     hostname: filebeat
     restart: unless-stopped

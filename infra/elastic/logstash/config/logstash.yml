@@ -1,57 +1,38 @@
 http.host: "0.0.0.0"
-# monitoreo de X-Pack apagado (seguridad apagada, despliegue privado)
-xpack.monitoring.enabled: false
-# el pipeline principal vive en los archivos bajo /usr/share/logstash/pipeline
+# El pipeline principal vive en los archivos bajo /usr/share/logstash/pipeline.
 pipeline.ordered: auto
 log.level: info
 
-# --- Bases de datos geográficas ---
-#
-# Se desactiva el gestor que viene activo por defecto. Con él, Logstash intenta descargar las bases
-# desde el servicio de Elastic y, si no lo alcanza, entra en un período de gracia de 30 días y
-# después DEJA DE ENRIQUECER, marcando los eventos en vez de fallar. Sobre un sistema que corre sin
-# supervisión continua eso es una bomba de tiempo silenciosa: el enriquecimiento desaparece un mes
-# después y nada lo anuncia.
-#
-# Desactivado, el filtro usa las bases con licencia Creative Commons que ya vienen empaquetadas con
-# el plugin (GeoLite2-City y GeoLite2-ASN), que no caducan. Son menos precisas que las comerciales,
-# lo cual para ubicar el origen de un ataque a nivel país y organización es más que suficiente.
-xpack.geoip.downloader.enabled: false
+# Bases geográficas. La edición abierta no trae el gestor que descarga bases desde el servicio de
+# Elastic, así que el filtro geoip usa las que vienen empaquetadas con el plugin: GeoLite2-City y
+# GeoLite2-ASN, de MaxMind, bajo licencia Creative Commons Atribución-CompartirIgual 4.0. No caducan
+# ni dependen de ningún servicio externo. Son las últimas que MaxMind publicó con esa licencia, así
+# que no se actualizan: a nivel país y organización sirven para agrupar y comparar, y a nivel ciudad
+# son aproximadas.
 
-# --- Cola persistente entre la entrada y el resto del pipeline ---
+# Cola persistente entre la entrada y el resto del pipeline.
 #
-# POR QUÉ
 # Con la cola en memoria, los eventos que Logstash ya aceptó del transportador pero todavía no
-# escribió en el índice viven únicamente en la RAM del proceso. Un reinicio del contenedor, un
-# corte de energía en el servidor o un fin de proceso por memoria se los lleva. Sobre un honeypot
-# eso no es un dato reproducible: el ataque ocurrió una vez y no se repite.
+# escribió en el índice viven solo en la RAM del proceso, y un reinicio, un corte de energía o un
+# fin por memoria se los lleva. En un honeypot eso no se recupera: el ataque ocurrió una vez y no se
+# repite. Con la cola persistida, la entrada confirma la recepción recién cuando el evento está
+# escrito en disco, y al reiniciar el pipeline retoma desde el último punto de control.
 #
-# Con la cola persistida, la entrada confirma recepción recién cuando el evento está escrito en
-# disco, y al reiniciar el pipeline retoma desde el último punto de control. La telemetría deja de
-# depender de que el proceso siga vivo.
-#
-# La cola vive en path.data, que en el compose está montado sobre un volumen con nombre. Sin ese
-# volumen esto no serviría de nada: la cola quedaría en la capa efímera del contenedor y se
-# perdería en cada recreación, que es exactamente lo que se quiere evitar.
+# La cola vive en path.data, que en la composición está montado sobre un volumen con nombre. Sin ese
+# volumen quedaría en la capa efímera del contenedor y se perdería en cada recreación.
 queue.type: persisted
 
-# Dimensionado, medido sobre el corpus real
-# El día de mayor actividad registró 258.348 eventos. Un evento en cola pesa más que en el índice
-# (no está comprimido y conserva el mensaje original), del orden de 1,5 KB, así que un día pico
-# ocupa unos 400 MB. Dos gigabytes cubren cerca de cinco días pico seguidos con el índice caído.
-#
-# El espacio se reserva de a páginas, a medida que hace falta: en operación normal la cola está
-# casi vacía y no ocupa ese tamaño. El servidor tiene 182 GB libres, así que el techo es holgado a
-# propósito: el costo de que sobre es nulo y el de que falte es perder eventos.
+# El tope cubre varios días de actividad intensa con el índice caído. El espacio se reserva de a
+# páginas a medida que hace falta, así que en operación normal la cola está casi vacía: que sobre no
+# cuesta nada y que falte cuesta eventos.
 queue.max_bytes: 2gb
 
 # El punto de control se sincroniza a disco cada 128 escrituras en lugar de las 1024 por defecto.
-# Con el caudal de este sistema, 21 eventos por minuto de media y 180 en el día pico, el valor por
-# defecto dejaba ventanas de hasta 48 minutos sin sincronizar. A 128 la ventana baja a menos de un
-# minuto en pico, y el costo es de una sincronización cada minuto y medio: irrelevante.
+# Con el caudal de este sistema, el valor por defecto deja ventanas largas sin sincronizar; a 128 la
+# ventana queda por debajo del minuto aun en los picos, por el costo de una sincronización cada
+# tanto.
 #
 # Lo que hay dentro de esa ventana no se pierde: se vuelve a entregar al reiniciar. Como el
 # identificador del documento es determinista, reindexar lo mismo no genera duplicados. Sí llegan
-# repetidos al bus, que es de entrega al menos una vez por diseño y por eso su consumidor tiene que
-# ser idempotente.
+# repetidos al bus, que entrega al menos una vez por diseño, y por eso su consumidor es idempotente.
 queue.checkpoint.writes: 128
