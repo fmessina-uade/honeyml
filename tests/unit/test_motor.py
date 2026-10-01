@@ -301,8 +301,8 @@ def test_la_cuota_agotada_corta_la_corrida_y_no_persiste(sin_indice: None) -> No
     assert almacen.escrituras == []
 
 
-class _RedisFalso:
-    """Lo mínimo de Redis que usa la estimación: el grupo, los mensajes y el repertorio."""
+class _BusFalso:
+    """Lo mínimo del bus que usa la estimación: el grupo, los mensajes y el repertorio."""
 
     def __init__(self, mensajes: list[tuple[str, dict[str, str]]], conocidas: set[str]) -> None:
         self.mensajes = mensajes
@@ -330,7 +330,7 @@ def test_la_estimacion_con_reutilizacion_cuenta_conductas_y_no_mensajes() -> Non
     mensajes = [(f"{i}-0", {**uname, "doc_id": str(i)}) for i in range(1000)] + [("2000-0", ls)]
     conocida = PREFIJO + firma.de_evento(EventoDelBus.desde_mensaje("0-0", ls))
     consumidor = SimpleNamespace(
-        r=_RedisFalso(mensajes, {conocida}), stream="honeyml:events", grupo="triaje"
+        r=_BusFalso(mensajes, {conocida}), stream="honeyml:events", grupo="triaje"
     )
 
     assert motor.firmas_nuevas(consumidor) == 1  # type: ignore[arg-type]

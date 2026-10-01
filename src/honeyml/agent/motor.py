@@ -33,7 +33,7 @@ from . import firma as firma_de_conducta
 from .adapters.almacen import Almacen, AlmacenConsultable, AlmacenElastic
 from .adapters.config import MODELO_POR_DEFECTO, CredencialAusenteError
 from .adapters.inferencia import PRECIOS, CuotaAgotadaError
-from .adapters.repertorio import PREFIJO, Repertorio, RepertorioEnRedis
+from .adapters.repertorio import PREFIJO, Repertorio, RepertorioEnElBus
 from .adapters.servicio import AdaptadorDeInferencia, ServicioDeInferencia
 from .graph import INFERENCIA, MEMORIA, PERSISTENCIA, construir_grafo, ejecutar
 from .nodes import inferencia as nodo_inferencia
@@ -245,7 +245,7 @@ def main() -> int:
             "  --reescribir y --reutilizar no se combinan: se copiarían las decisiones que se "
             "quieren rehacer.\n"
             "  Para rehacer con reutilización, primero hay que vaciar las claves "
-            "honeyml:firma:* de Redis."
+            "honeyml:firma:* del bus."
         )
         return 1
 
@@ -256,7 +256,7 @@ def main() -> int:
         print(f"  No se puede arrancar: {exc}")
         return 1
 
-    repertorio = RepertorioEnRedis() if args.reutilizar else None
+    repertorio = RepertorioEnElBus() if args.reutilizar else None
     almacen = AlmacenElastic(reescribir=args.reescribir)
 
     consumidor = bus.ConsumidorDelBus(

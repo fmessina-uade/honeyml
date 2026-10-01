@@ -5,9 +5,9 @@ el repertorio, y cuando hay acierto el ciclo salta directo a persistencia: ni co
 historial, ni llamada al proveedor.
 
 Va antes de contexto y no después a propósito. Puesto después, cada repetición seguiría costando las
-cuatro o cinco consultas al índice que arma el contexto, y sobre 71.639 eventos eso es medio millón
-de consultas para un resultado que nadie va a leer. Puesto acá, un acierto cuesta una lectura de
-Redis.
+cuatro o cinco consultas al índice que arma el contexto, y sobre decenas de miles de eventos son
+cientos de miles de consultas para un resultado que nadie va a leer. Puesto acá, un acierto cuesta
+una lectura en el bus.
 
 Lo que no se reutiliza. La identidad del evento, su momento, su origen y los límites de severidad
 se recalculan siempre, porque son del evento y no de la conducta. Y el documento que se persiste

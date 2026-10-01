@@ -1,13 +1,13 @@
 """Qué firmas de conducta ya tienen una decisión, para no volver a pagarlas.
 
 Misma frontera que `Almacen` y `ServicioDeInferencia`: el nodo depende del protocolo `Repertorio` y
-no sabe que del otro lado hay un Redis. Así se prueba sin bus, que es lo que permite fijar el
+no sabe qué servidor hay del otro lado. Así se prueba sin bus, que es lo que permite fijar el
 comportamiento del ciclo sin levantar un contenedor.
 
-Vive en Redis y no en Elasticsearch porque es una consulta por clave exacta en el camino caliente,
-una por evento, y porque el bus ya está ahí. Tampoco hace falta que sea durable: si se pierde, lo
-único que pasa es que las primeras repeticiones de cada firma se vuelven a pagar. Un repertorio
-vacío da el comportamiento de antes, que sigue siendo correcto, solo que más caro.
+Vive en el servidor del bus y no en Elasticsearch porque es una consulta por clave exacta en el
+camino caliente, una por evento, y porque el bus ya está ahí. Tampoco hace falta que sea durable: si
+se pierde, lo único que pasa es que las primeras repeticiones de cada firma se vuelven a pagar. Con
+el repertorio vacío el motor razona cada evento, que sigue siendo correcto, solo que más caro.
 
 Lo que se guarda es la decisión del proveedor, no el documento entero. Lo que depende del evento
 (identidad, momento, origen, límites de severidad) se recalcula cada vez, así que copiarlo acá sería
@@ -24,7 +24,7 @@ import redis
 from .. import consumer as bus
 
 # Una clave por firma. El prefijo es el mismo estilo que `honeyml:visto:` del consumidor, así todo
-# lo que el motor deja en Redis se lista con un solo patrón.
+# lo que el motor deja en el bus se lista con un solo patrón.
 PREFIJO = "honeyml:firma:"
 
 # Cuánto vive una firma resuelta.
@@ -44,8 +44,8 @@ class Repertorio(Protocol):
     def registrar(self, firma: str, decision: dict[str, Any], doc_id: str) -> None: ...
 
 
-class RepertorioEnRedis:
-    """El repertorio real, sobre el mismo Redis que lleva el bus."""
+class RepertorioEnElBus:
+    """El repertorio real, en el mismo servidor que lleva el bus."""
 
     def __init__(self, cliente: redis.Redis | None = None, ttl: int = TTL) -> None:
         self.r = cliente or redis.Redis(
@@ -58,8 +58,8 @@ class RepertorioEnRedis:
     def consultar(self, firma: str) -> dict[str, Any] | None:
         """La decisión ya tomada para esta firma, o None.
 
-        Un Redis caído no puede frenar el triaje: sin repertorio el evento va por el camino
-        completo, que es el mismo que sigue con la reutilización apagada.
+        Un bus caído no puede frenar el triaje: sin repertorio el evento va por el camino completo,
+        que es el mismo que sigue con la reutilización apagada.
         """
         try:
             crudo = self.r.get(f"{PREFIJO}{firma}")

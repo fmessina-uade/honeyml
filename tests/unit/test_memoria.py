@@ -56,7 +56,7 @@ def _decision(severidad: Severidad = Severidad.ALTO) -> Decision:
 
 
 class RepertorioFalso:
-    """Un repertorio en memoria, con la misma interfaz que el de Redis."""
+    """Un repertorio en memoria, con la misma interfaz que el del bus."""
 
     def __init__(self) -> None:
         self.datos: dict[str, dict[str, Any]] = {}

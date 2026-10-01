@@ -32,7 +32,7 @@ from . import firma
 from .adapters.almacen import AlmacenElastic
 from .adapters.config import CredencialAusenteError
 from .adapters.inferencia import CuotaAgotadaError
-from .adapters.repertorio import PREFIJO, RepertorioEnRedis
+from .adapters.repertorio import PREFIJO, RepertorioEnElBus
 from .adapters.servicio import AdaptadorDeInferencia
 from .graph import ejecutar
 from .motor import compilar, costo_estimado
@@ -95,7 +95,7 @@ def main() -> int:
     # Primero se olvidan las firmas y recién después se decide: al revés, el primer evento copiaría
     # la decisión vieja que se quiere rehacer.
     r.delete(*(PREFIJO + f for f in firmas))
-    repertorio = RepertorioEnRedis(r)
+    repertorio = RepertorioEnElBus(r)
     compilado = compilar(
         servicio=inferencia, almacen=AlmacenElastic(reescribir=True), repertorio=repertorio
     )

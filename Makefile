@@ -265,18 +265,18 @@ validate-indexing-resumen:
 
 # panel educativo: API + SPA. Se corren `make api` y `make dash` en dos terminales.
 
-REDIS_FILE   = infra/redis/docker-compose.yml
+BUS_FILE     = infra/valkey/docker-compose.yml
 
-# Bus de eventos (Redis Streams). Vive en la zona de análisis y se une a elastic_net, así que el
-# stack tiene que estar arriba antes: la red se crea ahí.
+# Bus de eventos, sobre los streams de Valkey. Vive en la zona de análisis y se une a elastic_net,
+# así que el stack tiene que estar arriba antes: la red se crea ahí.
 bus-up:
-	@if [ ! -f infra/redis/.env ]; then cp infra/redis/.env.example infra/redis/.env; echo "Creado infra/redis/.env desde el ejemplo."; fi
-	docker compose --env-file infra/redis/.env -f $(REDIS_FILE) up -d
+	@if [ ! -f infra/valkey/.env ]; then cp infra/valkey/.env.example infra/valkey/.env; echo "Creado infra/valkey/.env desde el ejemplo."; fi
+	docker compose --env-file infra/valkey/.env -f $(BUS_FILE) up -d
 	@echo ""
 	@echo "Bus de eventos disponible en 127.0.0.1:6379"
 
 bus-down:
-	docker compose --env-file infra/redis/.env -f $(REDIS_FILE) down
+	docker compose --env-file infra/valkey/.env -f $(BUS_FILE) down
 
 bus-status:
 	@./.venv/bin/python scripts/bus_status.py

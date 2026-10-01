@@ -1,6 +1,6 @@
 """Informa el estado del bus de eventos: stream, grupos de consumidores y entradas pendientes.
 
-Escrito directamente contra el protocolo de Redis sobre un socket, sin biblioteca cliente. El motivo
+Escrito directamente contra el protocolo del bus sobre un socket, sin biblioteca cliente. El motivo
 es el mismo que en el resto de las herramientas del proyecto: esto tiene que correr desde el entorno
 virtual pelado, y agregar una dependencia para contestar "¿el bus está vivo y hay alguien atrasado?"
 no justifica el pin.
@@ -24,7 +24,7 @@ PORT = 6379
 STREAM = "honeyml:events"
 
 
-class RedisError(RuntimeError):
+class BusError(RuntimeError):
     pass
 
 
@@ -40,13 +40,13 @@ def _encode(*args: str) -> bytes:
 def _read_reply(f: Any) -> Any:
     line = f.readline()
     if not line:
-        raise RedisError("la conexión se cerró")
+        raise BusError("la conexión se cerró")
     kind, body = line[:1], line[1:].strip()
 
     if kind == b"+":
         return body.decode()
     if kind == b"-":
-        raise RedisError(body.decode())
+        raise BusError(body.decode())
     if kind == b":":
         return int(body)
     if kind == b"$":
@@ -60,7 +60,7 @@ def _read_reply(f: Any) -> Any:
         if count == -1:
             return None
         return [_read_reply(f) for _ in range(count)]
-    raise RedisError(f"respuesta inesperada: {line!r}")
+    raise BusError(f"respuesta inesperada: {line!r}")
 
 
 def command(sock_file: Any, sock: socket.socket, *args: str) -> Any:
@@ -69,7 +69,7 @@ def command(sock_file: Any, sock: socket.socket, *args: str) -> Any:
 
 
 def as_dict(pairs: list[Any] | None) -> dict[str, Any]:
-    """Redis devuelve los mapas como listas planas [k1, v1, k2, v2, ...]."""
+    """El protocolo devuelve los mapas como listas planas, clave y valor alternados."""
     if not pairs:
         return {}
     return {pairs[i]: pairs[i + 1] for i in range(0, len(pairs) - 1, 2)}

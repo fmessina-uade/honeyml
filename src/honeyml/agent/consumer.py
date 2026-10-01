@@ -45,7 +45,7 @@ from typing import Any, cast
 
 import redis
 
-# Los valores por defecto coinciden con infra/redis/docker-compose.yml: el bus escucha solo en
+# Los valores por defecto coinciden con infra/valkey/docker-compose.yml: el bus escucha solo en
 # loopback y no se alcanza desde afuera de la zona de análisis.
 HOST = os.getenv("BUS_HOST", "127.0.0.1")
 PORT = int(os.getenv("BUS_PORT", "6379"))
@@ -83,7 +83,7 @@ PREFIJO_VISTO = "honeyml:visto:"
 TTL_VISTO = int(os.getenv("BUS_TTL_VISTO", "86400"))
 
 
-# Un mensaje tal como lo entrega Redis con decode_responses activo: el id de entrada y sus campos.
+# Un mensaje tal como lo entrega el bus con decode_responses activo: el id de entrada y sus campos.
 Mensaje = tuple[str, dict[str, str]]
 
 # Prefijos que Cowrie deja en la línea del registro y que no son parte del comando que tipeó el
@@ -98,7 +98,7 @@ PREFIJOS_DEL_REGISTRO = re.compile(r"^(CMD: |Command (not )?found: )")
 
 
 def _mensajes(respuesta: Any) -> list[Mensaje]:
-    """Reduce la respuesta de un stream de Redis a la forma que el protocolo sí garantiza.
+    """Reduce la respuesta de un stream del bus a la forma que el protocolo sí garantiza.
 
     redis-py anota estos comandos con uniones anchas (`bytes | str`, opcionales anidados) porque la
     forma real depende del comando y de si `decode_responses` está activo. Acá el cliente se
@@ -456,7 +456,8 @@ class ConsumidorDelBus:
 
         Leerlos ya les sumó una entrega. Sin descontarla, un corte por cuota que se repitiera tres
         veces mandaría esos mismos eventos a la cola de muertos sin que tengan nada malo.
-        `RETRYCOUNT` fija el contador a mano, y es la única forma que da Redis de descontarla.
+        `RETRYCOUNT` fija el contador a mano, y es la única forma que da el protocolo de
+        descontarla.
         """
         for evento in eventos:
             self.r.xclaim(

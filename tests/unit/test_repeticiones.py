@@ -9,7 +9,7 @@ decisión razonada.
 Se fija la protección en las capas que la sostienen: el motor no vuelve a triar lo que ya tiene
 decisión, el almacén no sobrescribe, la persistencia no escribe una copia de sí misma, y el motor le
 avisa al consumidor que el evento ya estaba decidido. El conteo del lado del consumidor necesita un
-Redis de verdad y vive en las pruebas de integración.
+bus de verdad y vive en las pruebas de integración.
 """
 
 from __future__ import annotations
@@ -89,7 +89,7 @@ class _Repertorio:
         self.datos[firma] = {"decision": decision, "doc_id": doc_id}
 
 
-# ---- el almacén --------------------------------------------------------------------------------
+# El almacén.
 
 
 class _Respuesta:
@@ -201,7 +201,7 @@ def test_si_la_consulta_falla_levanta_sin_reintentar(red: Any) -> None:
     assert len(transporte.urls) == 1
 
 
-# ---- la persistencia ---------------------------------------------------------------------------
+# La persistencia.
 
 
 def test_nunca_escribe_una_copia_de_si_misma() -> None:
@@ -245,7 +245,7 @@ def test_una_escritura_nueva_si_registra_la_firma() -> None:
     assert repertorio.datos["f1"]["doc_id"] == DOC_ID
 
 
-# ---- el motor ----------------------------------------------------------------------------------
+# El motor.
 
 
 class _Servicio:
@@ -276,7 +276,7 @@ def sin_indice(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         contexto,
         "construir",
-        lambda estado: {"contexto": Contexto(doc_id=DOC_ID, resumen="cowrie/process · uname -a")},
+        lambda estado: {"contexto": Contexto(doc_id=DOC_ID, resumen="cowrie/process, uname -a")},
     )
     monkeypatch.setattr(historial, "recuperar", lambda estado: {})
 

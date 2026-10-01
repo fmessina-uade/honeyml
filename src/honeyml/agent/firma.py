@@ -62,7 +62,7 @@ def de_evento(evento: EventoDelBus) -> str:
     """El resumen de la conducta de este evento.
 
     Se devuelve un hash y no la concatenación por una razón práctica: el comando puede tener miles
-    de caracteres y termina siendo clave de Redis y valor de un campo indexado.
+    de caracteres y termina siendo clave en el bus y valor de un campo indexado.
     """
     valores = []
     for campo in CAMPOS:

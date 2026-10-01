@@ -1,4 +1,4 @@
-"""Comportamiento del consumidor del bus contra un Redis de verdad.
+"""Comportamiento del consumidor contra un bus de verdad.
 
 Acá se comprueban las propiedades que hacen que el motor sobreviva, que son justo las que no se
 pueden verificar leyendo el código: que la confirmación llegue recién después de que el manejador

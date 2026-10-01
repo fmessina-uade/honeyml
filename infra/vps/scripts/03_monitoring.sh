@@ -100,7 +100,7 @@ done < <(df -h | tail -n +2 | grep -v tmpfs)
 # 'docker ps' un contenedor frenado no figura en la lista, así que la comprobación se salteaba justo
 # en el caso que tiene que avisar. Uno que no existe se omite, para que el mismo chequeo sirva en un
 # anfitrión que solo tiene los sensores y en uno que además corre el análisis.
-for container in cowrie dionaea elasticsearch logstash filebeat redis motor api; do
+for container in cowrie dionaea elasticsearch logstash filebeat valkey motor api; do
     STATUS=\$(docker inspect --format='{{.State.Status}}' "\$container" 2>/dev/null || echo "")
     if [[ -z "\$STATUS" ]]; then
         continue
@@ -125,8 +125,8 @@ fi
 
 # Atraso del bus. Que el motor esté corriendo no alcanza: si deja de consumir, el contenedor sigue
 # en pie y lo único que lo delata es el atraso creciendo sin techo.
-if docker inspect --format='{{.State.Status}}' redis >/dev/null 2>&1; then
-    ATRASO=\$(docker exec redis redis-cli --raw XINFO GROUPS honeyml:events 2>/dev/null \
+if docker inspect --format='{{.State.Status}}' valkey >/dev/null 2>&1; then
+    ATRASO=\$(docker exec valkey valkey-cli --raw XINFO GROUPS honeyml:events 2>/dev/null \
         | awk '/^lag\$/{getline; print; exit}')
     if [[ "\$ATRASO" =~ ^[0-9]+\$ ]] && [[ "\$ATRASO" -ge $THRESHOLD_ATRASO ]]; then
         send_alert "WARNING" "El motor no consume: \${ATRASO} eventos de atraso en el bus"

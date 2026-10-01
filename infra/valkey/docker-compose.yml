@@ -1,37 +1,40 @@
 services:
 
-  # Redis Streams: bus en tiempo real entre el pipeline de normalización y el motor de triaje.
+  # El bus en tiempo real entre el pipeline de normalización y el motor de triaje, sobre los streams
+  # de Valkey.
   #
   # Vive en la zona de análisis y no en la de captura: los sensores nunca lo alcanzan. El pipeline
   # publica acá después de normalizar, y el motor consume con un grupo de consumidores, que es lo
   # que da el acuse explícito: un evento tomado y no confirmado queda pendiente, y se puede reclamar
   # si el consumidor se muere en el medio.
-  redis:
-    image: redis:7.4-alpine
-    container_name: redis
-    hostname: redis
+  valkey:
+    # Valkey 9.1.2, fijada por digest como los sensores. Es BSD-3-Clause y habla el mismo protocolo
+    # que Redis, así que los clientes de Python y de Logstash no cambian.
+    image: valkey/valkey@sha256:48332870af354a799964c0012ae1194a0bf2bf894eb508f945810596dc2d8d11
+    container_name: valkey
+    hostname: valkey
     restart: unless-stopped
     command: >-
-      redis-server
+      valkey-server
       --appendonly yes
       --appendfsync everysec
-      --maxmemory ${REDIS_MAXMEMORY:-512mb}
+      --maxmemory ${BUS_MAXMEMORY:-512mb}
       --maxmemory-policy noeviction
       --save ""
     volumes:
-      - redis_data:/data
+      - valkey_data:/data
     # atado a loopback, nunca expuesto en la interfaz pública del VPS
     ports:
       - "127.0.0.1:6379:6379"
     networks:
       - elastic_net
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "valkey-cli", "ping"]
       interval: 15s
       timeout: 5s
       retries: 5
       start_period: 10s
-    mem_limit: ${REDIS_MEM_LIMIT:-768m}
+    mem_limit: ${BUS_MEM_LIMIT:-768m}
     logging:
       driver: "json-file"
       options:
@@ -45,5 +48,5 @@ networks:
     name: elastic_net
 
 volumes:
-  redis_data:
-    name: redis_data
+  valkey_data:
+    name: valkey_data
