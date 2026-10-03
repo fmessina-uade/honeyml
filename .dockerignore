@@ -4,4 +4,5 @@
 *
 !pyproject.toml
 !src/
+!infra/analisis/versiones.txt
 **/__pycache__
