@@ -219,7 +219,9 @@ def resumen(es_url: str = queries.ES_URL) -> dict[str, Any]:
             },
             # Solo lo que decidió el motor al consumir el bus. Una decisión que se volvió a triar
             # tiene la marca temporal del retriaje sobre un evento que pudo ocurrir semanas antes,
-            # y una sola tanda así lleva la mediana a días.
+            # y una sola tanda así lleva la mediana a días. La media va junto a la mediana porque la
+            # métrica de conclusión se define como tiempo medio; la mediana dice lo típico y la
+            # media deja ver si hay colas largas.
             "conclusion": {
                 "filter": {
                     "bool": {
@@ -228,7 +230,8 @@ def resumen(es_url: str = queries.ES_URL) -> dict[str, Any]:
                     }
                 },
                 "aggs": {
-                    "percentiles": {"percentiles": {"field": "demora_ms", "percents": [50, 90]}}
+                    "percentiles": {"percentiles": {"field": "demora_ms", "percents": [50, 90]}},
+                    "media": {"avg": {"field": "demora_ms"}},
                 },
             },
         },
@@ -286,6 +289,7 @@ def resumen(es_url: str = queries.ES_URL) -> dict[str, Any]:
             "decisiones": a["conclusion"]["doc_count"],
             "mediana_s": _segundos(pct.get("50.0")),
             "p90_s": _segundos(pct.get("90.0")),
+            "media_s": _segundos(a["conclusion"].get("media", {}).get("value")),
         },
     }
 

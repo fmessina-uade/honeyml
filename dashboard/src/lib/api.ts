@@ -203,6 +203,8 @@ export interface ResumenTriaje {
     decisiones: number;
     mediana_s: number | null;
     p90_s: number | null;
+    /** La media, que es como se define la métrica; la mediana dice lo típico. */
+    media_s?: number | null;
   };
 }
 
@@ -385,6 +387,7 @@ export const api = {
   archetypes: () => get<ArchetypeData>('/archetypes'),
   passwordCheck: (prefix: string) =>
     get<PasswordCheckResult>(`/password-check?prefix=${encodeURIComponent(prefix)}`),
+  passwordResumen: () => get<{ distintas: number; intentos: number }>('/password-check/resumen'),
   triaje: () => get<ResumenTriaje>('/decisiones/resumen'),
   decisiones: (f: FiltrosDecisiones) => {
     const q = new URLSearchParams({

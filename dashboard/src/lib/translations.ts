@@ -271,8 +271,8 @@ const es = {
   },
   passcheck: {
     title: '¿Tu contraseña está acá?',
-    intro:
-      'Comparala contra las 53.580 contraseñas distintas que los atacantes probaron realmente contra este señuelo. No se envía a ningún lado.',
+    intro: (distintas: string | null) =>
+      `Comparala contra ${distintas ? `las ${distintas} contraseñas distintas` : 'las contraseñas'} que los atacantes probaron realmente contra este señuelo. No se envía a ningún lado.`,
     placeholder: 'Escribí una contraseña',
     button: 'Comparar',
     failed: 'No se pudo consultar el índice. Generalo con make passwords.',
@@ -281,7 +281,7 @@ const es = {
       `Se probó ${c} veces contra este equipo. Si la usás en algún lado, cambiala: no hace falta que nadie te apunte, los bots la prueban por defecto.`,
     safeTitle: 'No aparece en las capturas.',
     safeBody:
-      'Que no esté acá no la vuelve segura: este es un señuelo, no un catálogo completo. Significa que no está entre las que se probaron en estos setenta y seis días.',
+      'Que no esté acá no la vuelve segura: este es un señuelo, no un catálogo completo. Significa que no está entre las que se probaron contra este equipo durante la captura.',
     hashTitle: 'El resumen SHA-256 de lo que escribiste, tal como sale del navegador.',
     noteSent: 'solo esto viaja',
     restStays: (c: number) => `${c} caracteres que se quedan en tu equipo`,
@@ -444,8 +444,8 @@ const es = {
     correctedByEngine: 'corregidas tras un rechazo de la validación',
     conclusion: 'Tiempo de conclusión',
     conclusionNote: (d: number) => `del evento a la decisión guardada, últimos ${d} días`,
-    conclusionP90: (p90: string, d: number) =>
-      `nueve de cada diez, en menos de ${p90}. Últimos ${d} días`,
+    conclusionP90: (p90: string, d: number, media: string | null) =>
+      `${media ? `media de ${media}; ` : ''}nueve de cada diez, en menos de ${p90}. Últimos ${d} días`,
     pendingNone: (r: string) => `el motor cerró todo solo; ${r} con veredicto`,
     inbox: 'Decisiones',
     live: 'en vivo',
@@ -929,8 +929,8 @@ const en: typeof es = {
   },
   passcheck: {
     title: 'Is your password in here?',
-    intro:
-      'Compare it against the 53,580 distinct passwords attackers actually tried against this decoy. It is never sent anywhere.',
+    intro: (distinct: string | null) =>
+      `Compare it against ${distinct ? `the ${distinct} distinct passwords` : 'the passwords'} attackers actually tried against this decoy. It is never sent anywhere.`,
     placeholder: 'Type a password',
     button: 'Compare',
     failed: 'Could not query the index. Generate it with make passwords.',
@@ -939,7 +939,7 @@ const en: typeof es = {
       `It was tried ${c} times against this machine. If you use it anywhere, change it: nobody has to target you, the bots try it by default.`,
     safeTitle: 'It does not appear in the captures.',
     safeBody:
-      'Not being here does not make it safe: this is one decoy, not a complete catalog. It means it is not among those tried during these seventy-six days.',
+      'Not being here does not make it safe: this is one decoy, not a complete catalog. It means it is not among those tried against this machine during the capture.',
     hashTitle: 'The SHA-256 digest of what you typed, as it leaves the browser.',
     noteSent: 'only this travels',
     restStays: (c: number) => `${c} characters that stay on your machine`,
@@ -1098,7 +1098,8 @@ const en: typeof es = {
     correctedByEngine: 'corrected after a validation rejection',
     conclusion: 'Time to conclusion',
     conclusionNote: (d: number) => `from the event to the stored decision, last ${d} days`,
-    conclusionP90: (p90: string, d: number) => `nine out of ten in under ${p90}. Last ${d} days`,
+    conclusionP90: (p90: string, d: number, media: string | null) =>
+      `${media ? `mean of ${media}; ` : ''}nine out of ten in under ${p90}. Last ${d} days`,
     pendingNone: (r: string) => `the engine settled everything on its own; ${r} with a verdict`,
     inbox: 'Decisions',
     live: 'live',

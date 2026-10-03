@@ -243,6 +243,22 @@ def get_fingerprints() -> dict[str, Any]:
     return data
 
 
+@app.get("/api/password-check/resumen")
+def password_summary() -> dict[str, int]:
+    """Cuántas contraseñas distintas y cuántos intentos tiene el índice, sin ningún hash.
+
+    El panel lo usa para decir contra cuántas se compara antes de que nadie pregunte nada, y así
+    el número sale del índice vigente y no de un texto escrito a mano.
+    """
+    index = password_index.load()
+    if index is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Falta el índice de contraseñas. Generalo con: make passwords",
+        )
+    return {"distintas": int(index.get("distinct", 0)), "intentos": int(index.get("attempts", 0))}
+
+
 @app.get("/api/password-check")
 def check_password(prefix: str) -> dict[str, Any]:
     """Consulta con k-anonimato: recibe un prefijo de hash, nunca una contraseña.

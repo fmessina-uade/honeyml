@@ -215,6 +215,9 @@ export default function Triage() {
                 ? t.triage.conclusionP90(
                     duracion(resumen.conclusion.p90_s),
                     resumen.conclusion.ventana_dias,
+                    resumen.conclusion.media_s != null
+                      ? duracion(resumen.conclusion.media_s)
+                      : null,
                   )
                 : t.triage.conclusionNote(resumen.conclusion.ventana_dias)
             }

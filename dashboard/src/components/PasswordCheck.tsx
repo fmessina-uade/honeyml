@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ShieldCheck, ShieldAlert, Lock, Loader2 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useI18n } from '../lib/i18n';
@@ -35,6 +35,15 @@ export default function PasswordCheck() {
   const [prefijo, setPrefijo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [distintas, setDistintas] = useState<number | null>(null);
+
+  // Contra cuántas se compara sale del índice vigente, así el texto no envejece con cada corte.
+  useEffect(() => {
+    api
+      .passwordResumen()
+      .then((r) => setDistintas(r.distintas))
+      .catch(() => setDistintas(null));
+  }, []);
 
   async function check(e: React.FormEvent) {
     e.preventDefault();
@@ -65,7 +74,9 @@ export default function PasswordCheck() {
         </Hexagono>
         <span className="rotulo">{t.passcheck.title}</span>
       </div>
-      <div className="text-[11px] text-white/50 mt-2 leading-relaxed">{t.passcheck.intro}</div>
+      <div className="text-[11px] text-white/50 mt-2 leading-relaxed">
+        {t.passcheck.intro(distintas !== null ? n(distintas) : null)}
+      </div>
 
       <form onSubmit={check} className="flex gap-2 mt-3 max-w-xl">
         <input
