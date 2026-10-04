@@ -79,3 +79,22 @@ def test_el_error_que_muestra_es_un_error() -> None:
 def test_sin_errores_no_inventa_uno() -> None:
     real = np.array(["none", "Exfiltration"])
     assert demo.un_error(real, real.copy(), semilla=3) is None
+
+
+def test_la_matriz_pone_la_real_en_filas_y_la_predicha_en_columnas() -> None:
+    real = np.array(["none"] * 3 + ["Exfiltration"] * 2)
+    predicha = np.array(["none", "none", "Exfiltration", "Exfiltration", "none"])
+
+    encabezado, exfiltracion, benigno = demo.matriz_de_confusion(real, predicha)
+
+    assert encabezado.split() == ["Exfiltration", "benigno"]
+    assert exfiltracion.split() == ["Exfiltration", "1", "1"]
+    assert benigno.split() == ["benigno", "1", "2"]
+
+
+def test_la_matriz_separa_los_miles_como_el_resto_de_la_salida() -> None:
+    real = np.array(["none"] * 1200)
+
+    _, fila = demo.matriz_de_confusion(real, real.copy())
+
+    assert fila.split() == ["benigno", "1.200"]

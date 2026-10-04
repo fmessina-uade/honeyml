@@ -1,5 +1,5 @@
 .PHONY: help up down logs status ps clean deploy-vps dev-up dev-down dev-logs validate lint test \
-        test-integration consumer triaje retriaje grafo arquetipos modelo evaluacion clasificar \
+        test-integration consumer triaje retriaje grafo arquetipos modelo evaluacion comparacion clasificar \
         api dash replays \
         elastic-up elastic-down elastic-logs elastic-dev-up elastic-dev-down elastic-dev-logs \
         es-bootstrap validate-indexing pull-logs \
@@ -41,6 +41,7 @@ help:
 	@echo "  Clasificador supervisado (conjunto de referencia UWF-ZeekData24):"
 	@echo "    make modelo      Reentrenar y exportar el modelo final con su tarjeta"
 	@echo "    make evaluacion  Las cuatro mediciones del modelo"
+	@echo "    make comparacion Las cuatro familias comparadas"
 	@echo "    make clasificar  Demostración sobre flujos de prueba no vistos"
 	@echo ""
 	@echo "  Panel educativo (demo):"
@@ -259,9 +260,11 @@ es-bootstrap:
 validate-indexing:
 	@python3 infra/elastic/scripts/validate_indexing.py --es-url $${ES_URL:-http://localhost:9200}
 
-# salida compacta para capturas de pantalla: sin lista de índices por día ni direcciones
+# salida compacta para capturas de pantalla: sin lista de índices por día, direcciones ni usuarios.
+# Con HASTA cuenta solo hasta ese instante, para reproducir un corte de cifras.
+#   make validate-indexing-resumen HASTA=2026-10-03T22:00:59Z
 validate-indexing-resumen:
-	@python3 infra/elastic/scripts/validate_indexing.py --es-url $${ES_URL:-http://localhost:9200} --resumen
+	@python3 infra/elastic/scripts/validate_indexing.py --es-url $${ES_URL:-http://localhost:9200} --resumen $(if $(HASTA),--hasta $(HASTA),)
 
 # panel educativo: API + SPA. Se corren `make api` y `make dash` en dos terminales.
 
@@ -389,13 +392,20 @@ modelo:
 evaluacion:
 	@./.venv/bin/python -m honeyml.features.uwf_evaluacion $(if $(RAPIDO),--rapido,)
 
+# La comparación de las cuatro familias de modelos, ordenada por F1 macro. Imprime la última
+# guardada; con REENTRENAR=1 vuelve a entrenarlas, que tarda unos seis minutos y la reescribe.
+#   make comparacion               make comparacion REENTRENAR=1
+comparacion:
+	@./.venv/bin/python -m honeyml.features.uwf_comparison $(if $(REENTRENAR),,--mostrar)
+
 # Demostración del clasificador: flujos de prueba que el modelo no vio, táctica real contra
 # predicha, y el F1 macro recalculado en el momento contra el de la tarjeta. Usa el modelo que
 # exportó `make modelo`, sin reentrenar.
 #   make clasificar                        dos flujos por clase y un error real
 #   make clasificar POR_CLASE=4 SEMILLA=7  otra muestra
+#   make clasificar MATRIZ=1               suma la matriz de confusión con el umbral
 clasificar:
-	@./.venv/bin/python -m honeyml.features.uwf_clasificar $(if $(POR_CLASE),--por-clase $(POR_CLASE),) $(if $(SEMILLA),--semilla $(SEMILLA),)
+	@./.venv/bin/python -m honeyml.features.uwf_clasificar $(if $(POR_CLASE),--por-clase $(POR_CLASE),) $(if $(SEMILLA),--semilla $(SEMILLA),) $(if $(MATRIZ),--matriz,)
 
 # Un solo comando para todo el ciclo de datos: bajar registros frescos de los sensores, esperar a
 # que el pipeline los ingiera, y regenerar todos los artefactos derivados. Reemplaza correr cinco

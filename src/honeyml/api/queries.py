@@ -34,13 +34,52 @@ def _search(body: dict[str, Any], es_url: str = ES_URL, index: str = INDEX) -> d
         return result
 
 
+# Cada índice diario contesta solo sus primeros valores, y Elasticsearch suma esas respuestas. Un
+# país o un usuario que un día queda afuera de ese recorte pierde los eventos de ese día en el
+# total, y con un índice por día el error se acumula: con el recorte por defecto, el ranking de
+# usuarios cambia de orden en los últimos puestos y a los países chicos les faltan direcciones. Con
+# dos mil valores por índice, las sumas coinciden con el conteo exacto.
+def _ranking(field: str, size: int) -> dict[str, Any]:
+    return {"terms": {"field": field, "size": size, "shard_size": max(2_000, size)}}
+
+
 def _terms(
     field: str, size: int, es_url: str = ES_URL, extra: dict[str, Any] | None = None
 ) -> list[dict[str, Any]]:
     query = extra or NOT_LOCAL
-    body = {"size": 0, "query": query, "aggs": {"t": {"terms": {"field": field, "size": size}}}}
+    body = {"size": 0, "query": query, "aggs": {"t": _ranking(field, size)}}
     buckets = _search(body, es_url)["aggregations"]["t"]["buckets"]
     return [{"key": b["key"], "count": b["doc_count"]} for b in buckets]
+
+
+# Elasticsearch cuenta valores distintos con un estimador, y con su umbral por defecto (tres mil) se
+# equivoca cerca de un uno por ciento por encima de ese número. Los países y protocolos con más
+# tráfico lo pasan, así que se le pide el umbral máximo que admite: por debajo de él, el conteo por
+# grupo coincide con el exacto.
+def _distintas(campo: str) -> dict[str, Any]:
+    return {"cardinality": {"field": campo, "precision_threshold": 40_000}}
+
+
+def _direcciones_exactas(query: dict[str, Any], es_url: str = ES_URL) -> int:
+    """Direcciones distintas del corpus entero, contadas una por una y no estimadas.
+
+    El total ya anda cerca del umbral del estimador, y es la cifra que se compara con los artefactos
+    derivados, que cuentan sobre la tabla consolidada. De a diez mil por pedido alcanzan unos pocos.
+    """
+    total, despues = 0, None
+    while True:
+        compuesta: dict[str, Any] = {
+            "size": 10_000,
+            "sources": [{"ip": {"terms": {"field": "source.ip"}}}],
+        }
+        if despues:
+            compuesta["after"] = despues
+        body = {"size": 0, "query": query, "aggs": {"c": {"composite": compuesta}}}
+        agg = _search(body, es_url)["aggregations"]["c"]
+        total += len(agg["buckets"])
+        despues = agg.get("after_key")
+        if len(agg["buckets"]) < compuesta["size"] or not despues:
+            return total
 
 
 def overview(es_url: str = ES_URL) -> dict[str, Any]:
@@ -51,7 +90,6 @@ def overview(es_url: str = ES_URL) -> dict[str, Any]:
         "track_total_hits": True,
         "query": NOT_LOCAL,
         "aggs": {
-            "ips": {"cardinality": {"field": "source.ip"}},
             "sensors": {"terms": {"field": "honeypot"}},
             "logins": {"filter": {"term": {"event.action": "login"}}},
             "logins_ok": {
@@ -72,7 +110,7 @@ def overview(es_url: str = ES_URL) -> dict[str, Any]:
     agg = res["aggregations"]
     return {
         "events": res["hits"]["total"]["value"],
-        "unique_ips": agg["ips"]["value"],
+        "unique_ips": _direcciones_exactas(NOT_LOCAL, es_url),
         "logins": agg["logins"]["doc_count"],
         "logins_success": agg["logins_ok"]["doc_count"],
         "commands": agg["commands"]["doc_count"],
@@ -182,9 +220,9 @@ def protocol_detail(es_url: str = ES_URL) -> list[dict[str, Any]]:
         },
         "aggs": {
             "p": {
-                "terms": {"field": "network.protocol", "size": 12},
+                **_ranking("network.protocol", 12),
                 "aggs": {
-                    "ips": {"cardinality": {"field": "source.ip"}},
+                    "ips": _distintas("source.ip"),
                     "port": {"terms": {"field": "destination.port", "size": 1}},
                 },
             }
@@ -226,13 +264,13 @@ def geography(es_url: str = ES_URL) -> dict[str, Any]:
         "aggs": {
             "con_geo": {
                 "filter": {"exists": {"field": "source.geo.country_name"}},
-                "aggs": {"ips": {"cardinality": {"field": "source.ip"}}},
+                "aggs": {"ips": _distintas("source.ip")},
             },
             "con_asn": {"filter": {"exists": {"field": "source.as.organization.name"}}},
             "paises": {
-                "terms": {"field": "source.geo.country_name", "size": 12},
+                **_ranking("source.geo.country_name", 12),
                 "aggs": {
-                    "ips": {"cardinality": {"field": "source.ip"}},
+                    "ips": _distintas("source.ip"),
                     "iso": {"terms": {"field": "source.geo.country_iso_code", "size": 1}},
                     # Centroide de las direcciones observadas, no del país. Se usa para ubicar el
                     # marcador en el globo, y sale de los datos en vez de una tabla fija de
@@ -241,8 +279,8 @@ def geography(es_url: str = ES_URL) -> dict[str, Any]:
                 },
             },
             "sistemas": {
-                "terms": {"field": "source.as.organization.name", "size": 10},
-                "aggs": {"ips": {"cardinality": {"field": "source.ip"}}},
+                **_ranking("source.as.organization.name", 10),
+                "aggs": {"ips": _distintas("source.ip")},
             },
         },
     }

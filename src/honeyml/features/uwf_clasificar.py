@@ -10,11 +10,12 @@ un error real del modelo: una demostración que solo muestra aciertos esconde ju
 la evaluación documenta.
 
 Antes de la muestra se recalcula el F1 macro sobre toda la prueba y se lo pone al lado del de la
-tarjeta, para que el número informado se pueda comprobar en el momento.
+tarjeta, para que el número informado se pueda comprobar en el momento. Con `--matriz` se agrega
+la matriz de confusión del mismo modelo con su umbral, que es la que corresponde citar: la de la
+evaluación sale de un ajuste nuevo y predice sin umbral.
 
-Uso:
-    python -m honeyml.features.uwf_clasificar
-    python -m honeyml.features.uwf_clasificar --por-clase 4 --semilla 7
+Se corre con `python -m honeyml.features.uwf_clasificar`, y con `--por-clase 4 --semilla 7` arma
+otra muestra.
 """
 
 from __future__ import annotations
@@ -25,7 +26,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import f1_score
+from sklearn.metrics import confusion_matrix, f1_score
 
 from .uwf_comparison import RANDOM_STATE, cargar_y_partir
 from .uwf_export import CARD_FILE, MODEL_FILE, cargar_modelo
@@ -81,11 +82,29 @@ def _nombre(clase: str) -> str:
     return NOMBRE_VISIBLE.get(clase, clase)
 
 
+def _miles(n: int) -> str:
+    return f"{n:,}".replace(",", ".")
+
+
+def matriz_de_confusion(y_real: np.ndarray, y_predicha: np.ndarray) -> list[str]:
+    """La matriz en líneas de texto: la táctica real en las filas y la predicha en columnas."""
+    clases = sorted(set(y_real) | set(y_predicha))
+    matriz = confusion_matrix(y_real, y_predicha, labels=clases)
+    nombres = [_nombre(c) for c in clases]
+    rotulo = max(len(n) for n in nombres)
+    ancho = max(max(len(_miles(int(v))) for v in matriz.flat), *(len(n) for n in nombres)) + 2
+    lineas = [" " * (rotulo + 4) + "".join(f"{n:>{ancho}}" for n in nombres)]
+    for nombre, fila in zip(nombres, matriz, strict=True):
+        celdas = "".join(f"{_miles(int(v)):>{ancho}}" for v in fila)
+        lineas.append(f"    {nombre:<{rotulo}}{celdas}")
+    return lineas
+
+
 def _linea(x: pd.DataFrame, real: str, predicha: str, probabilidad: float) -> str:
     fila = x.iloc[0]
     servicio = fila["service"] if isinstance(fila["service"], str) and fila["service"] else "-"
     duracion = f"{fila['duration']:.2f}s" if pd.notna(fila["duration"]) else "-"
-    marca = "✓" if real == predicha else "✗"
+    marca = "ok" if real == predicha else "x "
     return (
         f"  {marca} {int(fila['dest_port_zeek']):>6} {fila['proto']:<5} {servicio[:16]:<16} "
         f"{fila['conn_state']:<6} {duracion:>9}   {_nombre(real):<17} {_nombre(predicha):<17} "
@@ -97,6 +116,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Demostración del clasificador exportado.")
     ap.add_argument("--por-clase", type=int, default=POR_CLASE)
     ap.add_argument("--semilla", type=int, default=RANDOM_STATE)
+    ap.add_argument("--matriz", action="store_true", help="agrega la matriz de confusión")
     args = ap.parse_args()
 
     pipe, tarjeta = cargar_modelo()
@@ -105,14 +125,14 @@ def main() -> None:
     print(f"Huella : {MODEL_FILE} coincide con {CARD_FILE}")
     print(f"Umbral : {punto['clase']} desde {punto['umbral']:.2f}\n")
 
-    print("  cargando el conjunto de referencia y su partición…", end="", flush=True)
+    print("  cargando el conjunto de referencia y su partición:", end="", flush=True)
     comenzado = time.monotonic()
     _, x_prueba, _, y_prueba = cargar_y_partir()
     x_prueba = x_prueba.reset_index(drop=True)
     y_real = y_prueba.to_numpy()
     print(f" {time.monotonic() - comenzado:.0f}s")
 
-    print("  prediciendo toda la prueba…", end="", flush=True)
+    print("  prediciendo toda la prueba:", end="", flush=True)
     comenzado = time.monotonic()
     predicha, probabilidad = predecir(pipe, x_prueba, tarjeta)
     print(f" {time.monotonic() - comenzado:.0f}s\n")
@@ -122,12 +142,16 @@ def main() -> None:
     total = f"{len(y_real):,}".replace(",", ".")
     print(f"  F1 macro sobre {total} flujos de prueba: {f1:.4f}   (tarjeta: {informado:.4f})\n")
 
+    if args.matriz:
+        print("  matriz de confusión con el umbral (filas: táctica real; columnas: predicha)\n")
+        print("\n".join(matriz_de_confusion(y_real, predicha)) + "\n")
+
     encabezado = (
-        f"    {'puerto':>6} {'proto':<5} {'servicio':<16} {'estado':<6} {'duración':>9}   "
+        f"     {'puerto':>6} {'proto':<5} {'servicio':<16} {'estado':<6} {'duración':>9}   "
         f"{'táctica real':<17} {'predicha':<17} {'prob.':>6}"
     )
     print(encabezado)
-    print("    " + "-" * (len(encabezado) - 4))
+    print("     " + "-" * (len(encabezado) - 5))
     filas = muestra_por_clase(pd.Series(y_real), args.por_clase, args.semilla)
     for i in filas:
         print(_linea(x_prueba.iloc[[i]], y_real[i], predicha[i], probabilidad[i]))

@@ -5,8 +5,9 @@ Comprueba que la telemetría de los honeypots haya quedado indexada y normalizad
 conteos por índice, cobertura de los campos ECS clave, que no haya eventos sin rutear ni fallas al
 parsear fechas, y un reparto rápido de eventos. Sin dependencias externas, solo biblioteca estándar.
 
-Uso:
-    python3 validate_indexing.py [--es-url http://localhost:9200]
+Se corre con `python3 validate_indexing.py --es-url http://localhost:9200`. Con `--hasta` cuenta
+solo lo indexado hasta ese instante, así la salida reproduce un corte de cifras aunque el índice
+siga creciendo.
 """
 
 from __future__ import annotations
@@ -17,9 +18,14 @@ import sys
 import urllib.error
 import urllib.request
 
-OK = "\033[92m✓\033[0m"
-WARN = "\033[93m!\033[0m"
-FAIL = "\033[91m✗\033[0m"
+OK = "\033[92m[ok]\033[0m"
+WARN = "\033[93m[aviso]\033[0m"
+FAIL = "\033[91m[falla]\033[0m"
+
+# Cada índice diario contesta solo sus primeros valores y Elasticsearch suma esas respuestas: un
+# valor que un día queda afuera pierde los eventos de ese día. Con dos mil por índice, el reparto
+# coincide con el conteo exacto.
+RECORTE_POR_INDICE = 2000
 
 
 def es(url: str, path: str, body: dict | None = None) -> dict:
@@ -34,16 +40,34 @@ def es(url: str, path: str, body: dict | None = None) -> dict:
         return json.load(resp)
 
 
+def con_rango(query: dict | None, rango: dict | None) -> dict | None:
+    """La consulta con el límite temporal sumado, o la misma si no hay límite."""
+    partes = [q for q in (query, rango) if q]
+    if len(partes) < 2:
+        return partes[0] if partes else None
+    return {"bool": {"filter": partes}}
+
+
 def count(url: str, index: str, query: dict | None = None) -> int:
     body = {"query": query} if query else None
     return es(url, f"/{index}/_count", body).get("count", 0)
 
 
-def terms(url: str, index: str, field: str, size: int = 10) -> list[tuple[str, int]]:
-    body = {"size": 0, "aggs": {"t": {"terms": {"field": field, "size": size}}}}
+def terms(
+    url: str, index: str, field: str, size: int = 10, query: dict | None = None
+) -> list[tuple[str, int]]:
+    agg = {"terms": {"field": field, "size": size, "shard_size": RECORTE_POR_INDICE}}
+    body: dict = {"size": 0, "aggs": {"t": agg}}
+    if query:
+        body["query"] = query
     res = es(url, f"/{index}/_search", body)
     buckets = res.get("aggregations", {}).get("t", {}).get("buckets", [])
     return [(b["key"], b["doc_count"]) for b in buckets]
+
+
+def _fecha_del_indice(nombre: str) -> str:
+    """honeypot-<sensor>-AAAA.MM.DD da AAAA-MM-DD, comparable con el inicio de un instante ISO."""
+    return nombre.rsplit("-", 1)[-1].replace(".", "-")
 
 
 def main() -> int:
@@ -53,11 +77,16 @@ def main() -> int:
     ap.add_argument(
         "--resumen",
         action="store_true",
-        help="salida compacta para capturas de pantalla: colapsa la lista de indices y "
-        "omite las direcciones de origen",
+        help="salida compacta para capturas de pantalla: colapsa la lista de índices y omite "
+        "las direcciones de origen y los usuarios probados",
+    )
+    ap.add_argument(
+        "--hasta",
+        help="cuenta solo hasta este instante, en ISO 8601 (por ejemplo 2026-10-03T22:00:59Z)",
     )
     args = ap.parse_args()
     url = args.es_url.rstrip("/")
+    rango = {"range": {"@timestamp": {"lte": args.hasta}}} if args.hasta else None
 
     try:
         health = es(url, "/_cluster/health")
@@ -65,23 +94,27 @@ def main() -> int:
         print(f"{FAIL} No se pudo conectar a Elasticsearch en {url}: {exc}")
         return 1
 
-    print("\n=== Estado del cluster ===")
+    print("\nEstado del cluster")
     print(f"  status={health['status']}  nodos={health['number_of_nodes']}")
 
-    # --- Índices honeypot-* ---
-    print(f"\n=== Índices ({args.index}) ===")
+    titulo = f"Índices ({args.index})" + (f", hasta {args.hasta}" if args.hasta else "")
+    print(f"\n{titulo}")
     try:
         cat = es(url, f"/_cat/indices/{args.index}?format=json&bytes=mb")
     except urllib.error.HTTPError:
         cat = []
+    if args.hasta:
+        cat = [i for i in cat if _fecha_del_indice(i["index"]) <= args.hasta[:10]]
     if not cat:
         print(f"  {WARN} No hay índices que coincidan con {args.index}. ¿Ya se ingirió algo?")
         return 1
+
     total = 0
     by_sensor: dict[str, int] = {}
     size_mb = 0.0
     for idx in sorted(cat, key=lambda i: i["index"]):
-        docs = int(idx.get("docs.count") or 0)
+        # El conteo de _cat es el del momento. Con un límite temporal se cuenta con el filtro.
+        docs = count(url, idx["index"], rango) if rango else int(idx.get("docs.count") or 0)
         total += docs
         size_mb += float(idx.get("store.size") or 0)
         # honeypot-<sensor>-<fecha>
@@ -90,20 +123,21 @@ def main() -> int:
             by_sensor[parts[1]] = by_sensor.get(parts[1], 0) + docs
         if not args.resumen:
             print(f"  {idx['index']:<32} docs={docs:>8}  size={idx.get('store.size', '?')}mb")
+    # El tamaño en disco no se puede llevar a un instante pasado, así que con límite no se informa.
+    tamano = "" if args.hasta else f"  ({size_mb:.0f} mb)"
     if args.resumen:
         for sensor, docs in sorted(by_sensor.items()):
             n_idx = sum(1 for i in cat if i["index"].split("-")[1:2] == [sensor])
-            print(f"  {sensor:<12} {n_idx:>3} indices diarios  docs={docs:>9}")
-        print(f"  {'TOTAL':<12} {len(cat):>3} indices          docs={total:>9}  ({size_mb:.0f} mb)")
+            print(f"  {sensor:<12} {n_idx:>3} índices diarios  docs={docs:>9}")
+        print(f"  {'TOTAL':<12} {len(cat):>3} índices          docs={total:>9}{tamano}")
     else:
-        print(f"  {'TOTAL':<32} docs={total:>8}")
+        print(f"  {'TOTAL':<32} docs={total:>8}{tamano}")
 
     checks_ok = True
 
-    # eventos sin rutear
-    print("\n=== Integridad de enrutamiento ===")
+    print("\nIntegridad de enrutamiento")
     try:
-        unrouted = count(url, "honeypot-unrouted-*")
+        unrouted = count(url, "honeypot-unrouted-*", rango)
     except urllib.error.HTTPError:
         unrouted = 0
     if unrouted == 0:
@@ -112,8 +146,7 @@ def main() -> int:
         print(f"  {FAIL} {unrouted} eventos en honeypot-unrouted-* (revisar filebeat/logstash)")
         checks_ok = False
 
-    # cobertura de los campos ECS
-    print(f"\n=== Cobertura de campos ECS (sobre {total} docs) ===")
+    print(f"\nCobertura de campos ECS (sobre {total} docs)")
     ecs_fields = [
         "@timestamp",
         "event.category",
@@ -123,7 +156,7 @@ def main() -> int:
         "observer.type",
     ]
     for field in ecs_fields:
-        n = count(url, args.index, {"exists": {"field": field}})
+        n = count(url, args.index, con_rango({"exists": {"field": field}}, rango))
         pct = (n / total * 100) if total else 0
         mark = OK if pct >= 99 else (WARN if pct >= 50 else FAIL)
         # source.ip no está en todos los eventos: se informa sin penalizar
@@ -132,11 +165,12 @@ def main() -> int:
         if field in ("@timestamp", "event.category", "observer.type") and pct < 99:
             checks_ok = False
 
-    # fallas al parsear fechas
     datefail = count(
         url,
         args.index,
-        {"terms": {"tags": ["_dateparsefailure_cowrie", "_dateparsefailure_dionaea"]}},
+        con_rango(
+            {"terms": {"tags": ["_dateparsefailure_cowrie", "_dateparsefailure_dionaea"]}}, rango
+        ),
     )
     mark = OK if datefail == 0 else FAIL
     print(f"  {mark} sin fallos de parseo de fecha ({datefail} con _dateparsefailure)")
@@ -144,25 +178,27 @@ def main() -> int:
         checks_ok = False
 
     # reparto de eventos, que después alimenta el EDA
-    print("\n=== Distribución por event.action ===")
-    for key, n in terms(url, args.index, "event.action", 15):
+    print("\nDistribución por event.action")
+    for key, n in terms(url, args.index, "event.action", 15, rango):
         print(f"  {n:>8}  {key}")
 
-    print("\n=== Distribución por event.category ===")
-    for key, n in terms(url, args.index, "event.category", 15):
+    print("\nDistribución por event.category")
+    for key, n in terms(url, args.index, "event.category", 15, rango):
         print(f"  {n:>8}  {key}")
 
+    # Las direcciones y los usuarios quedan fuera del resumen: es la salida que se captura, y
+    # entre los usuarios más probados hay uno que delata la dirección del propio servidor.
     if not args.resumen:
-        print("\n=== Top 10 source.ip ===")
+        print("\nTop 10 source.ip")
         try:
-            for key, n in terms(url, args.index, "source.ip", 10):
+            for key, n in terms(url, args.index, "source.ip", 10, rango):
                 print(f"  {n:>8}  {key}")
         except urllib.error.HTTPError:
             print("  (sin datos)")
 
-    print("\n=== Top credenciales probadas (user.name) ===")
-    for key, n in terms(url, args.index, "user.name", 10):
-        print(f"  {n:>8}  {key}")
+        print("\nTop credenciales probadas (user.name)")
+        for key, n in terms(url, args.index, "user.name", 10, rango):
+            print(f"  {n:>8}  {key}")
 
     print()
     if checks_ok:

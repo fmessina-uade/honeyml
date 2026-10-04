@@ -13,9 +13,9 @@ La comparación mira con particular atención la clase más débil, exfiltració
 configuración de partida es de 0,11. Un candidato que la levante importa más que uno que le rasque
 una décima al agregado.
 
-Uso:
-    python -m honeyml.features.uwf_comparison
-    python -m honeyml.features.uwf_comparison --rapido    # submuestreado, para iterar
+Se corre con `python -m honeyml.features.uwf_comparison`. Con `--rapido` submuestrea el
+entrenamiento para iterar, y con `--mostrar` imprime la tabla de la última comparación guardada sin
+volver a entrenar, que es lo que se usa para mostrarla.
 """
 
 from __future__ import annotations
@@ -185,45 +185,9 @@ def cargar_y_partir() -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]
     return partir(*cargar())
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument(
-        "--rapido",
-        action="store_true",
-        help="submuestrea el entrenamiento para iterar rápido; no usar para el resultado final",
-    )
-    args = ap.parse_args()
-
-    x_tr, x_te, y_tr, y_te = cargar_y_partir()
-    x = pd.concat([x_tr, x_te])
-    y = pd.concat([y_tr, y_te])
-
-    if args.rapido:
-        # submuestreo estratificado, así sobreviven todas las clases, incluidas las raras
-        x_tr, _, y_tr, _ = train_test_split(
-            x_tr, y_tr, train_size=0.15, stratify=y_tr, random_state=RANDOM_STATE
-        )
-        print("  MODO RÁPIDO: entrenamiento submuestreado, resultados solo orientativos\n")
-
-    print(f"Entrenamiento: {len(x_tr):,}  |  Prueba: {len(x_te):,}".replace(",", "."))
-    print(f"Clases: {y.nunique()}  |  Características: {len(x.columns)}\n")
-
-    resultados = []
-    for name, (model, scale) in candidates().items():
-        print(f"  entrenando {name}…", end="", flush=True)
-        try:
-            res = evaluate(name, model, scale, x_tr, y_tr, x_te, y_te)
-        except Exception as exc:  # que falle un candidato no puede hundir la comparación
-            print(f" falló: {type(exc).__name__}: {exc}")
-            continue
-        resultados.append(res)
-        print(f" {res['segundos_entrenamiento']}s")
-
-    if not resultados:
-        raise SystemExit("Ningún candidato completó el entrenamiento.")
-
-    resultados.sort(key=lambda r: r["f1_macro"], reverse=True)
-
+def imprimir(resultados: list[dict[str, Any]]) -> None:
+    """La tabla de la comparación, ordenada por F1 macro, y qué gana con cada criterio."""
+    resultados = sorted(resultados, key=lambda r: r["f1_macro"], reverse=True)
     print(f"\n{'modelo':<30}{'F1 macro':>10}{'F1 pond.':>10}{'exactitud':>11}", end="")
     print(f"{'F1 ' + WEAK_CLASS:>18}{'seg':>7}")
     print("-" * 86)
@@ -245,6 +209,66 @@ def main() -> None:
         )
         print("  Los dos criterios no coinciden: la elección final es una decisión, no un cálculo.")
 
+
+def mostrar_guardada() -> None:
+    guardada = json.loads(OUT_FILE.read_text(encoding="utf-8"))
+    if guardada["submuestreado"]:
+        print("  Ojo: la comparación guardada se hizo en modo rápido, con datos submuestreados.")
+    entrenamiento = f"{guardada['n_entrenamiento']:,}".replace(",", ".")
+    prueba = f"{guardada['n_prueba']:,}".replace(",", ".")
+    print(f"Comparación guardada en {OUT_FILE}")
+    print(f"Entrenamiento: {entrenamiento}  |  Prueba: {prueba}")
+    imprimir(guardada["resultados"])
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument(
+        "--rapido",
+        action="store_true",
+        help="submuestrea el entrenamiento para iterar rápido; no usar para el resultado final",
+    )
+    ap.add_argument(
+        "--mostrar",
+        action="store_true",
+        help="imprime la última comparación guardada, sin volver a entrenar",
+    )
+    args = ap.parse_args()
+    if args.mostrar:
+        mostrar_guardada()
+        return
+
+    x_tr, x_te, y_tr, y_te = cargar_y_partir()
+    x = pd.concat([x_tr, x_te])
+    y = pd.concat([y_tr, y_te])
+
+    if args.rapido:
+        # submuestreo estratificado, así sobreviven todas las clases, incluidas las raras
+        x_tr, _, y_tr, _ = train_test_split(
+            x_tr, y_tr, train_size=0.15, stratify=y_tr, random_state=RANDOM_STATE
+        )
+        print("  Modo rápido: entrenamiento submuestreado, resultados solo orientativos\n")
+
+    print(f"Entrenamiento: {len(x_tr):,}  |  Prueba: {len(x_te):,}".replace(",", "."))
+    print(f"Clases: {y.nunique()}  |  Características: {len(x.columns)}\n")
+
+    resultados = []
+    for name, (model, scale) in candidates().items():
+        print(f"  entrenando {name}:", end="", flush=True)
+        try:
+            res = evaluate(name, model, scale, x_tr, y_tr, x_te, y_te)
+        except Exception as exc:  # que falle un candidato no puede hundir la comparación
+            print(f" falló: {type(exc).__name__}: {exc}")
+            continue
+        resultados.append(res)
+        print(f" {res['segundos_entrenamiento']}s")
+
+    if not resultados:
+        raise SystemExit("Ningún candidato completó el entrenamiento.")
+
+    resultados.sort(key=lambda r: r["f1_macro"], reverse=True)
+    imprimir(resultados)
+
     OUT_FILE.parent.mkdir(parents=True, exist_ok=True)
     OUT_FILE.write_text(
         json.dumps(
@@ -260,7 +284,7 @@ def main() -> None:
         ),
         encoding="utf-8",
     )
-    print(f"\n-> {OUT_FILE}")
+    print(f"\nGuardado en {OUT_FILE}")
 
 
 if __name__ == "__main__":
