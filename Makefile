@@ -1,5 +1,5 @@
 .PHONY: help up down logs status ps clean deploy-vps dev-up dev-down dev-logs validate lint test \
-        test-integration consumer triaje retriaje grafo arquetipos modelo evaluacion comparacion clasificar \
+        test-integration consumer triaje retriaje grafo arquetipos modelo evaluacion comparacion clasificar muestra \
         api dash replays \
         elastic-up elastic-down elastic-logs elastic-dev-up elastic-dev-down elastic-dev-logs \
         es-bootstrap validate-indexing pull-logs \
@@ -57,6 +57,7 @@ help:
 	@echo "    make status    Resumen de estado del sistema"
 	@echo "    make deploy-vps  Llevar el último commit al VPS (SECO=1 muestra qué cambiaría)"
 	@echo "    make analisis-up Levantar el motor de triaje y la API en contenedores"
+	@echo "    make muestra     Muestra para la revisión a ciegas (en el servidor)"
 	@echo "    make publicar-artefactos  Subir los artefactos derivados al VPS"
 	@echo "    make tunel     La API del VPS en esta máquina, por túnel SSH"
 	@echo "    make respaldar-decisiones  Traer los volcados de decisiones del VPS"
@@ -391,6 +392,19 @@ modelo:
 #   make evaluacion RAPIDO=1     submuestreado, para validar el armado
 evaluacion:
 	@./.venv/bin/python -m honeyml.features.uwf_evaluacion $(if $(RAPIDO),--rapido,)
+
+# La muestra estratificada por conducta para la revisión a ciegas del motor. Corre en el servidor,
+# que es donde está el índice, en un contenedor de una sola vez con la imagen de análisis: la API
+# monta los artefactos de solo lectura y no puede escribirla. El nombre y la etiqueta avisan que no
+# se toca mientras corre.
+#   sudo make muestra SECO=1      los estratos, sin escribir
+#   sudo make muestra             arma la muestra; se niega a pisar una existente
+#   sudo make muestra REEMPLAZAR=1
+muestra:
+	@docker run --rm --name honeyml-muestra-no-modificar --label honeyml.aviso="no modificar" \
+		--network host --memory 1g --user 0 -e ES_URL=http://127.0.0.1:9200 \
+		-v $(CURDIR)/data/processed:/app/data/processed honeyml-analisis \
+		python -m honeyml.medicion.muestra $(if $(SECO),--seco,) $(if $(REEMPLAZAR),--reemplazar,)
 
 # La comparación de las cuatro familias de modelos, ordenada por F1 macro. Imprime la última
 # guardada; con REENTRENAR=1 vuelve a entrenarlas, que tarda unos seis minutos y la reescribe.
