@@ -18,6 +18,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -30,6 +31,10 @@ from . import queries
 DECISIONES = "honeyml-decisiones"
 REVISIONES = "honeyml-revisiones"
 NO_EXISTE = 404
+
+# La muestra estratificada por conducta que se revisa a ciegas. La arma `make muestra` y la API
+# solo la lee.
+MUESTRA_FILE = Path("data/processed/muestra_de_revision.json")
 
 # Cómo se nombra en los filtros una decisión sin táctica. Un valor que ninguna táctica real puede
 # tener, así el panel filtra por "sin táctica" con el mismo parámetro que por cualquier otra.
@@ -98,14 +103,46 @@ class Veredicto(BaseModel):
             )
         if self.veredicto == "corrige" and self.severidad is None:
             raise ValueError("una corrección tiene que decir qué severidad corresponde")
-        if self.tactica_mitre and self.tactica_mitre not in TACTICAS_OBSERVABLES:
-            admitidas = ", ".join(TACTICAS_OBSERVABLES)
-            raise ValueError(f"táctica '{self.tactica_mitre}' fuera del vocabulario: {admitidas}")
+        _exigir_vocabulario(self.tactica_mitre)
         return self
+
+
+class ClasificacionACiegas(BaseModel):
+    """Lo que el analista elige sin haber visto la clasificación del motor.
+
+    Lleva siempre la clasificación completa, también cuando termina coincidiendo con la del motor:
+    es la referencia contra la que se mide, y una coincidencia elegida a ciegas es un dato, no una
+    confirmación. Una táctica nula quiere decir que no aplica ninguna.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    severidad: Severidad
+    tactica_mitre: str | None = None
+    nota: str = Field(default="", max_length=2000)
+
+    @model_validator(mode="after")
+    def _en_el_vocabulario(self) -> ClasificacionACiegas:
+        _exigir_vocabulario(self.tactica_mitre)
+        return self
+
+
+def _exigir_vocabulario(tactica: str | None) -> None:
+    if tactica and tactica not in TACTICAS_OBSERVABLES:
+        admitidas = ", ".join(TACTICAS_OBSERVABLES)
+        raise ValueError(f"táctica '{tactica}' fuera del vocabulario: {admitidas}")
 
 
 class SinClasificacionError(ValueError):
     """Se quiso confirmar una decisión en la que el motor no llegó a clasificar nada."""
+
+
+class RevisadaACiegasError(ValueError):
+    """Se quiso reemplazar una revisión a ciegas con un veredicto común."""
+
+
+class SinMuestraError(RuntimeError):
+    """No hay muestra de revisión generada."""
 
 
 def _pedir(
@@ -444,19 +481,44 @@ def detalle(doc_id: str, es_url: str = queries.ES_URL) -> dict[str, Any] | None:
     if decision is None:
         return None
 
-    r = queries._search({"size": 1, "query": {"ids": {"values": [doc_id]}}}, es_url)
-    evento: dict[str, Any] | None = None
-    if r["hits"]["hits"]:
-        plano = _aplanar(r["hits"]["hits"][0]["_source"])
-        evento = {campo: plano[campo] for campo in CAMPOS_DEL_EVENTO if campo in plano}
-
     return {
         "doc_id": doc_id,
         "decision": decision,
         "camino": camino(decision),
-        "evento": evento,
+        "evento": _atributos_del_evento(doc_id, es_url),
         "revision": _documento(REVISIONES, doc_id, es_url),
     }
+
+
+def _atributos_del_evento(doc_id: str, es_url: str) -> dict[str, Any] | None:
+    r = queries._search({"size": 1, "query": {"ids": {"values": [doc_id]}}}, es_url)
+    if not r["hits"]["hits"]:
+        return None
+    plano = _aplanar(r["hits"]["hits"][0]["_source"])
+    return {campo: plano[campo] for campo in CAMPOS_DEL_EVENTO if campo in plano}
+
+
+def _lo_que_dijo_el_motor(decision: dict[str, Any]) -> dict[str, Any]:
+    """La clasificación del motor tal como estaba, para guardarla al lado del veredicto."""
+    del_motor = decision.get("decision", {})
+    ciclo = decision.get("ciclo", {})
+    return {
+        "severidad": del_motor.get("severidad"),
+        "tactica_mitre": del_motor.get("tactica_mitre"),
+        "concluyente": del_motor.get("concluyente"),
+        "requiere_revision": bool(ciclo.get("requiere_revision")),
+        "consultas_fallidas": ciclo.get("consultas_fallidas") or [],
+    }
+
+
+def _guardar_revision(doc_id: str, documento: dict[str, Any], es_url: str) -> None:
+    # `refresh=wait_for` para que el listado que el panel pide enseguida ya la cuente.
+    _pedir(
+        "PUT",
+        f"/{REVISIONES}/_doc/{urllib.parse.quote(doc_id, safe='')}?refresh=wait_for",
+        documento,
+        es_url,
+    )
 
 
 def revisar(
@@ -473,32 +535,106 @@ def revisar(
     if decision is None:
         return None
 
-    del_motor = decision.get("decision", {})
-    ciclo = decision.get("ciclo", {})
-    if veredicto.veredicto == "confirma" and not del_motor.get("severidad"):
+    if veredicto.veredicto == "confirma" and not decision.get("decision", {}).get("severidad"):
         raise SinClasificacionError(
             "El motor no llegó a clasificar este evento: no hay nada que confirmar. Corresponde "
             "corregir con la clasificación que el analista considere."
         )
+    previa = _documento(REVISIONES, doc_id, es_url)
+    if previa and previa.get("a_ciegas"):
+        raise RevisadaACiegasError(
+            "Esta decisión ya tiene una revisión a ciegas. Es la referencia con la que se mide el "
+            "motor, y un veredicto tomado después de ver su clasificación no la reemplaza."
+        )
 
-    propio = veredicto.model_dump(mode="json")
     documento = {
         "@timestamp": datetime.now(UTC).isoformat(timespec="seconds"),
         "doc_id": doc_id,
-        **propio,
-        "motor": {
-            "severidad": del_motor.get("severidad"),
-            "tactica_mitre": del_motor.get("tactica_mitre"),
-            "concluyente": del_motor.get("concluyente"),
-            "requiere_revision": bool(ciclo.get("requiere_revision")),
-            "consultas_fallidas": ciclo.get("consultas_fallidas") or [],
-        },
+        **veredicto.model_dump(mode="json"),
+        "motor": _lo_que_dijo_el_motor(decision),
     }
-    # `refresh=wait_for` para que el listado que el panel pide enseguida ya la cuente.
-    _pedir(
-        "PUT",
-        f"/{REVISIONES}/_doc/{urllib.parse.quote(doc_id, safe='')}?refresh=wait_for",
-        documento,
-        es_url,
-    )
+    _guardar_revision(doc_id, documento, es_url)
+    return documento
+
+
+def _muestra() -> list[dict[str, Any]]:
+    try:
+        datos = json.loads(MUESTRA_FILE.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise SinMuestraError("Falta la muestra de revisión. Generala con: make muestra") from exc
+    conductas: list[dict[str, Any]] = datos.get("conductas", [])
+    return conductas
+
+
+def _revisadas_a_ciegas(ids: list[str], es_url: str) -> set[str]:
+    if not ids:
+        return set()
+    consulta = {"bool": {"filter": [{"ids": {"values": ids}}, {"term": {"a_ciegas": True}}]}}
+    r = _buscar(REVISIONES, {"size": len(ids), "_source": False, "query": consulta}, es_url)
+    return {h["_id"] for h in r["hits"]["hits"]} if r else set()
+
+
+def siguiente_a_ciegas(es_url: str = queries.ES_URL) -> dict[str, Any]:
+    """La próxima conducta de la muestra que no tiene revisión a ciegas, sin lo que dijo el motor.
+
+    La clasificación se saca acá y no en el panel: lo que no viaja no se puede ver por accidente.
+    Tampoco viaja el estrato, porque dice si el motor escaló o no, que es justo lo que quien revisa
+    no tiene que saber. El piso y el techo sí, porque salen de la evidencia y no del motor.
+    """
+    ids = [c["doc_id"] for c in _muestra()]
+    hechas = _revisadas_a_ciegas(ids, es_url)
+    progreso = {"total": len(ids), "revisadas": len(hechas)}
+    for doc_id in ids:
+        if doc_id in hechas:
+            continue
+        decision = _documento(DECISIONES, doc_id, es_url)
+        if decision is None:
+            continue
+        evento = decision.get("evento", {})
+        motor = decision.get("decision", {})
+        campos = ("momento", "sensor", "categoria", "accion", "resultado", "protocolo", "resumen")
+        return {
+            **progreso,
+            "terminada": False,
+            "doc_id": doc_id,
+            "evento": {campo: evento.get(campo) for campo in campos},
+            "atributos": _atributos_del_evento(doc_id, es_url),
+            "piso": motor.get("piso"),
+            "techo": motor.get("techo"),
+        }
+    return {**progreso, "terminada": True}
+
+
+def revisar_a_ciegas(
+    doc_id: str, clasificacion: ClasificacionACiegas, es_url: str = queries.ES_URL
+) -> dict[str, Any] | None:
+    """Guarda lo que el analista eligió a ciegas y lo compara con la clasificación del motor.
+
+    El veredicto lo calcula el servidor: confirma si coinciden la severidad y la táctica, corrige si
+    no. Así no depende de lo que el analista piense después de ver la respuesta del motor, que es
+    lo que la revisión a ciegas existe para evitar. None si el evento no tiene decisión del motor.
+    """
+    decision = _documento(DECISIONES, doc_id, es_url)
+    if decision is None:
+        return None
+
+    motor = _lo_que_dijo_el_motor(decision)
+    coincide = clasificacion.severidad == motor["severidad"] and (
+        clasificacion.tactica_mitre or None
+    ) == (motor["tactica_mitre"] or None)
+    try:
+        estratos = {c["doc_id"]: c.get("estrato") for c in _muestra()}
+    except SinMuestraError:
+        estratos = {}
+
+    documento = {
+        "@timestamp": datetime.now(UTC).isoformat(timespec="seconds"),
+        "doc_id": doc_id,
+        "veredicto": "confirma" if coincide else "corrige",
+        **clasificacion.model_dump(mode="json"),
+        "a_ciegas": True,
+        "estrato": estratos.get(doc_id),
+        "motor": motor,
+    }
+    _guardar_revision(doc_id, documento, es_url)
     return documento

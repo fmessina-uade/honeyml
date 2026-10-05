@@ -217,6 +217,8 @@ export interface Revision {
   severidad: string | null;
   tactica_mitre: string | null;
   nota: string;
+  /** Elegida sin ver la clasificación del motor: es la referencia con la que se lo mide. */
+  a_ciegas?: boolean;
   /** La clasificación del motor tal como estaba cuando se revisó. */
   motor: {
     severidad: string | null;
@@ -339,6 +341,36 @@ export interface VeredictoNuevo {
   nota?: string;
 }
 
+/**
+ * La próxima conducta de la muestra para revisar a ciegas. Llega sin la clasificación del motor:
+ * la API no la manda, así que el panel no tiene cómo mostrarla antes de tiempo.
+ */
+export interface ItemACiegas {
+  total: number;
+  revisadas: number;
+  terminada: boolean;
+  doc_id?: string;
+  evento?: {
+    momento: string | null;
+    sensor: string | null;
+    categoria: string | null;
+    accion: string | null;
+    resultado: string | null;
+    protocolo: string | null;
+    resumen: string | null;
+  };
+  atributos?: Record<string, string | number | string[]> | null;
+  piso?: string;
+  techo?: string;
+}
+
+export interface ClasificacionACiegas {
+  severidad: string;
+  /** Nula quiere decir que no aplica ninguna táctica. */
+  tactica_mitre: string | null;
+  nota?: string;
+}
+
 async function leer<T>(path: string, res: Response): Promise<T> {
   if (!res.ok) {
     // La API explica en `detail` por qué no puede responder (típicamente qué falta levantar), y
@@ -405,4 +437,7 @@ export const api = {
   decision: (docId: string) => get<DetalleDecision>(`/decisiones/${encodeURIComponent(docId)}`),
   revisar: (docId: string, v: VeredictoNuevo) =>
     put<Revision>(`/decisiones/${encodeURIComponent(docId)}/revision`, v),
+  siguienteACiegas: () => get<ItemACiegas>('/decisiones/a-ciegas/siguiente'),
+  revisarACiegas: (docId: string, c: ClasificacionACiegas) =>
+    put<Revision>(`/decisiones/${encodeURIComponent(docId)}/revision-a-ciegas`, c),
 };

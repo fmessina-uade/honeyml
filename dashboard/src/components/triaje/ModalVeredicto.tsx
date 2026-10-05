@@ -5,8 +5,8 @@ import { dec, fechaHora } from '../../lib/format';
 import { useI18n } from '../../lib/i18n';
 import { Modal } from '../Superpuesto';
 import { tacticColor } from '../sections/SessionReplay';
-import { OBSERVED } from '../sections/MitreMatrix';
-import { ChipSeveridad, SEVERIDADES, colorDeSeveridad } from './comunes';
+import { ChipSeveridad } from './comunes';
+import { SelectorSeveridad, SelectorTactica } from './Selectores';
 
 type Eleccion = 'confirma' | 'corrige';
 
@@ -46,9 +46,6 @@ export default function ModalVeredicto({
   const [listo, setListo] = useState(false);
 
   const nivel = (k: string) => t.severities[k as keyof typeof t.severities] ?? k;
-  const indice = (k: string) => SEVERIDADES.indexOf(k as (typeof SEVERIDADES)[number]);
-  const dentroDelRango = (k: string) =>
-    indice(k) >= indice(delMotor.piso) && indice(k) <= indice(delMotor.techo);
 
   // Una corrección igual a lo que dijo el motor es una confirmación con otro nombre.
   const igualAlMotor =
@@ -226,96 +223,27 @@ export default function ModalVeredicto({
                 <div className="text-[11px] text-white/45 mt-0.5 mb-2.5">
                   {m.rangeHint(nivel(delMotor.piso), nivel(delMotor.techo))}
                 </div>
-                <div
-                  className="grid grid-cols-3 sm:grid-cols-5 gap-2"
-                  role="radiogroup"
-                  aria-label={m.severityQ}
-                >
-                  {SEVERIDADES.map((s) => {
-                    const color = colorDeSeveridad(s);
-                    const elegida = severidad === s;
-                    const fuera = !dentroDelRango(s);
-                    return (
-                      <button
-                        key={s}
-                        role="radio"
-                        aria-checked={elegida}
-                        onClick={() => setSeveridad(s)}
-                        title={fuera ? m.outOfRange : undefined}
-                        className="relative rounded-lg px-2 py-2 text-[11.5px] transition first-letter:uppercase"
-                        style={{
-                          color: elegida ? color : 'rgb(var(--tinta) / 0.7)',
-                          background: elegida
-                            ? `color-mix(in srgb, ${color} 14%, transparent)`
-                            : 'rgb(var(--tinta) / 0.03)',
-                          boxShadow: `inset 0 0 0 ${elegida ? 1.5 : 1}px ${
-                            elegida ? color : 'rgb(var(--tinta) / 0.1)'
-                          }`,
-                          opacity: fuera && !elegida ? 0.55 : 1,
-                        }}
-                      >
-                        <span
-                          className="inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle"
-                          style={{ background: color }}
-                        />
-                        {nivel(s)}
-                        {delMotor.severidad === s && (
-                          <span className="absolute -top-2 right-1.5 font-data text-[8.5px] px-1 rounded bg-elevada text-white/50 ring-1 ring-white/10">
-                            {m.engineTag}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+                <SelectorSeveridad
+                  valor={severidad}
+                  onElegir={setSeveridad}
+                  piso={delMotor.piso}
+                  techo={delMotor.techo}
+                  rotulo={m.severityQ}
+                  marcada={delMotor.severidad}
+                  etiqueta={m.engineTag}
+                />
               </div>
 
               <div>
                 <div className="text-[13px] text-white/85 mb-2.5">{m.tacticQ}</div>
-                <div className="grid sm:grid-cols-2 gap-2" role="radiogroup" aria-label={m.tacticQ}>
-                  {[...OBSERVED, ''].map((tac) => {
-                    const color = tac ? tacticColor(tac) : 'var(--ghost-slate)';
-                    const elegida = tactica === tac;
-                    return (
-                      <button
-                        key={tac || 'ninguna'}
-                        role="radio"
-                        aria-checked={elegida}
-                        onClick={() => setTactica(tac)}
-                        className="relative flex items-start gap-2.5 rounded-lg px-3 py-2.5 text-left transition"
-                        style={{
-                          background: elegida
-                            ? `color-mix(in srgb, ${color} 12%, transparent)`
-                            : 'rgb(var(--tinta) / 0.03)',
-                          boxShadow: `inset 0 0 0 ${elegida ? 1.5 : 1}px ${
-                            elegida ? color : 'rgb(var(--tinta) / 0.1)'
-                          }`,
-                        }}
-                      >
-                        <span
-                          className="w-2 h-2 rounded-full shrink-0 mt-1"
-                          style={{ background: color }}
-                        />
-                        <span className="min-w-0">
-                          <span
-                            className="block text-[12px]"
-                            style={{ color: elegida ? color : 'rgb(var(--tinta) / 0.85)' }}
-                          >
-                            {tac ? tacticName(tac) : m.none}
-                          </span>
-                          <span className="block text-[10.5px] text-white/45 leading-snug mt-0.5">
-                            {tac ? t.tactics[tac as keyof typeof t.tactics]?.meaning : m.noneHint}
-                          </span>
-                        </span>
-                        {(delMotor.tactica_mitre ?? '') === tac && (
-                          <span className="absolute -top-2 right-2 font-data text-[8.5px] px-1 rounded bg-elevada text-white/50 ring-1 ring-white/10">
-                            {m.engineTag}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+                <SelectorTactica
+                  valor={tactica}
+                  onElegir={setTactica}
+                  rotulo={m.tacticQ}
+                  tacticName={tacticName}
+                  marcada={delMotor.tactica_mitre ?? null}
+                  etiqueta={m.engineTag}
+                />
               </div>
             </div>
           )}

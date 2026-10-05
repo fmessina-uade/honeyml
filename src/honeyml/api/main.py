@@ -5,10 +5,10 @@ cliente, y además sirve las sesiones anotadas del replay. Corre al lado de Elas
 privada y se alcanza por el túnel SSH, nunca publicado.
 
 Lee y no escribe, con una sola excepción: el veredicto del analista sobre una decisión del motor,
-que va a su propio índice y nunca toca la telemetría ni la decisión. Está en `decisiones.py`.
+común o a ciegas, que va a su propio índice y nunca toca la telemetría ni la decisión. Está en
+`decisiones.py`.
 
-Uso:
-    uvicorn honeyml.api.main:app --reload --port 8000
+En desarrollo se levanta con `uvicorn honeyml.api.main:app --reload --port 8000`.
 """
 
 from __future__ import annotations
@@ -58,7 +58,7 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# Durante el desarrollo el panel corre en el servidor de Vite. PUT solo lo usa el veredicto del
+# Durante el desarrollo el panel corre en el servidor de Vite. PUT solo lo usan los veredictos del
 # analista.
 app.add_middleware(
     CORSMiddleware,
@@ -322,6 +322,15 @@ def get_decisiones(
     )
 
 
+@app.get("/api/decisiones/a-ciegas/siguiente")
+def get_siguiente_a_ciegas() -> dict[str, Any]:
+    """La próxima conducta de la muestra para revisar a ciegas, sin la clasificación del motor."""
+    try:
+        return _en_vivo(decisiones.siguiente_a_ciegas)
+    except decisiones.SinMuestraError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
 @app.get("/api/decisiones/{doc_id}")
 def get_decision(doc_id: str) -> dict[str, Any]:
     """Una decisión con su evento y el veredicto del analista, si lo hay."""
@@ -333,11 +342,24 @@ def get_decision(doc_id: str) -> dict[str, Any]:
 
 @app.put("/api/decisiones/{doc_id}/revision")
 def put_revision(doc_id: str, veredicto: decisiones.Veredicto) -> dict[str, Any]:
-    """El veredicto del analista. Es la única escritura de toda la API; ver `decisiones.py`."""
+    """El veredicto del analista. Con el de a ciegas, son las únicas escrituras de la API."""
     try:
         guardada = _en_vivo(lambda: decisiones.revisar(doc_id, veredicto))
     except decisiones.SinClasificacionError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except decisiones.RevisadaACiegasError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if guardada is None:
+        raise HTTPException(status_code=404, detail="Ese evento no tiene decisión del motor.")
+    return guardada
+
+
+@app.put("/api/decisiones/{doc_id}/revision-a-ciegas")
+def put_revision_a_ciegas(
+    doc_id: str, clasificacion: decisiones.ClasificacionACiegas
+) -> dict[str, Any]:
+    """La clasificación elegida a ciegas; la respuesta trae la del motor para mostrarla después."""
+    guardada = _en_vivo(lambda: decisiones.revisar_a_ciegas(doc_id, clasificacion))
     if guardada is None:
         raise HTTPException(status_code=404, detail="Ese evento no tiene decisión del motor.")
     return guardada

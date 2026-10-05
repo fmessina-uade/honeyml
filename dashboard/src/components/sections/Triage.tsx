@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   CircleHelp,
   Coins,
+  EyeOff,
   Inbox,
   PencilLine,
   Timer,
@@ -27,6 +28,7 @@ import { tacticColor } from './SessionReplay';
 import Guia from '../triaje/Guia';
 import Detalle from '../triaje/Detalle';
 import ModalVeredicto from '../triaje/ModalVeredicto';
+import RevisionACiegas from '../triaje/RevisionACiegas';
 import { ChipSeveridad, SIN_TACTICA, caminoDe, colorDeSeveridad } from '../triaje/comunes';
 
 const TAMANO = 25;
@@ -61,6 +63,7 @@ export default function Triage() {
   const [detalle, setDetalle] = useState<DetalleDecision | null>(null);
   const [errorDetalle, setErrorDetalle] = useState<string | null>(null);
   const [revisando, setRevisando] = useState(false);
+  const [aCiegas, setACiegas] = useState(false);
   const [guia, setGuia] = useState(() => !guiaCerrada());
   const [nuevas, setNuevas] = useState<Set<string>>(new Set());
   const bandeja = useRef<HTMLDivElement>(null);
@@ -260,32 +263,41 @@ export default function Triage() {
                 </span>
               )}
             </div>
-            <div
-              role="tablist"
-              className="flex rounded-lg ring-1 ring-white/10 bg-white/[0.03] p-0.5"
-            >
-              {(
-                [
-                  ['pendientes', pendientes],
-                  ['todas', resumen.total],
-                  ['revisadas', resumen.revision.revisadas],
-                ] as const
-              ).map(([estado, cuantas]) => (
-                <button
-                  key={estado}
-                  role="tab"
-                  aria-selected={filtros.estado === estado}
-                  onClick={() => filtrar({ estado })}
-                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] transition ${
-                    filtros.estado === estado
-                      ? 'bg-white/10 text-white/90'
-                      : 'text-white/50 hover:text-white/80'
-                  }`}
-                >
-                  {t.triage.state[estado]}
-                  <span className="font-data text-[10px] text-white/40">{n(cuantas)}</span>
-                </button>
-              ))}
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={() => setACiegas(true)}
+                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] text-[var(--honey-amber)] ring-1 ring-[var(--honey-amber)]/35 hover:bg-[var(--honey-amber)]/10 transition"
+              >
+                <EyeOff className="w-3.5 h-3.5" />
+                {t.triage.blind.open}
+              </button>
+              <div
+                role="tablist"
+                className="flex rounded-lg ring-1 ring-white/10 bg-white/[0.03] p-0.5"
+              >
+                {(
+                  [
+                    ['pendientes', pendientes],
+                    ['todas', resumen.total],
+                    ['revisadas', resumen.revision.revisadas],
+                  ] as const
+                ).map(([estado, cuantas]) => (
+                  <button
+                    key={estado}
+                    role="tab"
+                    aria-selected={filtros.estado === estado}
+                    onClick={() => filtrar({ estado })}
+                    className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] transition ${
+                      filtros.estado === estado
+                        ? 'bg-white/10 text-white/90'
+                        : 'text-white/50 hover:text-white/80'
+                    }`}
+                  >
+                    {t.triage.state[estado]}
+                    <span className="font-data text-[10px] text-white/40">{n(cuantas)}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -370,7 +382,12 @@ export default function Triage() {
         onCerrar={() => setElegida(null)}
         titulo={t.triage.detail.title}
         pie={
-          detalle && (
+          detalle &&
+          (detalle.revision?.a_ciegas ? (
+            <p className="text-[11px] text-white/50 text-center leading-relaxed">
+              {t.triage.verdict.blindLocked}
+            </p>
+          ) : (
             <button
               onClick={() => setRevisando(true)}
               className="w-full flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-[12.5px] font-medium bg-[var(--honey-amber)] text-[var(--sobre-ambar)] hover:brightness-110 transition"
@@ -378,7 +395,7 @@ export default function Triage() {
               <PencilLine className="w-4 h-4" />
               {detalle.revision ? t.triage.verdict.change : t.triage.detail.review}
             </button>
-          )
+          ))
         }
       >
         {errorDetalle && (
@@ -407,6 +424,16 @@ export default function Triage() {
           tacticName={tacticName}
         />
       )}
+
+      <RevisionACiegas
+        abierto={aCiegas}
+        onCerrar={() => setACiegas(false)}
+        onGuardado={() => {
+          cargarListado();
+          recargarResumen();
+        }}
+        tacticName={tacticName}
+      />
     </section>
   );
 }

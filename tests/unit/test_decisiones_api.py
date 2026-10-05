@@ -1,10 +1,10 @@
 """La lectura de las decisiones y el veredicto del analista, sin Elasticsearch.
 
-Tres cosas se rompen sin hacer ruido y por eso se fijan acá. Que la revisión sea la única escritura
-de la API, y que vaya a su propio índice sin tocar la decisión del motor. Que un veredicto
-incoherente (una confirmación con clasificación propia, una corrección sin severidad, una táctica
-fuera del vocabulario) no llegue a guardarse. Y que "pendiente" sea lo que requiere revisión y
-todavía no la tiene, y no cualquier decisión sin revisar.
+Tres cosas se rompen sin hacer ruido y por eso se fijan acá. Que los veredictos sean las únicas
+escrituras de la API, y que vayan a su propio índice sin tocar la decisión del motor. Que un
+veredicto incoherente (una confirmación con clasificación propia, una corrección sin severidad, una
+táctica fuera del vocabulario) no llegue a guardarse. Y que "pendiente" sea lo que requiere
+revisión y todavía no la tiene, y no cualquier decisión sin revisar.
 """
 
 from __future__ import annotations
@@ -224,13 +224,16 @@ def test_el_resumen_descuenta_de_pendientes_lo_ya_revisado(
 # Las rutas
 
 
-def test_la_revision_es_la_unica_escritura_de_la_api() -> None:
+def test_los_veredictos_son_las_unicas_escrituras_de_la_api() -> None:
     escrituras = {
         ruta.path  # type: ignore[attr-defined]
         for ruta in app.routes
         if set(getattr(ruta, "methods", set())) - {"GET", "HEAD"}
     }
-    assert escrituras == {"/api/decisiones/{doc_id}/revision"}
+    assert escrituras == {
+        "/api/decisiones/{doc_id}/revision",
+        "/api/decisiones/{doc_id}/revision-a-ciegas",
+    }
 
 
 def test_un_veredicto_incoherente_se_rechaza_antes_de_llegar_al_indice(

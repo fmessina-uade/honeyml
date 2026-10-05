@@ -17,6 +17,8 @@
         "severidad": { "type": "keyword" },
         "tactica_mitre": { "type": "keyword" },
         "nota": { "type": "text" },
+        "a_ciegas": { "type": "boolean" },
+        "estrato": { "type": "keyword" },
         "motor": {
           "properties": {
             "severidad": { "type": "keyword" },

@@ -645,6 +645,41 @@ const es = {
       corrected: 'Corrigió la clasificación',
       cannotConfirm: 'No hay clasificación del motor que confirmar: corresponde corregir.',
       change: 'Cambiar veredicto',
+      blindTag: 'a ciegas',
+      blindLocked:
+        'Revisada a ciegas: es la referencia con la que se mide al motor y no se cambia.',
+    },
+    blind: {
+      open: 'Revisión a ciegas',
+      title: 'Revisión a ciegas',
+      progress: (hechas: number, total: number) => `${hechas} de ${total} revisadas`,
+      intro:
+        'Elegí la severidad y la táctica que te parecen correctas sin ver lo que dijo el motor. Al guardar aparece su clasificación y la comparación queda registrada.',
+      event: 'El evento',
+      attributes: 'Atributos del evento',
+      noEvent: 'El evento ya no está en el índice de telemetría; queda el resumen.',
+      range: (piso: string, techo: string) =>
+        piso === techo
+          ? `La evidencia sola establece ${piso}.`
+          : `La evidencia sola establece ${piso}, y la escala admite hasta ${techo}.`,
+      save: 'Guardar y ver lo del motor',
+      saving: 'Guardando...',
+      missing: 'Falta elegir la severidad y la táctica.',
+      yours: 'Tu clasificación',
+      engine: 'La del motor',
+      matches: 'Coinciden',
+      differs: 'No coinciden',
+      severity: 'Severidad',
+      tactic: 'Táctica',
+      recorded: (confirma: boolean): string =>
+        confirma
+          ? 'Quedó registrada como confirmación del motor.'
+          : 'Quedó registrada como corrección del motor.',
+      next: 'Siguiente',
+      pause: 'Seguir más tarde',
+      done: (total: number) =>
+        `Terminaste la muestra: las ${total} conductas tienen su revisión a ciegas.`,
+      loading: 'Buscando la próxima conducta...',
     },
   },
   severities: {
@@ -1298,6 +1333,40 @@ const en: typeof es = {
       corrected: 'Corrected the classification',
       cannotConfirm: 'There is no engine classification to confirm: it has to be corrected.',
       change: 'Change verdict',
+      blindTag: 'blind',
+      blindLocked:
+        'Reviewed blind: it is the reference the engine is measured against and cannot be changed.',
+    },
+    blind: {
+      open: 'Blind review',
+      title: 'Blind review',
+      progress: (hechas: number, total: number) => `${hechas} of ${total} reviewed`,
+      intro:
+        'Choose the severity and the tactic you think are right without seeing what the engine said. When you save, its classification appears and the comparison is recorded.',
+      event: 'The event',
+      attributes: 'Event attributes',
+      noEvent: 'The event is no longer in the telemetry index; the summary remains.',
+      range: (piso: string, techo: string) =>
+        piso === techo
+          ? `The evidence alone establishes ${piso}.`
+          : `The evidence alone establishes ${piso}, and the scale allows up to ${techo}.`,
+      save: "Save and see the engine's",
+      saving: 'Saving...',
+      missing: 'Choose the severity and the tactic first.',
+      yours: 'Your classification',
+      engine: "The engine's",
+      matches: 'They match',
+      differs: 'They differ',
+      severity: 'Severity',
+      tactic: 'Tactic',
+      recorded: (confirma: boolean): string =>
+        confirma
+          ? 'Recorded as a confirmation of the engine.'
+          : 'Recorded as a correction of the engine.',
+      next: 'Next',
+      pause: 'Continue later',
+      done: (total: number) => `Sample finished: all ${total} behaviors have their blind review.`,
+      loading: 'Looking for the next behavior...',
     },
   },
   severities: {

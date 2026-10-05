@@ -58,19 +58,26 @@ function Encabezado({
   );
 }
 
-/** Un diálogo centrado; en el teléfono sube desde abajo, a lo ancho. */
+/**
+ * Un diálogo centrado; en el teléfono sube desde abajo, a lo ancho.
+ *
+ * Con `opaco`, el velo tapa la página entera en lugar de oscurecerla: lo usa la revisión a ciegas,
+ * porque detrás está la bandeja con la clasificación del motor a la vista.
+ */
 export function Modal({
   abierto,
   onCerrar,
   titulo,
   children,
   pie,
+  opaco = false,
 }: {
   abierto: boolean;
   onCerrar: () => void;
   titulo: ReactNode;
   children: ReactNode;
   pie?: ReactNode;
+  opaco?: boolean;
 }) {
   const id = useId();
   const caja = useSuperpuesto(abierto, onCerrar);
@@ -86,7 +93,7 @@ export function Modal({
         aria-hidden
         tabIndex={-1}
         onClick={onCerrar}
-        className="absolute inset-0 bg-black/60 menu-velo cursor-default"
+        className={`absolute inset-0 menu-velo cursor-default ${opaco ? 'bg-fondo' : 'bg-black/60'}`}
       />
       <div
         ref={caja}

@@ -36,11 +36,16 @@ function VeredictoGuardado({ r, tacticName }: { r: Revision; tacticName: (k: str
       <div className="flex items-center gap-1.5 text-[12px] text-[var(--neural-teal)]">
         <CheckCircle2 className="w-3.5 h-3.5" />
         {r.veredicto === 'confirma' ? v.confirmed : v.corrected}
+        {r.a_ciegas && (
+          <span className="font-data text-[9.5px] px-1.5 py-0.5 rounded ring-1 ring-[var(--neural-teal)]/40">
+            {v.blindTag}
+          </span>
+        )}
         <span className="font-data text-[10px] text-white/35 ml-auto">
           {fechaHora(r['@timestamp'])}
         </span>
       </div>
-      {r.veredicto === 'corrige' && (
+      {(r.veredicto === 'corrige' || r.a_ciegas) && (
         <div className="flex items-center gap-2 flex-wrap">
           <ChipSeveridad severidad={r.severidad} />
           <span className="text-[11px] text-white/65">
