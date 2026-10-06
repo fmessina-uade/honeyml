@@ -13,7 +13,6 @@ import Reveal from '../Reveal';
 import Tooltip, { useTooltip } from '../Tooltip';
 import ManoAlzada, { type Nota, type Trazo } from '../ManoAlzada';
 import { n, pct, dec, localeActual } from '../../lib/format';
-import { Indicador } from '../Instrumento';
 import { useI18n } from '../../lib/i18n';
 import TimelineControls, {
   ATAJOS,
@@ -304,36 +303,51 @@ export default function Pulse({
   if (run.length >= 2) outages.push({ from: run[0], to: run[run.length - 1], days: run.length });
 
   return (
-    <section className="flex flex-col gap-4">
+    <section className="flex flex-col gap-14">
       <Tooltip content={tip.content} at={tip.at} />
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {tiles.map((tile, i) => (
-          <Reveal key={tile.label} delay={i * 80}>
-            <Indicador
-              icono={tile.icon}
-              rotulo={tile.label}
-              valor={<CountUp end={tile.value} />}
-              sub={tile.sub}
-              color={tile.glow}
-              onMouseMove={(e) =>
-                tip.show(
-                  e,
-                  <div className="max-w-[240px]">
-                    <div className="text-[11px] text-white/85 leading-snug">{tile.detail}</div>
-                  </div>,
-                )
-              }
-              onMouseLeave={tip.hide}
-            />
-          </Reveal>
-        ))}
+      {/* La presentación: la captura diaria entera, dibujada en puntos, y los cuatro números */}
+      <div className="presentacion presentacion-puntos">
+        <div className="relative flex flex-col items-center text-center px-5 pt-16 sm:pt-20">
+          <span className="insignia section-in">{t.pulse.badge(days)}</span>
+          <h1 className="titulo-puntos mt-6 section-in">{t.nav.pulso}</h1>
+          <p className="portada-bajada section-in">{t.lead.pulso}</p>
+        </div>
+        <PuntosDelPulso serie={timelineBase} />
+        <div className="relative max-w-5xl mx-auto px-5 pt-10 pb-10 grid grid-cols-2 lg:grid-cols-4 gap-y-10 gap-x-4">
+          {tiles.map((tile, i) => (
+            <Reveal key={tile.label} delay={i * 80}>
+              <div
+                className="flex flex-col items-center text-center cursor-default"
+                onMouseMove={(e) =>
+                  tip.show(
+                    e,
+                    <div className="max-w-[240px]">
+                      <div className="text-[11px] text-white/85 leading-snug">{tile.detail}</div>
+                    </div>,
+                  )
+                }
+                onMouseLeave={tip.hide}
+              >
+                <tile.icon className="w-4 h-4" style={{ color: tile.glow }} />
+                <div className="cifra-columna mt-3">
+                  <CountUp end={tile.value} />
+                </div>
+                <div className="text-[12.5px] text-white/75 mt-2">{tile.label}</div>
+                <div className="text-[11px] text-white/40 mt-0.5">{tile.sub}</div>
+              </div>
+            </Reveal>
+          ))}
+        </div>
       </div>
 
-      <Reveal delay={200}>
-        <div className="panel p-4">
-          <div className="flex items-baseline justify-between mb-1 flex-wrap gap-2">
-            <span className="rotulo">{t.pulse.chartTitle}</span>
+      <Reveal>
+        <div className="pliego">
+          <div className="flex items-end justify-between mb-1 flex-wrap gap-3">
+            <div className="flex flex-col gap-3">
+              <span className="ceja">{t.pulse.events_short}</span>
+              <h2 className="titulo-bloque">{t.pulse.chartTitle}</h2>
+            </div>
             <div className="flex items-center gap-3 flex-wrap">
               {sensors.map((s) => (
                 <span key={s} className="flex items-center gap-1.5 text-[10px] text-white/45">
@@ -355,7 +369,7 @@ export default function Pulse({
             </div>
           </div>
 
-          <div className="mt-2">
+          <div className="mt-5">
             <TimelineControls
               interval={interval}
               sensor={sensor}
@@ -388,7 +402,7 @@ export default function Pulse({
           )}
 
           <div className="relative mt-3">
-            <div className="bar-group flex items-end gap-px sm:gap-[2px] h-40 sm:h-44">
+            <div className="bar-group flex items-end gap-px sm:gap-[2px] h-48 sm:h-60">
               {timeline.map((d) => {
                 const empty = d.count === 0;
                 return (
@@ -480,17 +494,20 @@ export default function Pulse({
 
       {/* La hora del día: lo que se encuentra es que la curva es plana. El tráfico humano tiene
           horario de oficina; este no, porque del otro lado no hay nadie. */}
-      <Reveal delay={260}>
-        <div className="grid lg:grid-cols-[1fr_320px] gap-3">
-          <div className="panel p-4">
-            <div className="flex items-baseline justify-between gap-3 flex-wrap">
-              <span className="rotulo">{t.pulse.busiest}</span>
-              <span className="font-data text-[10px] text-white/30">
-                {t.pulse.ratio(dec(ratio))}
+      <Reveal>
+        <div className="pliego grid lg:grid-cols-[300px_minmax(0,1fr)] gap-8 lg:gap-12">
+          <div className="flex flex-col gap-3">
+            <span className="ceja">{t.pulse.busiest}</span>
+            <div className="flex items-end gap-3 mt-2">
+              <span className="numero-puntos">{dec(ratio)}</span>
+              <span className="text-[13px] text-white/60 leading-snug pb-2 max-w-[9rem]">
+                {t.pulse.ratioLabel}
               </span>
             </div>
-
-            <div className="relative mt-3">
+            <p className="text-[13px] text-white/55 leading-relaxed">{t.pulse.busiestNote}</p>
+          </div>
+          <div className="min-w-0">
+            <div className="relative mt-1">
               <div className="bar-group flex items-end gap-[2px] sm:gap-[3px] h-28">
                 {hourly.map((h) => (
                   <div
@@ -556,46 +573,43 @@ export default function Pulse({
               <span>18</span>
               <span>23</span>
             </div>
-            <div className="text-[10px] text-white/40 mt-2.5 leading-relaxed">
-              {t.pulse.busiestNote}
-            </div>
-          </div>
 
-          {/* Los cortes de captura, deducidos de los huecos de la propia serie */}
-          <div className="panel p-4">
-            <div className="rotulo">{t.pulse.outages}</div>
-            {outages.length > 0 ? (
-              <>
-                <div className="flex flex-col gap-2 mt-3">
-                  {outages.map((o) => (
-                    <div
-                      key={o.from}
-                      className="flex items-center justify-between gap-2 rounded-lg bg-white/[0.02] ring-1 ring-white/5 px-2.5 py-2"
-                    >
-                      <span className="font-data text-[10px] text-white/60">
-                        {t.footer.range(o.from.slice(5), o.to.slice(5))}
-                      </span>
-                      <span className="text-[10px] text-white/35">{t.pulse.days(o.days)}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="text-[10px] text-white/40 mt-3 leading-relaxed">
-                  {t.pulse.outagesNote}
-                </div>
-              </>
-            ) : (
-              /* Un bloque vacío se lee como algo que falló al cargar. Decir que no hubo cortes es
+            {/* Los cortes de captura, deducidos de los huecos de la propia serie */}
+            <div className="mt-8 pt-5 border-t border-dashed border-white/10">
+              <div className="rotulo">{t.pulse.outages}</div>
+              {outages.length > 0 ? (
+                <>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {outages.map((o) => (
+                      <div
+                        key={o.from}
+                        className="flex items-center gap-3 rounded-full border border-dashed border-white/15 px-3 py-1.5"
+                      >
+                        <span className="font-data text-[10px] text-white/60">
+                          {t.footer.range(o.from.slice(5), o.to.slice(5))}
+                        </span>
+                        <span className="text-[10px] text-white/35">{t.pulse.days(o.days)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="text-[10px] text-white/40 mt-3 leading-relaxed">
+                    {t.pulse.outagesNote}
+                  </div>
+                </>
+              ) : (
+                /* Un bloque vacío se lee como algo que falló al cargar. Decir que no hubo cortes es
                  información: significa que el sensor cubrió el período entero. */
-              <div className="mt-3 flex items-start gap-2.5 rounded-lg bg-[var(--neural-teal)]/[0.06] ring-1 ring-[var(--neural-teal)]/20 px-3 py-2.5">
-                <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-[1px] text-[var(--neural-teal)]" />
-                <div>
-                  <div className="text-[11px] text-white/85">{t.pulse.noOutages}</div>
-                  <div className="text-[10px] text-white/40 mt-1 leading-relaxed">
-                    {t.pulse.noOutagesNote}
+                <div className="mt-3 flex items-start gap-2.5 rounded-lg bg-[var(--neural-teal)]/[0.06] ring-1 ring-[var(--neural-teal)]/20 px-3 py-2.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-[1px] text-[var(--neural-teal)]" />
+                  <div>
+                    <div className="text-[11px] text-white/85">{t.pulse.noOutages}</div>
+                    <div className="text-[10px] text-white/40 mt-1 leading-relaxed">
+                      {t.pulse.noOutagesNote}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </Reveal>
@@ -609,5 +623,52 @@ export default function Pulse({
         </Reveal>
       )}
     </section>
+  );
+}
+
+/**
+ * La captura diaria entera como una pared de puntos: una columna por día, con tantos puntos como
+ * proporción de eventos tuvo ese día. Los días sin captura quedan con un solo punto apagado, así el
+ * hueco se ve igual que en el gráfico de barras.
+ */
+function PuntosDelPulso({ serie }: { serie: TimelinePoint[] }) {
+  const PASO = 10;
+  const FILAS = 26;
+  const ancho = Math.max(serie.length, 1) * PASO;
+  const alto = FILAS * PASO;
+  const max = Math.max(...serie.map((d) => d.count), 1);
+  return (
+    <svg
+      viewBox={`0 0 ${ancho} ${alto}`}
+      preserveAspectRatio="xMidYMax slice"
+      className="puntos-del-pulso"
+      aria-hidden
+    >
+      {serie.map((d, i) => {
+        const cuantos = d.count ? Math.max(1, Math.round((d.count / max) * FILAS)) : 0;
+        return (
+          <g key={d.date} style={{ '--i': i } as React.CSSProperties}>
+            {d.count === 0 ? (
+              <circle
+                cx={i * PASO + PASO / 2}
+                cy={alto - PASO / 2}
+                r={1.3}
+                className="punto-apagado"
+              />
+            ) : (
+              Array.from({ length: cuantos }, (_, k) => (
+                <circle
+                  key={k}
+                  cx={i * PASO + PASO / 2}
+                  cy={alto - PASO / 2 - k * PASO}
+                  r={k === cuantos - 1 ? 2.4 : 1.8}
+                  className={k === cuantos - 1 ? 'punto-cima' : 'punto-lleno'}
+                />
+              ))
+            )}
+          </g>
+        );
+      })}
+    </svg>
   );
 }

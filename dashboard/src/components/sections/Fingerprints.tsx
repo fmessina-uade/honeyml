@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { ChevronDown, Users, Repeat, Layers } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import type { FingerprintData } from '../../lib/api';
 import { tacticColor } from './SessionReplay';
 import Reveal from '../Reveal';
 import ManoAlzada from '../ManoAlzada';
-import { Indicador } from '../Instrumento';
+import { Palabras } from '../Titular';
 import { localeActual, n, pct } from '../../lib/format';
 import { useI18n } from '../../lib/i18n';
 import { useAncho } from '../../lib/useAncho';
@@ -181,118 +181,134 @@ export default function Fingerprints({ data }: { data: FingerprintData }) {
         })
       : '—';
 
+  const cifras = [
+    {
+      valor: n(data.total_sessions),
+      rotulo: t.fingerprints.sessionsLabel,
+      sub: t.fingerprints.withCommands,
+    },
+    {
+      valor: n(data.families_found),
+      rotulo: t.fingerprints.familiesLabel,
+      sub: t.fingerprints.identical,
+    },
+    {
+      valor: `${share}%`,
+      rotulo: t.fingerprints.coverageLabel,
+      sub: t.fingerprints.grouped(n(data.grouped_sessions)),
+    },
+  ];
+
   return (
-    <section className="flex flex-col gap-4">
-      {/* Lo primero: casi todo el tráfico es un puñado de guiones */}
-      <div className="grid sm:grid-cols-3 gap-3">
-        <Reveal>
-          <Indicador
-            icono={Repeat}
-            rotulo={t.fingerprints.sessionsLabel}
-            valor={n(data.total_sessions)}
-            sub={t.fingerprints.withCommands}
-            color="var(--honey-amber)"
-          />
-        </Reveal>
-        <Reveal delay={70}>
-          <Indicador
-            icono={Users}
-            rotulo={t.fingerprints.familiesLabel}
-            valor={n(data.families_found)}
-            sub={t.fingerprints.identical}
-            color="var(--agent-coral)"
-          />
-        </Reveal>
-        <Reveal delay={140}>
-          <Indicador
-            icono={Layers}
-            rotulo={t.fingerprints.coverageLabel}
-            valor={`${share}%`}
-            sub={t.fingerprints.grouped(n(data.grouped_sessions))}
-            color="var(--neural-teal)"
-          />
-        </Reveal>
+    <section className="flex flex-col gap-14">
+      {/* La presentación: la concentración en grande y el panal de cien sesiones como imagen */}
+      <div className="presentacion presentacion-panal">
+        <div className="relative max-w-[1320px] mx-auto px-4 md:px-8 pt-14 sm:pt-20 pb-12">
+          <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-8 lg:gap-14 items-end">
+            <div className="min-w-0">
+              <span className="ceja section-in">{t.fingerprints.concentrationTitle}</span>
+              <h1 className="titular-landing mt-5">
+                <Palabras texto={t.nav.huellas} />
+              </h1>
+              <p className="portada-bajada section-in">{t.lead.huellas}</p>
+            </div>
+            {primera && (
+              <div className="min-w-0 section-in">
+                <div className="cifra-gigante">
+                  {pct(primera.sessions, data.total_sessions, 0)}
+                  <span>%</span>
+                </div>
+                <p className="text-[13px] text-white/60 leading-relaxed mt-3 max-w-[34rem]">
+                  {t.fingerprints.concentrationNote(
+                    pct(primera.sessions, data.total_sessions, 0),
+                    n(maquinas),
+                  )}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* La concentración: el dato que la lista ordenada insinúa pero no dice. */}
+          {primera && (
+            <div className="mt-12">
+              <Panal
+                celdas={celdas}
+                etiquetas={etiquetas}
+                notaPrimera={t.fingerprints.notePanal(celdas[0])}
+              />
+              <div className="flex flex-wrap gap-x-5 gap-y-2 mt-4">
+                {etiquetas.map((e, k) => (
+                  <span key={e} className="flex items-center gap-1.5 text-[11px] text-white/55">
+                    <span className="w-2.5 h-2.5 rounded-[3px]" style={{ background: TONOS[k] }} />
+                    <span className={k < 3 ? 'font-data' : ''}>{e}</span>
+                    <span className="font-data text-white/30">{celdas[k]}%</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Los números del conjunto, en una regla con divisiones */}
+          <div className="regla mt-12">
+            {cifras.map((c) => (
+              <div key={c.rotulo} className="regla-celda">
+                <span className="rotulo">{c.rotulo}</span>
+                <span className="cifra-fina mt-3">{c.valor}</span>
+                <span className="text-[11.5px] text-white/45 mt-2 leading-snug">{c.sub}</span>
+              </div>
+            ))}
+            {primera && (
+              <>
+                <div className="regla-celda">
+                  <span className="rotulo">{t.fingerprints.topThree}</span>
+                  <span className="cifra-fina mt-3">
+                    {pct(tresPrimeras, data.total_sessions, 0)}%
+                  </span>
+                </div>
+                <div className="regla-celda">
+                  <span className="rotulo">{t.fingerprints.machinesBehind}</span>
+                  <span className="cifra-fina mt-3">{n(maquinas)}</span>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* La concentración: el dato que la lista ordenada insinúa pero no dice. */}
-      {primera && (
-        <Reveal delay={60}>
-          <div className="panel p-4">
-            <div className="rotulo mb-2">{t.fingerprints.concentrationTitle}</div>
-
-            <Panal
-              celdas={celdas}
-              etiquetas={etiquetas}
-              notaPrimera={t.fingerprints.notePanal(celdas[0])}
-            />
-
-            <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3">
-              {etiquetas.map((e, k) => (
-                <span key={e} className="flex items-center gap-1.5 text-[10px] text-white/50">
-                  <span className="w-2.5 h-2.5 rounded-[3px]" style={{ background: TONOS[k] }} />
-                  <span className={k < 3 ? 'font-data' : ''}>{e}</span>
-                  <span className="font-data text-white/30">{celdas[k]}%</span>
-                </span>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-3 gap-2 mt-4">
-              {[
-                {
-                  valor: `${pct(primera.sessions, data.total_sessions, 0)}%`,
-                  rotulo: t.fingerprints.topOne,
-                },
-                {
-                  valor: `${pct(tresPrimeras, data.total_sessions, 0)}%`,
-                  rotulo: t.fingerprints.topThree,
-                },
-                { valor: n(maquinas), rotulo: t.fingerprints.machinesBehind },
-              ].map((m) => (
-                <div key={m.rotulo} className="rounded-lg bg-white/[0.03] p-2.5">
-                  <div className="cifra-chica">{m.valor}</div>
-                  <div className="rotulo mt-0.5">{m.rotulo}</div>
-                </div>
-              ))}
-            </div>
-
-            <div className="text-[11px] text-white/55 leading-relaxed mt-3">
-              {t.fingerprints.concentrationNote(
-                pct(primera.sessions, data.total_sessions, 0),
-                n(maquinas),
-              )}
-            </div>
-          </div>
-        </Reveal>
-      )}
-
-      <Reveal delay={100}>
-        <div className="panel p-4">
-          <div className="text-[11px] text-white/60 leading-relaxed">{t.fingerprints.lesson}</div>
-        </div>
+      <Reveal>
+        <figure className="cita" style={{ borderColor: 'var(--agent-coral)' }}>
+          <span className="ceja">{t.fingerprints.script}</span>
+          <blockquote className="mt-4">{t.fingerprints.lesson}</blockquote>
+        </figure>
       </Reveal>
 
       {/* Cada familia, desplegable hasta su guion exacto */}
-      <div className="flex flex-col gap-2">
-        {data.families.map((f, i) => {
-          const isOpen = open === i;
-          // El mismo tono que la familia tiene en el panal, que sale del orden por sesiones.
-          const puesto = orden.indexOf(f);
-          return (
-            <Reveal key={f.label} delay={Math.min(i * 50, 300)}>
-              <div className="panel overflow-hidden">
+      <div className="pliego">
+        <span className="ceja">{t.fingerprints.familiesLabel}</span>
+        <div className="flex flex-col mt-5">
+          {data.families.map((f, i) => {
+            const isOpen = open === i;
+            // El mismo tono que la familia tiene en el panal, que sale del orden por sesiones.
+            const puesto = orden.indexOf(f);
+            const tono = puesto < 3 ? TONOS[puesto] : 'var(--honey-amber)';
+            return (
+              <div
+                key={f.label}
+                className="familia"
+                data-abierta={isOpen ? 'si' : undefined}
+                style={{ '--tono': tono } as React.CSSProperties}
+              >
                 <button
                   onClick={() => setOpen(isOpen ? null : i)}
                   aria-expanded={isOpen}
-                  className="w-full text-left p-4 hover:bg-white/[0.02] transition"
+                  className="w-full text-left py-4 pl-5 pr-2"
                 >
                   <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <ChevronDown
-                        className={`w-3.5 h-3.5 text-white/30 transition-transform shrink-0 ${
-                          isOpen ? 'rotate-180' : ''
-                        }`}
-                      />
-                      <span className="font-data text-[12px] text-white/85 truncate">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="font-data text-[11px] text-white/30 w-6 shrink-0">
+                        {String(i + 1).padStart(2, '0')}
+                      </span>
+                      <span className="font-data text-[14px] text-white/90 truncate">
                         {f.label}
                       </span>
                       <div className="flex items-center gap-1 shrink-0">
@@ -306,34 +322,36 @@ export default function Fingerprints({ data }: { data: FingerprintData }) {
                         ))}
                       </div>
                     </div>
-                    <div className="flex items-center gap-4 font-data text-[10px] text-white/45">
+                    <div className="flex items-center gap-4 font-data text-[11px] text-white/45">
                       <span>
-                        <span className="text-white/80">{n(f.sessions)}</span>{' '}
+                        <span className="text-white/85">{n(f.sessions)}</span>{' '}
                         {t.fingerprints.sessions}
                       </span>
                       <span>
-                        <span className="text-white/80">{n(f.sources)}</span>{' '}
+                        <span className="text-white/85">{n(f.sources)}</span>{' '}
                         {t.fingerprints.sources}
                       </span>
                       <span className="text-white/25 hidden sm:inline">
                         {t.footer.range(fmtDate(f.first_seen), fmtDate(f.last_seen))}
                       </span>
+                      <ChevronDown
+                        className={`w-4 h-4 text-white/35 transition-transform shrink-0 ${
+                          isOpen ? 'rotate-180' : ''
+                        }`}
+                      />
                     </div>
                   </div>
 
-                  <div className="h-1 rounded bg-white/5 mt-2.5 overflow-hidden">
+                  <div className="h-1 rounded bg-white/5 mt-3 ml-9 overflow-hidden">
                     <div
                       className="h-1 rounded transition-all duration-700"
-                      style={{
-                        width: `${(f.sessions / max) * 100}%`,
-                        background: puesto < 3 ? TONOS[puesto] : 'var(--honey-amber)',
-                      }}
+                      style={{ width: `${(f.sessions / max) * 100}%`, background: tono }}
                     />
                   </div>
 
                   {/* Las sesiones por dirección son la pista: muchas repeticiones desde pocas
                       máquinas. */}
-                  <div className="text-[10px] text-white/35 mt-1.5">
+                  <div className="text-[11px] text-white/35 mt-2 ml-9">
                     {t.fingerprints.perSource(
                       (f.sessions / (f.sources || 1)).toLocaleString(localeActual(), {
                         maximumFractionDigits: 1,
@@ -343,15 +361,15 @@ export default function Fingerprints({ data }: { data: FingerprintData }) {
                 </button>
 
                 {isOpen && (
-                  <div className="impreso section-in border-t border-white/5 p-4">
+                  <div className="impreso section-in rounded-xl mx-5 mb-5 p-4">
                     <div className="rotulo mb-2">{t.fingerprints.script}</div>
-                    <div className="font-data text-[11px] flex flex-col gap-1.5">
+                    <div className="font-data text-[11.5px] flex flex-col gap-1.5">
                       {f.commands.map((c, k) => (
                         <div key={k} className="flex gap-2">
                           <span className="text-white/25 select-none w-4 text-right shrink-0">
                             {k + 1}
                           </span>
-                          <span className="text-white/70 break-all">{c}</span>
+                          <span className="text-white/75 break-all">{c}</span>
                         </div>
                       ))}
                       {f.truncated && (
@@ -363,9 +381,9 @@ export default function Fingerprints({ data }: { data: FingerprintData }) {
                   </div>
                 )}
               </div>
-            </Reveal>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </section>
   );

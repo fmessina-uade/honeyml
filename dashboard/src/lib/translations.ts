@@ -90,7 +90,14 @@ const es = {
     openEngine: 'Ver el motor trabajando',
     distinctOrigins: 'orígenes distintos, ninguno invitado',
     learnTitle: 'Para entender qué pasa',
-    learnHint: 'Cada tarjeta lleva a su sección.',
+    learnHint: 'Cada recuadro lleva a su sección.',
+    heroBadge: (fecha: string) => `Expuesto a internet desde el ${fecha}`,
+    heroWord: 'eventos',
+    heroSub:
+      'Cada uno llegó a un señuelo que nadie anunció, abierto a internet. Un motor de inteligencia artificial decide cuáles importan, y este panel muestra cómo.',
+    heroTour: 'Recorrer la captura',
+    marqueeLead: 'Ocho lecciones, cada una con su evidencia',
+    captureTitle: 'La captura en cuatro números',
     cards: {
       pulso: (dias: number) => `eventos en ${dias} días de captura`,
       anatomia: 'intrusiones reales, reproducidas comando por comando',
@@ -129,6 +136,8 @@ const es = {
       'Hora del día en que llegan los ataques, en horario universal. La distribución es plana: no hay horario de oficina del otro lado, son procesos automáticos corriendo sin pausa.',
     hour: 'hora',
     ratio: (r: string) => `${r} veces entre pico y valle`,
+    ratioLabel: 'veces entre pico y valle',
+    badge: (dias: number) => `${dias} días de captura, sin horario`,
     loginsAtThisHour: 'intentos de acceso en esa hora',
     events_short: 'eventos',
     outages: 'Interrupciones de captura',
@@ -142,6 +151,7 @@ const es = {
     filterFailed: 'No se pudo aplicar el filtro. El gráfico muestra el período completo.',
   },
   replay: {
+    heroBadge: (n: number) => `${n} sesiones reales, comando por comando`,
     speed: 'Velocidad',
     pause: 'Pausar',
     play: 'Reproducir',
@@ -171,6 +181,8 @@ const es = {
   },
   protocols: {
     contrastTitle: 'Mismo sensor, lecturas opuestas',
+    heroBadge: (n: number) => `${n} puertas abiertas además de SSH`,
+    indexTitle: 'Puerta por puerta',
     perSourceLabel: 'eventos por dirección',
     sourcesShort: 'direcciones',
     gap: 'de diferencia',
@@ -203,6 +215,7 @@ const es = {
       'Mirá las dos barras de SMB y las de HTTP. SMB acumula el grueso del volumen desde muy pocas direcciones: es un puñado de gusanos reintentando sin parar contra el mismo puerto. HTTP es al revés, mucho menos tráfico repartido entre muchísimas más direcciones: son escáneres distintos barriendo internet una vez cada uno. El mismo número de eventos significa cosas opuestas según cuántos lo produjeron, y por eso contar alertas no alcanza para priorizarlas.',
   },
   dictionary: {
+    heroBadge: 'Lo primero que prueban',
     usersTitle: 'Usuarios más probados',
     usersHint: 'Los atacantes prueban los nombres que casi siempre existen. No hay adivinanza.',
     passTitle: 'Contraseñas más probadas',
@@ -353,6 +366,7 @@ const es = {
       log1p_eventos_por_hora: 'ritmo por hora',
     } as Record<string, string>,
     traitsTitle: 'En qué se distingue, en desvíos del promedio',
+    heroBadge: 'Agrupados por cómo se comportan',
     sd: (v: string) => `${v} desv.`,
     ranCommands: 'Ejecutó comandos',
     downloaded: 'Descargó archivo',
@@ -398,6 +412,7 @@ const es = {
       `De ${total} direcciones que golpearon la puerta, ${fin} llegaron a descargar algo: el ${porc}%. En esa caída se apoya el triaje automático. Tratar cada evento como una alerta obliga a revisar catorce mil cosas para encontrar doscientas, así que la tarea del motor pasa más por descartar bien que por detectar más.`,
   },
   geography: {
+    heroBadge: 'El país y la red de cada dirección',
     byCountry: 'Por país',
     byAs: 'Por red que opera la dirección',
     addresses: 'direcciones',
@@ -850,7 +865,14 @@ const en: typeof es = {
     openEngine: 'See the engine at work',
     distinctOrigins: 'distinct origins, none of them invited',
     learnTitle: 'To understand what is going on',
-    learnHint: 'Each card opens its section.',
+    learnHint: 'Each tile opens its section.',
+    heroBadge: (fecha: string) => `Exposed to the internet since ${fecha}`,
+    heroWord: 'events',
+    heroSub:
+      'Each one reached a decoy nobody announced, open to the internet. An artificial intelligence engine decides which ones matter, and this panel shows how.',
+    heroTour: 'Walk through the capture',
+    marqueeLead: 'Eight lessons, each with its evidence',
+    captureTitle: 'The capture in four numbers',
     cards: {
       pulso: (dias: number) => `events over ${dias} days of capture`,
       anatomia: 'real intrusions, replayed command by command',
@@ -889,6 +911,8 @@ const en: typeof es = {
       'Hour of day when attacks arrive, in universal time. The distribution is flat: there are no office hours on the other side, these are automated processes running non-stop.',
     hour: 'hour',
     ratio: (r: string) => `${r} times between peak and trough`,
+    ratioLabel: 'times between peak and trough',
+    badge: (dias: number) => `${dias} days of capture, no office hours`,
     loginsAtThisHour: 'access attempts in that hour',
     events_short: 'events',
     outages: 'Capture outages',
@@ -902,6 +926,7 @@ const en: typeof es = {
     filterFailed: 'The filter could not be applied. The chart shows the full period.',
   },
   replay: {
+    heroBadge: (n: number) => `${n} real sessions, command by command`,
     speed: 'Speed',
     pause: 'Pause',
     play: 'Play',
@@ -931,6 +956,8 @@ const en: typeof es = {
   },
   protocols: {
     contrastTitle: 'Same sensor, opposite readings',
+    heroBadge: (n: number) => `${n} open doors besides SSH`,
+    indexTitle: 'Door by door',
     perSourceLabel: 'events per address',
     sourcesShort: 'addresses',
     gap: 'apart',
@@ -963,6 +990,7 @@ const en: typeof es = {
       'Look at the two bars for SMB and those for HTTP. SMB piles up the bulk of the volume from very few addresses: a handful of worms retrying endlessly against the same port. HTTP is the reverse, far less traffic spread across many more addresses: distinct scanners sweeping the internet once each. The same event count means opposite things depending on how many sources produced it, and that is why counting alerts is not enough to prioritize them.',
   },
   dictionary: {
+    heroBadge: 'What they try first',
     usersTitle: 'Most attempted usernames',
     usersHint: 'Attackers try the names that almost always exist. There is no guesswork.',
     passTitle: 'Most attempted passwords',
@@ -1110,6 +1138,7 @@ const en: typeof es = {
       log1p_eventos_por_hora: 'pace per hour',
     } as Record<string, string>,
     traitsTitle: 'What sets it apart, in standard deviations',
+    heroBadge: 'Grouped by how they behave',
     sd: (v: string) => `${v} SD`,
     ranCommands: 'Ran commands',
     downloaded: 'Downloaded a file',
@@ -1155,6 +1184,7 @@ const en: typeof es = {
       `Out of ${total} addresses that knocked, ${fin} got as far as downloading something: ${porc}%. That drop-off is what automated triage rests on. Treating every event as an alert means reviewing fourteen thousand things to find two hundred, so the engine's job has more to do with discarding well than with detecting more.`,
   },
   geography: {
+    heroBadge: 'The country and network behind every address',
     byCountry: 'By country',
     byAs: 'By network operating the address',
     addresses: 'addresses',

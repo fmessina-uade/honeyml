@@ -92,7 +92,7 @@ export default function WeekHeatmap({ data }: { data: WeeklyRhythm }) {
   ];
 
   return (
-    <div className="panel p-4">
+    <div className="pliego">
       <div className="flex items-baseline justify-between mb-3 flex-wrap gap-2">
         <span className="rotulo">{t.week.title}</span>
         <span className="text-[10px] text-white/30">{t.week.utc}</span>

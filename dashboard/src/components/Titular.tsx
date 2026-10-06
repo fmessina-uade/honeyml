@@ -22,3 +22,33 @@ export default function Titular({ texto }: { texto: string }) {
     </h1>
   );
 }
+
+/**
+ * Las palabras de un titular de presentación, cada una subiendo detrás de su máscara. Lo usan las
+ * secciones que dibujan su propio encabezado, cada una con su tamaño y su disposición.
+ */
+export function Palabras({ texto, ultimaEn }: { texto: string; ultimaEn?: string }) {
+  const palabras = texto.split(' ');
+  const ultima = palabras.length - 1;
+  return (
+    <span aria-label={texto}>
+      {palabras.map((p, i) => (
+        <span key={i} aria-hidden>
+          <span className="titular-mascara">
+            <span
+              style={
+                {
+                  '--d': `${0.1 + i * 0.09}s`,
+                  color: i === ultima ? ultimaEn : undefined,
+                } as React.CSSProperties
+              }
+            >
+              {p}
+            </span>
+          </span>
+          {i < ultima && ' '}
+        </span>
+      ))}
+    </span>
+  );
+}

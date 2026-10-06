@@ -6,6 +6,7 @@ import { tacticColor } from './SessionReplay';
 import Reveal from '../Reveal';
 import Tooltip, { useTooltip } from '../Tooltip';
 import ManoAlzada from '../ManoAlzada';
+import { Palabras } from '../Titular';
 import { n, pct } from '../../lib/format';
 import { useI18n } from '../../lib/i18n';
 import { useAncho } from '../../lib/useAncho';
@@ -159,23 +160,34 @@ export default function MitreMatrix({
       : techList.filter(([, info]) => info.tactic === tac).map(([id]) => id);
 
   return (
-    <section className="flex flex-col gap-4">
+    <section className="flex flex-col gap-14">
       <Tooltip content={tip.content} at={tip.at} />
 
-      {/* La cadena: lo que el señuelo ve, en el orden de una intrusión, y lo que no puede ver */}
-      <Reveal>
-        <div className="panel p-4">
-          <div className="flex items-baseline justify-between gap-3 flex-wrap">
-            <span className="rotulo">{t.mitre.coverageTitle}</span>
-            <span className="font-data text-[10px] text-white/30">
-              {t.mitre.observedOf(OBSERVED.length, CADENA.length)}
-            </span>
-          </div>
-          <div className="text-[11px] text-white/45 mt-1.5 leading-relaxed max-w-3xl">
-            {t.mitre.coverageNote}
+      {/* La presentación: la cadena de una intrusión es la imagen, sobre una trama de triángulos.
+          Lo que el señuelo ve, en el orden de una intrusión, y lo que no puede ver. */}
+      <div className="presentacion presentacion-cadena">
+        <div className="relative max-w-[1320px] mx-auto px-4 md:px-8 pt-14 sm:pt-20 pb-12">
+          <div className="grid lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-8 lg:gap-12 items-end">
+            <div className="min-w-0">
+              <span className="ceja section-in">{t.mitre.coverageTitle}</span>
+              <h1 className="titular-landing mt-5">
+                <Palabras texto={t.nav.mitre} />
+              </h1>
+              <p className="portada-bajada section-in">{t.lead.mitre}</p>
+            </div>
+            <div className="min-w-0 section-in">
+              <div className="flex items-end gap-4">
+                <span className="cifra-gigante cifra-gigante-fria">{OBSERVED.length}</span>
+                <span className="barra-oblicua mb-3" aria-hidden />
+                <span className="cifra-gigante cifra-gigante-tenue">{CADENA.length}</span>
+              </div>
+              <p className="text-[12.5px] text-white/55 leading-relaxed mt-4 max-w-[30rem]">
+                {t.mitre.coverageNote}
+              </p>
+            </div>
           </div>
 
-          <div ref={refCadena} className="relative mt-8">
+          <div ref={refCadena} className="relative mt-14">
             <div
               className="grid gap-y-5"
               style={{ gridTemplateColumns: `repeat(${porFila}, minmax(0, 1fr))` }}
@@ -282,149 +294,137 @@ export default function MitreMatrix({
               />
             )}
           </div>
-
-          {/* El eslabón elegido, en detalle */}
-          <div
-            key={elegida}
-            className="section-in mt-6 rounded-lg p-4"
-            style={{
-              background: `color-mix(in srgb, ${color(elegida)} 7%, transparent)`,
-              boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${color(elegida)} ${observada(elegida) ? 35 : 20}%, transparent)`,
-            }}
-          >
-            <div className="flex items-baseline justify-between gap-3 flex-wrap">
-              <span className="titulo" style={{ color: color(elegida) }}>
-                {tacticName(elegida)}
-              </span>
-              {observada(elegida) && (
-                <span className="flex items-baseline gap-2">
-                  <span className="cifra-chica">{cifra(elegida)}</span>
-                  <span className="text-[10px] text-white/40">{unidad(elegida)}</span>
-                </span>
-              )}
-            </div>
-            <div className="text-[12px] text-white/65 mt-1.5 leading-relaxed">
-              {tacticMeaning(elegida)}
-            </div>
-
-            {observada(elegida) ? (
-              <>
-                {elegida === 'Acceso inicial' && (
-                  <div className="mt-3">
-                    <div className="h-1.5 rounded bg-white/5 overflow-hidden">
-                      <div
-                        className="h-1.5 rounded"
-                        style={{
-                          width: `${overview.logins ? (overview.logins_success / overview.logins) * 100 : 0}%`,
-                          background: color(elegida),
-                        }}
-                      />
-                    </div>
-                    <div className="font-data text-[10px] text-white/35 mt-1">
-                      {pct(overview.logins_success, overview.logins)}% {t.mitre.ofAttempts}
-                    </div>
-                  </div>
-                )}
-                {!esAcceso(elegida) && (
-                  <div className="flex flex-wrap gap-x-5 gap-y-1 mt-3 font-data text-[10px] text-white/45">
-                    <span>
-                      <span className="text-white/80">{n(stepsPer.get(elegida) ?? 0)}</span>{' '}
-                      {t.mitre.steps}
-                    </span>
-                    <span>
-                      <span className="text-white/80">
-                        {pct(stepsPer.get(elegida) ?? 0, totalSteps)}%
-                      </span>{' '}
-                      {t.mitre.ofReplayed}
-                    </span>
-                    <span>
-                      <span className="text-white/80">{techniquesPer.get(elegida)?.size ?? 0}</span>{' '}
-                      {t.mitre.techniques}
-                    </span>
-                  </div>
-                )}
-                {techsDe(elegida).length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-3">
-                    {techsDe(elegida).map((id) => (
-                      <a
-                        key={id}
-                        href={`https://attack.mitre.org/techniques/${id.replace('.', '/')}/`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="group flex items-center gap-1.5 rounded-md px-2 py-1 transition-all hover:-translate-y-[1px]"
-                        style={{
-                          boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${color(elegida)} 35%, transparent)`,
-                        }}
-                      >
-                        <span className="font-data text-[10.5px]" style={{ color: color(elegida) }}>
-                          {id}
-                        </span>
-                        <ExternalLink className="w-2.5 h-2.5 text-white/25 group-hover:text-white/60 transition" />
-                      </a>
-                    ))}
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="mt-3">
-                <div className="rotulo mb-1">{t.mitre.whyNotSeen}</div>
-                <div className="text-[11px] text-white/50 leading-relaxed">
-                  {t.notObservedWhy[elegida as (typeof NOT_OBSERVED)[number]]}
-                </div>
-              </div>
-            )}
-          </div>
         </div>
-      </Reveal>
+      </div>
+
+      {/* El eslabón elegido, en detalle */}
+      <div
+        key={elegida}
+        className="pliego section-in grid lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-6 lg:gap-14"
+      >
+        <div className="min-w-0">
+          <span className="ceja">{t.mitre.observedOf(OBSERVED.length, CADENA.length)}</span>
+          <div className="titular-tactica mt-4" style={{ color: color(elegida) }}>
+            {tacticName(elegida)}
+          </div>
+          {observada(elegida) && (
+            <div className="flex items-baseline gap-2.5 mt-4">
+              <span className="cifra-fina">{cifra(elegida)}</span>
+              <span className="text-[12px] text-white/45">{unidad(elegida)}</span>
+            </div>
+          )}
+        </div>
+        <div className="min-w-0">
+          <p className="geist text-[17px] text-white/85 leading-relaxed tracking-tight">
+            {tacticMeaning(elegida)}
+          </p>
+
+          {observada(elegida) ? (
+            <>
+              {elegida === 'Acceso inicial' && (
+                <div className="mt-3">
+                  <div className="h-1.5 rounded bg-white/5 overflow-hidden">
+                    <div
+                      className="h-1.5 rounded"
+                      style={{
+                        width: `${overview.logins ? (overview.logins_success / overview.logins) * 100 : 0}%`,
+                        background: color(elegida),
+                      }}
+                    />
+                  </div>
+                  <div className="font-data text-[10px] text-white/35 mt-1">
+                    {pct(overview.logins_success, overview.logins)}% {t.mitre.ofAttempts}
+                  </div>
+                </div>
+              )}
+              {!esAcceso(elegida) && (
+                <div className="flex flex-wrap gap-x-5 gap-y-1 mt-3 font-data text-[10px] text-white/45">
+                  <span>
+                    <span className="text-white/80">{n(stepsPer.get(elegida) ?? 0)}</span>{' '}
+                    {t.mitre.steps}
+                  </span>
+                  <span>
+                    <span className="text-white/80">
+                      {pct(stepsPer.get(elegida) ?? 0, totalSteps)}%
+                    </span>{' '}
+                    {t.mitre.ofReplayed}
+                  </span>
+                  <span>
+                    <span className="text-white/80">{techniquesPer.get(elegida)?.size ?? 0}</span>{' '}
+                    {t.mitre.techniques}
+                  </span>
+                </div>
+              )}
+              {techsDe(elegida).length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-3">
+                  {techsDe(elegida).map((id) => (
+                    <a
+                      key={id}
+                      href={`https://attack.mitre.org/techniques/${id.replace('.', '/')}/`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group flex items-center gap-1.5 rounded-md px-2 py-1 transition-all hover:-translate-y-[1px]"
+                      style={{
+                        boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${color(elegida)} 35%, transparent)`,
+                      }}
+                    >
+                      <span className="font-data text-[10.5px]" style={{ color: color(elegida) }}>
+                        {id}
+                      </span>
+                      <ExternalLink className="w-2.5 h-2.5 text-white/25 group-hover:text-white/60 transition" />
+                    </a>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="mt-4">
+              <div className="rotulo mb-1.5">{t.mitre.whyNotSeen}</div>
+              <div className="text-[13px] text-white/55 leading-relaxed">
+                {t.notObservedWhy[elegida as (typeof NOT_OBSERVED)[number]]}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Las técnicas: los identificadores concretos, enlazados al catálogo oficial */}
-      <Reveal delay={120}>
-        <div className="panel p-4">
-          <div className="rotulo">{t.mitre.techTitle}</div>
-          <div className="text-[11px] text-white/45 mt-1 mb-3 leading-relaxed">
+      <Reveal>
+        <div className="pliego">
+          <span className="ceja">{t.mitre.techniques}</span>
+          <h2 className="titulo-bloque mt-3">{t.mitre.techTitle}</h2>
+          <p className="text-[13px] text-white/50 mt-2 leading-relaxed max-w-[48rem]">
             {t.mitre.techNote}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {ACCESS.map((tac) => (
+          </p>
+          <div className="catalogo mt-6">
+            {[
+              ...ACCESS.map((tac) => ({
+                id: ACCESS_TECHNIQUE[tac],
+                tactic: tac as string,
+                cuenta: `${n(accessCount[tac])} ${t.mitre.events}`,
+              })),
+              ...techList.map(([id, info]) => ({
+                id,
+                tactic: info.tactic,
+                cuenta: `${info.steps} ${t.mitre.steps}`,
+              })),
+            ].map((tec) => (
               <a
-                key={ACCESS_TECHNIQUE[tac]}
-                href={`https://attack.mitre.org/techniques/${ACCESS_TECHNIQUE[tac]}/`}
+                key={tec.id}
+                href={`https://attack.mitre.org/techniques/${tec.id.replace('.', '/')}/`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-all hover:-translate-y-[1px]"
-                style={{
-                  background: `color-mix(in srgb, ${tacticColor(tac)} 6%, transparent)`,
-                  boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${tacticColor(tac)} 30%, transparent)`,
-                }}
+                className="catalogo-celda group"
+                style={{ '--tono': tacticColor(tec.tactic) } as React.CSSProperties}
               >
-                <span className="font-data text-[11px]" style={{ color: tacticColor(tac) }}>
-                  {ACCESS_TECHNIQUE[tac]}
+                <span className="flex items-center justify-between gap-2">
+                  <span className="catalogo-id">{tec.id}</span>
+                  <ExternalLink className="w-3 h-3 text-white/20 group-hover:text-white/60 transition" />
                 </span>
-                <span className="text-[10px] text-white/35">
-                  <span className="font-data">{n(accessCount[tac])}</span> {t.mitre.events}
+                <span className="text-[11px] text-white/55 mt-2 leading-snug">
+                  {tacticName(tec.tactic)}
                 </span>
-                <ExternalLink className="w-2.5 h-2.5 text-white/20 group-hover:text-white/50 transition" />
-              </a>
-            ))}
-            {techList.map(([id, info]) => (
-              <a
-                key={id}
-                href={`https://attack.mitre.org/techniques/${id.replace('.', '/')}/`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-all hover:-translate-y-[1px]"
-                style={{
-                  background: `color-mix(in srgb, ${tacticColor(info.tactic)} 6%, transparent)`,
-                  boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${tacticColor(info.tactic)} 30%, transparent)`,
-                }}
-              >
-                <span className="font-data text-[11px]" style={{ color: tacticColor(info.tactic) }}>
-                  {id}
-                </span>
-                <span className="text-[10px] text-white/35">
-                  <span className="font-data">{info.steps}</span> {t.mitre.steps}
-                </span>
-                <ExternalLink className="w-2.5 h-2.5 text-white/20 group-hover:text-white/50 transition" />
+                <span className="font-data text-[10.5px] text-white/35 mt-1">{tec.cuenta}</span>
               </a>
             ))}
           </div>
@@ -432,10 +432,13 @@ export default function MitreMatrix({
       </Reveal>
 
       {/* Las etapas sobre toda la captura, no solo sobre las sesiones repetidas */}
-      <Reveal delay={200}>
-        <div className="panel p-4">
-          <div className="rotulo mb-1">{t.mitre.stagesTitle}</div>
-          <div className="text-[11px] text-white/45 mb-3 leading-relaxed">{t.mitre.stagesNote}</div>
+      <Reveal>
+        <div className="pliego">
+          <span className="ceja">{t.mitre.stageEvents}</span>
+          <h2 className="titulo-bloque mt-3">{t.mitre.stagesTitle}</h2>
+          <p className="text-[13px] text-white/50 mt-2 mb-6 leading-relaxed max-w-[48rem]">
+            {t.mitre.stagesNote}
+          </p>
           <div className="bar-group flex flex-col gap-2">
             {stages.map((s) => {
               const width = totalStages ? (s.count / totalStages) * 100 : 0;

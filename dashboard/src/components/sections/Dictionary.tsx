@@ -1,12 +1,10 @@
-import { KeyRound, UserRound } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
 import type { Bucket } from '../../lib/api';
 import Reveal from '../Reveal';
 import Tooltip, { useTooltip } from '../Tooltip';
 import { useI18n } from '../../lib/i18n';
 import PasswordCheck from '../PasswordCheck';
 import ManoAlzada from '../ManoAlzada';
-import { Hexagono } from '../Instrumento';
+import { Palabras } from '../Titular';
 import { n, pct, dec } from '../../lib/format';
 
 // Por qué los atacantes van a buscar justamente estas credenciales. Es la capa que convierte un
@@ -61,15 +59,19 @@ const PASS_NOTES_EN: Record<string, string> = {
 
 // Cuántos puestos del ranking se muestran con su explicación.
 const PUESTOS = 8;
+const PARECE_DIRECCION = /\d{1,3}\.\d{1,3}\.\d{1,3}/;
 
-function Panel({
+/**
+ * Un ranking escrito como un diccionario: la palabra, cuántas veces se probó y su definición, que
+ * es el motivo por el que el atacante la tiene en la lista.
+ */
+function Entradas({
   title,
   hint,
   buckets,
   notes,
   accent,
   unit,
-  icono: Icono,
 }: {
   title: string;
   hint: string;
@@ -77,7 +79,6 @@ function Panel({
   notes: Record<string, string>;
   accent: string;
   unit: string;
-  icono: LucideIcon;
 }) {
   const { t } = useI18n();
   const tip = useTooltip();
@@ -88,24 +89,15 @@ function Panel({
   const anchoPrimero = primero && total ? (primero.count / total) * 100 : 0;
 
   return (
-    <div className="panel overflow-hidden p-4 h-full">
+    <div className="pliego">
       <Tooltip content={tip.content} at={tip.at} />
-      <span
-        className="absolute inset-x-0 top-0 h-px"
-        style={{ background: `linear-gradient(90deg, transparent, ${accent}, transparent)` }}
-      />
-      <div className="flex items-center gap-2.5">
-        <Hexagono color={accent}>
-          <Icono className="w-3.5 h-3.5" />
-        </Hexagono>
-        <span className="rotulo">{title}</span>
-      </div>
-      <div className="text-[11px] text-white/45 mt-2 leading-relaxed">{hint}</div>
+      <span className="ceja">{title}</span>
+      <p className="text-[13px] text-white/50 mt-3 leading-relaxed">{hint}</p>
 
       {/* La concentración de un vistazo: el ranking entero como una sola tira, cada tramo del
           ancho de su parte. Lo que se anota es cuánto se lleva el primero solo. */}
       {primero && (
-        <div className="relative pt-8 mt-1 mb-4">
+        <div className="relative pt-8 mt-2 mb-4">
           <div className="flex h-3 rounded-sm overflow-hidden ring-1 ring-white/5">
             {buckets.map((b, i) => (
               <div
@@ -144,11 +136,11 @@ function Panel({
         </div>
       )}
 
-      <div className="bar-group flex flex-col gap-2.5">
+      <ol className="bar-group flex flex-col mt-2">
         {buckets.slice(0, PUESTOS).map((b, i) => (
-          <div
+          <li
             key={b.key}
-            className="bar-item transition-opacity duration-200 cursor-default"
+            className="entrada bar-item"
             onMouseMove={(e) =>
               tip.show(
                 e,
@@ -174,18 +166,16 @@ function Panel({
             }
             onMouseLeave={tip.hide}
           >
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="flex items-baseline gap-2 min-w-0">
-                <span className="font-data text-[9px] text-white/25 w-4 shrink-0">{i + 1}</span>
-                <span className="font-data text-[12px] text-white/85 truncate">
-                  {b.key || t.dictionary.empty}
-                </span>
+            <div className="flex items-baseline gap-3 flex-wrap">
+              <span className="entrada-palabra" style={i === 0 ? { color: accent } : undefined}>
+                {b.key || t.dictionary.empty}
               </span>
-              <span className="font-data text-[10px] text-white/40 shrink-0">{n(b.count)}</span>
+              <span className="font-data text-[11px] text-white/45">{n(b.count)}</span>
+              <span className="ml-auto font-data text-[10px] text-white/25">{i + 1}</span>
             </div>
-            <div className="h-1 rounded bg-white/5 mt-1 ml-6 overflow-hidden">
+            <div className="h-[3px] rounded bg-white/5 mt-2 overflow-hidden">
               <div
-                className="h-1 rounded transition-all duration-700"
+                className="h-full rounded transition-all duration-700"
                 style={{
                   width: `${(b.count / max) * 100}%`,
                   background: accent,
@@ -193,14 +183,10 @@ function Panel({
                 }}
               />
             </div>
-            {notes[b.key] && (
-              <div className="text-[10px] text-white/45 mt-1.5 ml-6 leading-relaxed">
-                {notes[b.key]}
-              </div>
-            )}
-          </div>
+            {notes[b.key] && <p className="entrada-definicion">{notes[b.key]}</p>}
+          </li>
         ))}
-      </div>
+      </ol>
     </div>
   );
 }
@@ -208,33 +194,74 @@ function Panel({
 /** Credenciales y comandos, cada uno con el motivo detrás. */
 export default function Dictionary({ users, passwords }: { users: Bucket[]; passwords: Bucket[] }) {
   const { t, lang } = useI18n();
-  return (
-    <section className="flex flex-col gap-4">
-      <Reveal>
-        <PasswordCheck />
-      </Reveal>
+  const usuario = users[0];
+  const clave = passwords[0];
+  // La pared del fondo son las mismas credenciales que muestra el ranking, repetidas. Solo los
+  // puestos visibles, y sin nada con forma de dirección: hay atacantes que prueban como usuario la
+  // dirección del propio señuelo, y esa no se publica.
+  const pared = [...users.slice(0, PUESTOS), ...passwords.slice(0, PUESTOS)]
+    .map((b) => b.key || t.dictionary.empty)
+    .filter((k) => !PARECE_DIRECCION.test(k))
+    .join('   ');
 
-      <div className="grid md:grid-cols-2 gap-4">
+  return (
+    <section className="flex flex-col gap-14">
+      {/* La presentación: un cartel con el usuario y la contraseña que más se prueban */}
+      <div className="presentacion presentacion-diccionario">
+        <div className="pared-de-claves" aria-hidden>
+          {Array.from({ length: 18 }, (_, i) => (
+            <p key={i} style={{ marginLeft: `${-(i * 37) % 160}px` }}>
+              {pared} {pared}
+            </p>
+          ))}
+        </div>
+        <div className="relative max-w-[1320px] mx-auto px-4 md:px-8 pt-12 sm:pt-16 pb-12 grid lg:grid-cols-[minmax(0,1.15fr)_minmax(0,420px)] gap-10 lg:gap-14 items-center">
+          <div className="min-w-0">
+            <span className="ceja section-in">{t.dictionary.heroBadge}</span>
+            <h1 className="titulo-bloque mt-4 section-in">{t.nav.diccionario}</h1>
+            {usuario && clave && (
+              <div className="cartel mt-6">
+                <div className="cartel-palabra" style={{ color: 'var(--honey-amber)' }}>
+                  <Palabras texto={usuario.key || t.dictionary.empty} />
+                </div>
+                <div className="cartel-dato">
+                  {n(usuario.count)} {t.dictionary.unitUsers}
+                </div>
+                <div className="cartel-palabra mt-3" style={{ color: 'var(--agent-coral)' }}>
+                  <Palabras texto={clave.key || t.dictionary.empty} />
+                </div>
+                <div className="cartel-dato">
+                  {n(clave.count)} {t.dictionary.unitPass}
+                </div>
+              </div>
+            )}
+            <p className="portada-bajada section-in">{t.lead.diccionario}</p>
+          </div>
+          <div className="min-w-0 section-in">
+            <PasswordCheck />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
         <Reveal>
-          <Panel
+          <Entradas
             title={t.dictionary.usersTitle}
             hint={t.dictionary.usersHint}
             buckets={users}
             notes={lang === 'en' ? USER_NOTES_EN : USER_NOTES}
             accent="var(--honey-amber)"
             unit={t.dictionary.unitUsers}
-            icono={UserRound}
           />
         </Reveal>
         <Reveal delay={120}>
-          <Panel
+          <Entradas
             title={t.dictionary.passTitle}
             hint={t.dictionary.passHint}
             buckets={passwords}
             notes={lang === 'en' ? PASS_NOTES_EN : PASS_NOTES}
             accent="var(--agent-coral)"
             unit={t.dictionary.unitPass}
-            icono={KeyRound}
           />
         </Reveal>
       </div>

@@ -76,7 +76,7 @@ export default function AttackFunnel({ data }: { data: ArchetypeData }) {
   );
 
   return (
-    <div className="panel p-4">
+    <div className="pliego">
       <div className="rotulo mb-4">{t.funnel.title}</div>
 
       <div className="flex flex-col">

@@ -27,6 +27,18 @@ import AttackCanvas from './components/AttackCanvas';
 
 export type { SectionId };
 
+const PRESENTACION_PROPIA = new Set<SectionId>([
+  'inicio',
+  'pulso',
+  'protocolos',
+  'origen',
+  'diccionario',
+  'huellas',
+  'arquetipos',
+  'anatomia',
+  'mitre',
+]);
+
 function SinDatos() {
   const { t } = useI18n();
   return <div className="panel p-8 text-center text-[13px] text-white/50">{t.error.title}</div>;
@@ -137,15 +149,18 @@ export default function App() {
         className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden thin-scroll papel"
       >
         <div className="max-w-[1320px] mx-auto px-4 md:px-8 pb-12">
-          <header key={`h-${active}`} className="relative -mx-4 px-4 md:-mx-8 md:px-8 pt-8 pb-7">
-            {snapshot && <AttackCanvas intensity={snapshot.timeline.map((d) => d.count)} />}
-            <div className="relative max-w-3xl">
-              <Titular texto={t.nav[active]} />
-              <p className="text-[14px] text-white/55 mt-3 leading-relaxed section-in">
-                {t.lead[active]}
-              </p>
-            </div>
-          </header>
+          {/* Las secciones con presentación propia dibujan su encabezado; el resto usa este. */}
+          {!(PRESENTACION_PROPIA.has(active) && snapshot) && (
+            <header key={`h-${active}`} className="relative -mx-4 px-4 md:-mx-8 md:px-8 pt-8 pb-7">
+              {snapshot && <AttackCanvas intensity={snapshot.timeline.map((d) => d.count)} />}
+              <div className="relative max-w-3xl">
+                <Titular texto={t.nav[active]} />
+                <p className="text-[14px] text-white/55 mt-3 leading-relaxed section-in">
+                  {t.lead[active]}
+                </p>
+              </div>
+            </header>
+          )}
 
           {error && (
             <div className="rounded-xl ring-1 ring-[var(--agent-coral)]/30 bg-[var(--agent-coral)]/5 p-4 flex gap-3">

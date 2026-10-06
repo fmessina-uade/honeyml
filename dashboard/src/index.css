@@ -2,10 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Cinco voces y ninguna más. Inter para la interfaz y la prosa, Geist para los titulares y la
+/* Seis voces y ninguna más. Inter para la interfaz y la prosa, Geist para los titulares y la
    navegación, JetBrains Mono para los nombres propios de las cosas (secciones, servicios, nodos),
-   Fira Code para todo lo que es un dato (cifras, direcciones, comandos, fechas) y Caveat para las
-   anotaciones a mano alzada. */
+   Fira Code para todo lo que es un dato (cifras, direcciones, comandos, fechas), Caveat para las
+   anotaciones a mano alzada y Doto, de matriz de puntos, solo para el pulso. */
 * {
   font-family: 'Inter', sans-serif;
 }
@@ -873,7 +873,7 @@ body {
   font-family: 'Geist', 'Inter', sans-serif;
 }
 .titular {
-  font-size: clamp(28px, 3.4vw, 44px);
+  font-size: clamp(26px, 2.8vw, 38px);
   line-height: 1.08;
   font-weight: 500;
   letter-spacing: -0.04em;
@@ -1329,7 +1329,7 @@ body {
 .cifra-fina {
   font-family: 'Geist', 'Inter', sans-serif;
   font-weight: 300;
-  font-size: clamp(30px, 3.4vw, 46px);
+  font-size: clamp(26px, 2.7vw, 38px);
   line-height: 0.9;
   letter-spacing: -0.05em;
   color: rgb(var(--tinta));
@@ -1432,4 +1432,1191 @@ body {
   .punto-vivo[data-pensando='si'] {
     animation: none;
   }
+}
+
+/* La ceja: el rótulo de un bloque entre dos rombos. Reemplaza a la tarjeta como marca de dónde
+   empieza algo, así un bloque puede ir suelto sobre el fondo y seguir leyéndose como unidad. */
+.ceja {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: rgb(var(--tinta) / 0.55);
+}
+.ceja::before,
+.ceja::after {
+  content: '';
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border: 1px solid currentColor;
+  transform: rotate(45deg);
+  opacity: 0.7;
+}
+/* El título de un bloque suelto, sin caja alrededor. */
+.titulo-bloque {
+  font-family: 'Geist', 'Inter', sans-serif;
+  font-size: clamp(20px, 1.9vw, 26px);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+  color: rgb(var(--tinta));
+}
+
+/* La portada: una pantalla entera de landing, de borde a borde. Los hilos del fondo son trazos
+   gruesos con degradé que derivan despacio; el velo oscuro del centro sostiene el contraste del
+   titular sin tapar los bordes. */
+.portada {
+  position: relative;
+  isolation: isolate;
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  min-height: calc(100dvh - 64px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+@media (max-width: 980px) {
+  .portada {
+    min-height: calc(100dvh - 58px);
+  }
+}
+.portada-fondo {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+}
+.portada-fondo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 55%, rgb(var(--fondo)) 100%);
+}
+.portada-velo {
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  top: 46%;
+  width: min(984px, 92vw);
+  height: 460px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: rgb(var(--fondo));
+  opacity: 0.82;
+  filter: blur(80px);
+  pointer-events: none;
+}
+.hilos-a,
+.hilos-b {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.hilos-a {
+  animation: deriva 28s ease-in-out infinite alternate;
+}
+.hilos-b {
+  animation: deriva 34s ease-in-out -9s infinite alternate-reverse;
+}
+@keyframes deriva {
+  from {
+    transform: translate(-2%, 1%) rotate(-1.5deg);
+  }
+  to {
+    transform: translate(2%, -1.5%) rotate(1.5deg);
+  }
+}
+.hilo-sombra {
+  stroke: #05040b;
+  stroke-opacity: 0.6;
+}
+.hilo-nucleo {
+  stroke: #000000;
+  stroke-opacity: 0.32;
+}
+:root[data-tema='claro'] .portada-fondo svg {
+  opacity: 0.6;
+}
+:root[data-tema='claro'] .hilo-sombra {
+  stroke: #1c345c;
+  stroke-opacity: 0.1;
+}
+:root[data-tema='claro'] .hilo-nucleo {
+  stroke: #1c345c;
+  stroke-opacity: 0.14;
+}
+.portada-titulo,
+.portada-titulo * {
+  font-family: 'Geist', 'Inter', sans-serif;
+}
+.portada-titulo {
+  font-size: clamp(38px, 7vw, 104px);
+  font-weight: 500;
+  line-height: 1.02;
+  letter-spacing: -0.045em;
+  color: rgb(var(--tinta));
+}
+.degradado {
+  background-image: linear-gradient(
+    100deg,
+    var(--honey-amber),
+    var(--agent-coral) 55%,
+    var(--neural-teal)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.portada-bajada {
+  max-width: 34rem;
+  margin-top: 14px;
+  font-size: clamp(14px, 1.05vw, 15.5px);
+  line-height: 1.6;
+  color: rgb(var(--tinta) / 0.66);
+}
+/* La insignia de arriba del titular: una lámina de metal con un punto vivo. */
+.insignia {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  letter-spacing: -0.01em;
+  color: #f2f2f2;
+  background: linear-gradient(90deg, #6b6f76 0%, #2a2d33 52%, #0a0c0f 100%);
+}
+:root[data-tema='claro'] .insignia {
+  color: #1b233a;
+  background: linear-gradient(90deg, #ffffff 0%, #eef1f4 52%, #d8dde4 100%);
+  box-shadow: inset 0 0 0 1px rgb(15 23 42 / 0.1);
+}
+.insignia::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--neural-teal);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--neural-teal) 60%, transparent);
+  animation: puntoInsignia 2s ease-in-out infinite;
+}
+@keyframes puntoInsignia {
+  50% {
+    box-shadow: 0 0 0 5px transparent;
+  }
+}
+
+/* Los dos botones de una landing: el sólido, que lleva a lo principal, y el de vidrio. */
+.boton-solido,
+.boton-vidrio {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 46px;
+  padding: 0 22px;
+  border-radius: 999px;
+  font-family: 'Geist', 'Inter', sans-serif;
+  font-size: 14.5px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  transition:
+    box-shadow 0.35s ease,
+    border-color 0.35s ease,
+    transform 0.35s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+.boton-solido::after,
+.boton-vidrio::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    115deg,
+    transparent 20%,
+    rgb(255 255 255 / 0.45) 48%,
+    transparent 76%
+  );
+  transform: translateX(-130%);
+  transition: transform 0.65s ease;
+}
+.boton-solido:hover::after,
+.boton-vidrio:hover::after {
+  transform: translateX(130%);
+}
+.boton-solido {
+  color: #111;
+  border: 1px solid #fff;
+  background: linear-gradient(180deg, #ffffff 0%, #e7e7e7 48%, #cfcfcf 100%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.95);
+}
+.boton-solido:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 0 24px color-mix(in srgb, var(--honey-amber) 40%, transparent),
+    0 8px 18px rgb(255 255 255 / 0.1);
+}
+:root[data-tema='claro'] .boton-solido {
+  color: #fff;
+  border-color: #0f1b31;
+  background: linear-gradient(180deg, #24324d 0%, #0f1b31 100%);
+  box-shadow: 0 10px 24px rgb(11 26 50 / 0.18);
+}
+.boton-vidrio {
+  color: rgb(var(--tinta));
+  border: 1px solid rgb(var(--tinta) / 0.28);
+  background: linear-gradient(
+    135deg,
+    rgb(var(--tinta) / 0.1),
+    rgb(var(--fondo) / 0.45) 50%,
+    rgb(var(--tinta) / 0.06)
+  );
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+.boton-vidrio:hover {
+  border-color: rgb(var(--tinta) / 0.6);
+  box-shadow: 0 0 22px rgb(var(--tinta) / 0.12);
+}
+.boton-solido:focus-visible,
+.boton-vidrio:focus-visible {
+  outline: 2px solid var(--honey-amber);
+  outline-offset: 3px;
+}
+
+/* Vidrio líquido: el filo claro arriba y abajo que se desvanece a los costados. */
+.vidrio-liquido {
+  position: relative;
+  overflow: hidden;
+  background: rgb(var(--tinta) / 0.03);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  box-shadow: inset 0 1px 1px rgb(var(--tinta) / 0.12);
+}
+.vidrio-liquido::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.4px;
+  background: linear-gradient(
+    180deg,
+    rgb(var(--tinta) / 0.45) 0%,
+    rgb(var(--tinta) / 0.15) 20%,
+    transparent 40%,
+    transparent 60%,
+    rgb(var(--tinta) / 0.15) 80%,
+    rgb(var(--tinta) / 0.45) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* La marquesina del pie de la portada: corre sola y se detiene bajo el puntero, para poder elegir. */
+.marquesina {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+.marquesina-pista {
+  display: flex;
+  width: max-content;
+  animation: marquesina 46s linear infinite;
+}
+.marquesina:hover .marquesina-pista,
+.marquesina:focus-within .marquesina-pista {
+  animation-play-state: paused;
+}
+@keyframes marquesina {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* Las cifras en columna: ícono, número fino y su rótulo, sin caja. */
+.cifra-columna,
+.cifra-columna * {
+  font-family: 'Geist', 'Inter', sans-serif;
+}
+.cifra-columna {
+  font-size: clamp(26px, 2.5vw, 36px);
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: -0.045em;
+  color: rgb(var(--tinta));
+  font-variant-numeric: tabular-nums;
+}
+
+/* El bento: recuadros de distinto tamaño, cada uno con el gráfico de su sección como imagen. */
+.bento {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-auto-rows: 172px;
+  grid-auto-flow: dense;
+}
+.bento > [data-celda='pulso'] {
+  grid-column: span 5;
+  grid-row: span 2;
+}
+.bento > [data-celda='anatomia'],
+.bento > [data-celda='protocolos'],
+.bento > [data-celda='diccionario'],
+.bento > [data-celda='huellas'],
+.bento > [data-celda='arquetipos'] {
+  grid-column: span 4;
+}
+.bento > [data-celda='origen'] {
+  grid-column: span 3;
+  grid-row: span 2;
+}
+.bento > [data-celda='mitre'] {
+  grid-column: span 12;
+}
+@media (max-width: 1023px) {
+  .bento {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: 190px;
+  }
+  .bento > [data-celda] {
+    grid-column: span 1;
+    grid-row: span 1;
+  }
+  .bento > [data-celda='pulso'],
+  .bento > [data-celda='mitre'] {
+    grid-column: span 2;
+  }
+}
+@media (max-width: 640px) {
+  .bento {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bento > [data-celda='pulso'],
+  .bento > [data-celda='mitre'] {
+    grid-column: span 1;
+  }
+}
+.lamina {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border-radius: 22px;
+  text-align: left;
+  color: rgb(var(--tinta));
+  background:
+    radial-gradient(
+      120% 90% at 50% 0%,
+      color-mix(in srgb, var(--tono) 20%, transparent),
+      transparent 62%
+    ),
+    linear-gradient(180deg, rgb(var(--tinta) / 0.05), rgb(var(--tinta) / 0.015));
+  box-shadow: inset 0 0 0 1px rgb(var(--tinta) / 0.07);
+  transition:
+    box-shadow 0.4s ease,
+    transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+:root[data-tema='claro'] .lamina {
+  background:
+    radial-gradient(
+      120% 90% at 50% 0%,
+      color-mix(in srgb, var(--tono) 14%, transparent),
+      transparent 62%
+    ),
+    rgb(var(--superficie));
+  box-shadow:
+    inset 0 0 0 1px rgb(15 23 42 / 0.08),
+    0 10px 24px -18px rgb(15 23 42 / 0.28);
+}
+.lamina:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--tono) 45%, transparent),
+    0 18px 40px -24px color-mix(in srgb, var(--tono) 60%, transparent);
+}
+.lamina:focus-visible {
+  outline: 2px solid var(--honey-amber);
+  outline-offset: 3px;
+}
+.lamina-ceja {
+  margin: 18px 18px 0;
+  align-self: flex-start;
+}
+/* En los recuadros bajos el gráfico ocupa la mitad derecha y el texto la izquierda; en los altos,
+   el gráfico va arriba y el texto abajo, sobre un velo que lo hace legible. */
+.lamina-arte {
+  position: absolute;
+  top: 46px;
+  right: 14px;
+  bottom: 16px;
+  left: 48%;
+  z-index: -1;
+  overflow: hidden;
+  color: rgb(var(--tinta));
+  opacity: 0.92;
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.lamina[data-celda='mitre'] .lamina-arte {
+  left: 34%;
+}
+/* Las listas largas arrancan por arriba, que es donde está lo más grande: si se cortan, que se
+   corte la cola. */
+.lamina[data-celda='protocolos'] .lamina-arte > div {
+  justify-content: flex-start;
+}
+.lamina[data-celda='diccionario'] .lamina-arte > div {
+  align-content: flex-start;
+}
+.lamina:hover .lamina-arte {
+  transform: scale(1.03);
+}
+.lamina-pie {
+  margin-top: auto;
+  width: 46%;
+  padding: 0 18px 16px;
+}
+.lamina[data-celda='mitre'] .lamina-pie {
+  width: 32%;
+}
+@media (min-width: 1024px) {
+  .lamina[data-forma='alta'] .lamina-ceja {
+    align-self: center;
+  }
+  .lamina[data-forma='alta'] .lamina-arte {
+    top: 48px;
+    left: 14px;
+    bottom: 96px;
+  }
+  .lamina[data-forma='alta'] .lamina-pie {
+    width: auto;
+    padding-top: 28px;
+    background: linear-gradient(to top, rgb(var(--fondo) / 0.85), transparent);
+  }
+  :root[data-tema='claro'] .lamina[data-forma='alta'] .lamina-pie {
+    background: linear-gradient(to top, rgb(var(--superficie) / 0.92), transparent);
+  }
+}
+.lamina-cifra,
+.lamina-cifra * {
+  font-family: 'Geist', 'Inter', sans-serif;
+}
+.lamina-cifra {
+  font-size: 26px;
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+.lamina-flecha {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  color: rgb(var(--tinta) / 0.45);
+  transition:
+    transform 0.35s ease,
+    color 0.35s ease;
+}
+.lamina:hover .lamina-flecha {
+  color: rgb(var(--tinta));
+  transform: translate(2px, -2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hilos-a,
+  .hilos-b,
+  .marquesina-pista,
+  .insignia::before {
+    animation: none;
+  }
+  .lamina,
+  .lamina-arte,
+  .boton-solido::after,
+  .boton-vidrio::after {
+    transition: none;
+  }
+}
+
+/* La presentación de una sección: una franja de borde a borde con su propio fondo. Cada sección
+   elige el suyo, así ninguna se abre igual que otra. */
+.presentacion {
+  position: relative;
+  isolation: isolate;
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  overflow: hidden;
+}
+/* El pliego: un bloque abierto, sin caja, que empieza con un filo fino y su ceja. */
+.pliego {
+  position: relative;
+  padding-top: 30px;
+}
+.pliego::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    rgb(var(--tinta) / 0.16),
+    rgb(var(--tinta) / 0.05) 70%,
+    transparent
+  );
+}
+
+/* El pulso: un degradé tramado en puntos, como una pantalla de matriz, y encima la captura diaria
+   dibujada con los mismos puntos. */
+.presentacion-puntos::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(70% 60% at 50% 0%, rgb(212 134 10 / 0.55), transparent 70%),
+    radial-gradient(50% 60% at 0% 30%, rgb(0 184 148 / 0.4), transparent 70%),
+    radial-gradient(50% 60% at 100% 30%, rgb(255 107 53 / 0.4), transparent 70%);
+  -webkit-mask-image: radial-gradient(circle, #000 1.1px, transparent 1.7px);
+  mask-image: radial-gradient(circle, #000 1.1px, transparent 1.7px);
+  -webkit-mask-size: 6px 6px;
+  mask-size: 6px 6px;
+}
+.presentacion-puntos::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(60% 45% at 50% 42%, rgb(var(--fondo) / 0.9), transparent 75%),
+    linear-gradient(to bottom, transparent 60%, rgb(var(--fondo)) 100%);
+}
+.puntos-del-pulso {
+  display: block;
+  width: 100%;
+  height: clamp(110px, 14vw, 170px);
+  margin-top: 44px;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+}
+.puntos-del-pulso g {
+  animation: columnaSube 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i) * 8ms);
+}
+@keyframes columnaSube {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+.punto-lleno {
+  fill: var(--honey-amber);
+  fill-opacity: 0.55;
+}
+.punto-cima {
+  fill: var(--agent-coral);
+}
+.punto-apagado {
+  fill: rgb(var(--tinta) / 0.25);
+}
+.titulo-puntos,
+.numero-puntos {
+  font-family: 'Doto', 'Fira Code', monospace;
+  font-weight: 900;
+  letter-spacing: 0.01em;
+  line-height: 0.95;
+  color: rgb(var(--tinta));
+}
+.titulo-puntos {
+  font-size: clamp(44px, 6.6vw, 96px);
+}
+.numero-puntos {
+  font-size: clamp(42px, 4.4vw, 62px);
+  color: var(--honey-amber);
+}
+:root[data-tema='claro'] .presentacion-puntos::before {
+  opacity: 0.7;
+}
+@media (prefers-reduced-motion: reduce) {
+  .puntos-del-pulso g {
+    animation: none;
+  }
+}
+
+/* El titular de una presentación de sección: grande, sin caja, alineado a la izquierda. */
+.titular-landing,
+.titular-landing * {
+  font-family: 'Geist', 'Inter', sans-serif;
+}
+.titular-landing {
+  font-size: clamp(34px, 4.6vw, 70px);
+  font-weight: 500;
+  line-height: 0.98;
+  letter-spacing: -0.05em;
+  color: rgb(var(--tinta));
+}
+
+/* Más allá de SSH: un plano de grilla fina y los puertos abiertos pasando en contorno. */
+.presentacion-puertas {
+  background:
+    linear-gradient(rgb(var(--tinta) / 0.04) 1px, transparent 1px) 0 0 / 56px 56px,
+    linear-gradient(90deg, rgb(var(--tinta) / 0.04) 1px, transparent 1px) 0 0 / 56px 56px,
+    radial-gradient(60% 80% at 85% 20%, rgb(0 184 148 / 0.12), transparent 70%),
+    radial-gradient(50% 70% at 10% 90%, rgb(255 107 53 / 0.1), transparent 70%);
+}
+.presentacion-puertas::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(to bottom, transparent 55%, rgb(var(--fondo)) 100%);
+  pointer-events: none;
+}
+.puertas-fondo {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 15%, #000 85%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 15%, #000 85%, transparent);
+}
+.puertas-pista {
+  display: flex;
+  gap: 0.35em;
+  width: max-content;
+  font-family: 'Geist', 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: clamp(110px, 16vw, 236px);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: transparent;
+  -webkit-text-stroke: 1px rgb(var(--tinta) / 0.1);
+  animation: marquesina 90s linear infinite;
+}
+
+/* El índice de puertas: una fila por servicio, con el puerto en grande y en el color del servicio. */
+.indice-fila {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 12px 28px;
+  padding: 22px 8px;
+  border-top: 1px solid rgb(var(--tinta) / 0.07);
+  transition: background 0.3s ease;
+  cursor: default;
+}
+.indice-fila:hover {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--tono) 7%, transparent),
+    transparent 70%
+  );
+}
+.indice-puerto {
+  font-family: 'Geist', 'Inter', sans-serif;
+  font-size: clamp(28px, 3vw, 42px);
+  font-weight: 300;
+  line-height: 0.9;
+  letter-spacing: -0.05em;
+  color: var(--tono);
+}
+.indice-medidas {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 12px;
+}
+@media (min-width: 1024px) {
+  .indice-fila {
+    grid-template-columns: 160px minmax(0, 1.2fr) minmax(0, 1fr);
+    gap: 12px 40px;
+  }
+  .indice-medidas {
+    grid-column: auto;
+    align-self: center;
+  }
+}
+
+/* La cita: la lección de una sección dicha en grande, con un filo de color a la izquierda. */
+.cita {
+  position: relative;
+  padding: 6px 0 6px 28px;
+  border-left: 2px solid var(--honey-amber);
+}
+.cita blockquote {
+  font-family: 'Geist', 'Inter', sans-serif;
+  font-size: clamp(15px, 1.3vw, 18.5px);
+  line-height: 1.5;
+  letter-spacing: -0.015em;
+  color: rgb(var(--tinta) / 0.82);
+  max-width: 62rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  .puertas-pista {
+    animation: none;
+  }
+}
+
+/* De dónde vienen: el espacio detrás del globo, con un halo frío, y el titular pesado en
+   mayúsculas. */
+.presentacion-globo {
+  background:
+    radial-gradient(45% 70% at 78% 45%, rgb(0 184 148 / 0.16), transparent 70%),
+    radial-gradient(40% 60% at 20% 20%, rgb(212 134 10 / 0.12), transparent 70%),
+    radial-gradient(rgb(var(--tinta) / 0.18) 1px, transparent 1.4px) 0 0 / 46px 46px;
+}
+.presentacion-globo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(to bottom, transparent 60%, rgb(var(--fondo)) 100%);
+  pointer-events: none;
+}
+.globo-halo {
+  position: absolute;
+  inset: 8%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(0 184 148 / 0.22), transparent 65%);
+  filter: blur(30px);
+  pointer-events: none;
+}
+.titular-pesado,
+.titular-pesado * {
+  font-family: 'Geist', 'Inter', sans-serif;
+}
+.titular-pesado {
+  font-size: clamp(38px, 5.2vw, 80px);
+  font-weight: 800;
+  line-height: 0.9;
+  letter-spacing: -0.045em;
+  text-transform: uppercase;
+  color: var(--neural-teal);
+}
+
+.titular-pesado.pais-grande {
+  font-size: clamp(24px, 3vw, 42px);
+}
+
+/* Las filas de un ranking: el puesto en grande y fino, y la barra debajo del nombre. */
+.ranking-fila {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  width: 100%;
+  padding: 14px 8px;
+  text-align: left;
+  border-top: 1px solid rgb(var(--tinta) / 0.06);
+  transition: background 0.25s ease;
+}
+button.ranking-fila:hover {
+  background: rgb(var(--tinta) / 0.03);
+}
+.ranking-fila[data-activo='si'] {
+  background: color-mix(in srgb, var(--agent-coral) 8%, transparent);
+}
+.ranking-n {
+  flex: none;
+  width: 2.2em;
+  font-family: 'Geist', 'Inter', sans-serif;
+  font-size: 19px;
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: rgb(var(--tinta) / 0.35);
+  font-variant-numeric: tabular-nums;
+}
+
+/* El diccionario: una pared de credenciales reales de fondo y, adelante, el cartel con las dos que
+   más se prueban, en la letra de lo que se tipea. */
+.presentacion-diccionario {
+  background:
+    radial-gradient(55% 70% at 15% 30%, rgb(212 134 10 / 0.14), transparent 70%),
+    radial-gradient(45% 60% at 70% 80%, rgb(255 107 53 / 0.1), transparent 70%);
+}
+.presentacion-diccionario::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(60% 80% at 30% 50%, rgb(var(--fondo) / 0.75), transparent 80%),
+    linear-gradient(to bottom, transparent 60%, rgb(var(--fondo)) 100%);
+  pointer-events: none;
+}
+.pared-de-claves {
+  position: absolute;
+  inset: -20px 0 0;
+  z-index: -2;
+  overflow: hidden;
+  pointer-events: none;
+  font-family: 'Fira Code', monospace;
+  font-size: 13px;
+  line-height: 2;
+  white-space: nowrap;
+  color: rgb(var(--tinta) / 0.09);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 20%, #000 80%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 20%, #000 80%, transparent);
+}
+.cartel-palabra,
+.cartel-palabra * {
+  font-family: 'JetBrains Mono', monospace;
+}
+.cartel-palabra {
+  font-size: clamp(42px, 5.6vw, 86px);
+  font-weight: 700;
+  line-height: 0.95;
+  letter-spacing: -0.05em;
+}
+.cartel-dato {
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: rgb(var(--tinta) / 0.5);
+}
+
+/* Las entradas del diccionario: la palabra en grande, su frecuencia y su definición. */
+.entrada {
+  padding: 16px 4px;
+  border-top: 1px dashed rgb(var(--tinta) / 0.1);
+  cursor: default;
+}
+.entrada-palabra {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: rgb(var(--tinta) / 0.92);
+}
+.entrada-definicion {
+  margin-top: 8px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: rgb(var(--tinta) / 0.5);
+}
+
+/* Huella de las botnets: un panal tenue de fondo con luz coral, la cifra de concentración enorme y
+   una regla con divisiones para los números del conjunto. */
+.presentacion-panal {
+  background:
+    radial-gradient(50% 60% at 80% 20%, rgb(255 107 53 / 0.16), transparent 70%),
+    radial-gradient(40% 50% at 10% 70%, rgb(212 134 10 / 0.1), transparent 70%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='38.105' height='66' viewBox='0 0 38.105 66'%3E%3Cpath d='M19.053 0L38.105 11V33L19.053 44L0 33V11Z M19.053 44V66' fill='none' stroke='%23ff6b35' stroke-opacity='0.07'/%3E%3C/svg%3E")
+      0 0 / 38.105px 66px;
+}
+.presentacion-panal::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(to bottom, transparent 70%, rgb(var(--fondo)) 100%);
+  pointer-events: none;
+}
+.cifra-gigante {
+  font-family: 'Geist', 'Inter', sans-serif;
+  font-size: clamp(70px, 9.5vw, 144px);
+  font-weight: 300;
+  line-height: 0.85;
+  letter-spacing: -0.07em;
+  color: var(--agent-coral);
+}
+.cifra-gigante span {
+  font-family: inherit;
+  font-size: 0.45em;
+  letter-spacing: -0.02em;
+  margin-left: 0.04em;
+  color: rgb(var(--tinta) / 0.5);
+}
+.regla {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid rgb(var(--tinta) / 0.12);
+}
+@media (min-width: 1024px) {
+  .regla {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+.regla-celda {
+  display: flex;
+  flex-direction: column;
+  padding: 18px 18px 4px 0;
+  border-right: 1px solid rgb(var(--tinta) / 0.07);
+}
+.regla-celda:last-child {
+  border-right: 0;
+}
+.regla-celda + .regla-celda {
+  padding-left: 18px;
+}
+@media (max-width: 1023px) {
+  .regla-celda:nth-child(odd) {
+    padding-left: 0;
+  }
+  .regla-celda:nth-child(2n) {
+    border-right: 0;
+  }
+}
+
+/* Una familia del guion: una fila con el filo de su color, que al abrirse muestra el guion. */
+.familia {
+  position: relative;
+  border-top: 1px solid rgb(var(--tinta) / 0.07);
+  transition: background 0.25s ease;
+}
+.familia::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 18px;
+  bottom: 18px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--tono);
+  opacity: 0.5;
+  transition: opacity 0.25s ease;
+}
+.familia:hover,
+.familia[data-abierta='si'] {
+  background: rgb(var(--tinta) / 0.025);
+}
+.familia:hover::before,
+.familia[data-abierta='si']::before {
+  opacity: 1;
+}
+
+/* Tipos de atacante: un radar que asoma desde el pie, con sus guías punteadas. */
+.presentacion-radar {
+  background:
+    radial-gradient(60% 70% at 50% 100%, rgb(148 163 184 / 0.14), transparent 70%),
+    radial-gradient(20% 30% at 50% 100%, rgb(255 107 53 / 0.18), transparent 70%);
+}
+.radar-guia {
+  fill: none;
+  stroke: rgb(var(--tinta) / 0.12);
+  stroke-dasharray: 3 6;
+}
+.radar-grupo {
+  animation: radarSube 1s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(0.25s + var(--i) * 0.18s);
+  transform-origin: 50% 100%;
+  transform-box: view-box;
+}
+@keyframes radarSube {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+.radar-rotulo {
+  font-family: 'Geist', 'Inter', sans-serif;
+  font-size: 15px;
+  fill: rgb(var(--tinta) / 0.8);
+}
+/* El radar se achica entero con el ancho; en el teléfono el rótulo se agranda en unidades del
+   dibujo para seguir leyéndose. */
+@media (max-width: 640px) {
+  .radar-rotulo {
+    font-size: 30px;
+  }
+}
+
+/* El retrato de un arquetipo: una lámina alta con el fondo que lo describe (anillos de radar para
+   el sondeo, rayas de repetición para la fuerza bruta, un foco para la intrusión) y su lista al pie. */
+.retrato {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 560px;
+  padding: 22px 22px 20px;
+  border-radius: 24px;
+  box-shadow: inset 0 0 0 1px rgb(var(--tinta) / 0.08);
+  background: linear-gradient(180deg, rgb(var(--tinta) / 0.04), rgb(var(--tinta) / 0.015));
+}
+.retrato::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.9;
+}
+.retrato[data-arquetipo='sondeo']::before {
+  background:
+    repeating-radial-gradient(
+      circle at 50% 30%,
+      transparent 0 26px,
+      color-mix(in srgb, var(--tono) 18%, transparent) 26px 27px
+    ),
+    radial-gradient(
+      70% 50% at 50% 25%,
+      color-mix(in srgb, var(--tono) 22%, transparent),
+      transparent 70%
+    );
+  -webkit-mask-image: linear-gradient(to bottom, #000 30%, transparent 75%);
+  mask-image: linear-gradient(to bottom, #000 30%, transparent 75%);
+}
+.retrato[data-arquetipo='fuerza']::before {
+  background:
+    repeating-linear-gradient(
+      115deg,
+      transparent 0 14px,
+      color-mix(in srgb, var(--tono) 16%, transparent) 14px 15px
+    ),
+    radial-gradient(
+      70% 50% at 50% 25%,
+      color-mix(in srgb, var(--tono) 24%, transparent),
+      transparent 70%
+    );
+  -webkit-mask-image: linear-gradient(to bottom, #000 30%, transparent 75%);
+  mask-image: linear-gradient(to bottom, #000 30%, transparent 75%);
+}
+.retrato[data-arquetipo='intrusion']::before {
+  background:
+    radial-gradient(
+      40% 30% at 50% 26%,
+      color-mix(in srgb, var(--tono) 45%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      90% 60% at 50% 20%,
+      color-mix(in srgb, var(--tono) 14%, transparent),
+      transparent 75%
+    );
+}
+.retrato-lista {
+  display: flex;
+  flex-direction: column;
+}
+.retrato-lista li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 0;
+  font-size: 12.5px;
+  color: rgb(var(--tinta) / 0.7);
+  border-top: 1px solid rgb(var(--tinta) / 0.08);
+}
+.retrato-lista li span:first-child {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.retrato-lista li span:first-child::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border: 1px solid var(--tono);
+  transform: rotate(45deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .radar-grupo {
+    animation: none;
+  }
+}
+
+/* Anatomía de un ataque: una sala oscura con líneas de barrido, y la terminal como la imagen de la
+   escena. */
+.presentacion-escena {
+  background:
+    radial-gradient(50% 60% at 15% 10%, rgb(0 184 148 / 0.12), transparent 70%),
+    radial-gradient(45% 55% at 90% 70%, rgb(255 107 53 / 0.1), transparent 70%),
+    repeating-linear-gradient(to bottom, rgb(var(--tinta) / 0.025) 0 1px, transparent 1px 4px);
+}
+.escena-terminal {
+  box-shadow:
+    inset 0 0 0 1px rgb(var(--tinta) / 0.1),
+    0 30px 80px -40px rgb(0 0 0 / 0.8),
+    0 0 0 1px rgb(0 184 148 / 0.06);
+}
+.titular-tactica {
+  font-family: 'Geist', 'Inter', sans-serif;
+  font-size: clamp(28px, 3.2vw, 46px);
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: -0.035em;
+  text-transform: uppercase;
+}
+.sesion-fila {
+  display: block;
+  width: 100%;
+  padding: 12px 6px;
+  text-align: left;
+  border-top: 1px solid rgb(var(--tinta) / 0.07);
+  transition: background 0.25s ease;
+}
+.sesion-fila:hover {
+  background: rgb(var(--tinta) / 0.03);
+}
+.sesion-fila[data-actual='si'] {
+  background: color-mix(in srgb, var(--neural-teal) 8%, transparent);
+  box-shadow: inset 2px 0 0 var(--neural-teal);
+}
+
+/* Tácticas MITRE: una trama de triángulos, la misma geometría del hexágono de la marca, con la
+   cadena de una intrusión como imagen. */
+.presentacion-cadena {
+  background:
+    radial-gradient(50% 60% at 85% 15%, rgb(0 184 148 / 0.12), transparent 70%),
+    radial-gradient(45% 55% at 10% 85%, rgb(212 134 10 / 0.1), transparent 70%),
+    repeating-linear-gradient(60deg, rgb(var(--tinta) / 0.035) 0 1px, transparent 1px 34px),
+    repeating-linear-gradient(-60deg, rgb(var(--tinta) / 0.035) 0 1px, transparent 1px 34px),
+    repeating-linear-gradient(0deg, rgb(var(--tinta) / 0.035) 0 1px, transparent 1px 29.4px);
+}
+.presentacion-cadena::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(to bottom, transparent 70%, rgb(var(--fondo)) 100%);
+  pointer-events: none;
+}
+.cifra-gigante-fria {
+  color: var(--neural-teal);
+}
+.cifra-gigante-tenue {
+  color: rgb(var(--tinta) / 0.3);
+}
+
+/* El catálogo de técnicas: una grilla de celdas con el identificador en grande, en el color de su
+   táctica. */
+.catalogo {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  border-top: 1px solid rgb(var(--tinta) / 0.08);
+  border-left: 1px solid rgb(var(--tinta) / 0.08);
+}
+.catalogo-celda {
+  display: flex;
+  flex-direction: column;
+  padding: 14px 14px 12px;
+  border-right: 1px solid rgb(var(--tinta) / 0.08);
+  border-bottom: 1px solid rgb(var(--tinta) / 0.08);
+  transition: background 0.25s ease;
+}
+.catalogo-celda:hover {
+  background: color-mix(in srgb, var(--tono) 8%, transparent);
+}
+.catalogo-id {
+  font-family: 'Fira Code', monospace;
+  font-size: 16px;
+  letter-spacing: -0.02em;
+  color: var(--tono);
 }

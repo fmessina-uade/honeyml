@@ -1,8 +1,7 @@
-import { Crosshair, KeyRound, Radar } from 'lucide-react';
 import type { ArchetypeData } from '../../lib/api';
 import Reveal from '../Reveal';
 import AttackFunnel from '../AttackFunnel';
-import { Hexagono } from '../Instrumento';
+import { Palabras } from '../Titular';
 import { dec, n } from '../../lib/format';
 import { useI18n } from '../../lib/i18n';
 
@@ -16,13 +15,13 @@ import { useI18n } from '../../lib/i18n';
  */
 
 /** Identidad visual por arquetipo, indexada por el nombre que el backend deriva del perfil. */
-const LOOK: Record<string, { icon: typeof Radar; color: string }> = {
-  'Intrusión efectiva': { icon: Crosshair, color: 'var(--agent-coral)' },
-  'Fuerza bruta': { icon: KeyRound, color: 'var(--honey-amber)' },
-  Sondeo: { icon: Radar, color: 'var(--ghost-slate)' },
+const LOOK: Record<string, { fondo: string; color: string }> = {
+  'Intrusión efectiva': { fondo: 'intrusion', color: 'var(--agent-coral)' },
+  'Fuerza bruta': { fondo: 'fuerza', color: 'var(--honey-amber)' },
+  Sondeo: { fondo: 'sondeo', color: 'var(--ghost-slate)' },
 };
 
-const FALLBACK = { icon: Radar, color: 'var(--ghost-slate)' };
+const FALLBACK = { fondo: 'sondeo', color: 'var(--ghost-slate)' };
 
 export default function Archetypes({ data }: { data: ArchetypeData }) {
   const { t } = useI18n();
@@ -55,124 +54,193 @@ export default function Archetypes({ data }: { data: ArchetypeData }) {
     1,
   );
 
+  const perfiles = [...data.perfiles].sort((a, b) => b.porcentaje - a.porcentaje);
+
   return (
-    <section className="flex flex-col gap-4">
-      <Reveal>
-        <div className="panel p-4">
-          <div className="text-[11px] text-white/60 leading-relaxed">{t.archetypes.lesson}</div>
+    <section className="flex flex-col gap-14">
+      {/* La presentación: un radar que asoma desde abajo, un semicírculo por grupo */}
+      <div className="presentacion presentacion-radar">
+        <div className="relative max-w-[1320px] mx-auto px-4 md:px-8 pt-14 sm:pt-20 flex flex-col items-center text-center">
+          <span className="ceja section-in">{t.archetypes.heroBadge}</span>
+          <h1 className="titular-landing mt-5">
+            <Palabras texto={t.nav.arquetipos} />
+          </h1>
+          <p className="portada-bajada section-in">{t.lead.arquetipos}</p>
         </div>
+        <Radar perfiles={perfiles} nombre={(k) => copy(k).name} />
+      </div>
+
+      <Reveal>
+        <figure className="cita" style={{ borderColor: 'var(--ghost-slate)' }}>
+          <span className="ceja">{t.funnel.title}</span>
+          <blockquote className="mt-4">{t.archetypes.lesson}</blockquote>
+        </figure>
       </Reveal>
 
-      {/* El embudo va antes que las tarjetas: da la forma del conjunto, y recién después conviene
+      {/* El embudo va antes que los retratos: da la forma del conjunto, y recién después conviene
           mirar quiénes componen cada escalón. */}
-      <Reveal delay={40}>
+      <Reveal>
         <AttackFunnel data={data} />
       </Reveal>
 
-      <div className="grid lg:grid-cols-3 gap-3">
+      {/* Un retrato por arquetipo, con su fondo propio y su lista al pie */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {data.perfiles.map((p, i) => {
           const look = LOOK[p.nombre] ?? FALLBACK;
-          const Icon = look.icon;
           const c = copy(p.nombre);
-
           return (
             <Reveal key={p.nombre} delay={Math.min(i * 80, 240)}>
-              <div className="panel tile overflow-hidden p-4 h-full flex flex-col">
-                <span className="tile-glow" style={{ background: look.color }} />
-                <span
-                  className="absolute inset-x-0 top-0 h-px"
-                  style={{
-                    background: `linear-gradient(90deg, transparent, ${look.color}, transparent)`,
-                  }}
-                />
-                <div className="relative flex flex-col flex-1">
-                  <div className="flex items-center gap-2.5">
-                    <Hexagono color={look.color}>
-                      <Icon className="w-3.5 h-3.5" />
-                    </Hexagono>
-                    <span className="titulo">{c.name}</span>
-                    <span
-                      className="ml-auto font-data text-[10px] rounded-full px-2 py-0.5"
-                      style={{
-                        color: look.color,
-                        boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${look.color} 45%, transparent)`,
-                      }}
-                    >
-                      {dec(p.porcentaje, 1)}%
-                    </span>
+              <article
+                className="retrato"
+                data-arquetipo={look.fondo}
+                style={{ '--tono': look.color } as React.CSSProperties}
+              >
+                <span className="ceja self-center">{c.name}</span>
+
+                <div className="mt-8 text-center">
+                  <div className="cifra-columna" style={{ color: look.color }}>
+                    {dec(p.porcentaje, 1)}%
                   </div>
-
-                  <div className="mt-3 flex items-baseline gap-2">
-                    <span className="cifra">{n(p.direcciones)}</span>
-                    <span className="text-[10px] text-white/40">{t.archetypes.addresses}</span>
-                  </div>
-
-                  <div className="text-[11px] text-white/55 leading-relaxed mt-2">{c.blurb}</div>
-
-                  {/* Los tres números que separan un compromiso real de un intento */}
-                  <div className="grid grid-cols-3 gap-2 mt-3">
-                    {[
-                      { label: t.archetypes.ranCommands, value: p.pct_ejecuto_comandos },
-                      { label: t.archetypes.downloaded, value: p.pct_descargo_archivo },
-                      { label: t.archetypes.gotIn, value: p.pct_logro_acceso },
-                    ].map((m) => (
-                      <div key={m.label} className="rounded-lg bg-white/[0.03] p-2.5">
-                        <div className="cifra-chica">{dec(m.value, 1)}%</div>
-                        <div className="rotulo mt-0.5">{m.label}</div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* En qué se apoyó el agrupamiento: cuántos desvíos se aparta cada rasgo del
-                      promedio de todas las direcciones, hacia arriba o hacia abajo. */}
-                  <div className="mt-4 pt-3 border-t border-white/5">
-                    <div className="rotulo mb-2">{t.archetypes.traitsTitle}</div>
-                    <div className="flex flex-col gap-1.5">
-                      {p.rasgos.map((r) => {
-                        const largo = (Math.abs(r.desvios) / maxDesvio) * 50;
-                        const positivo = r.desvios > 0;
-                        return (
-                          <div
-                            key={r.columna}
-                            className="grid grid-cols-[minmax(0,1fr)_minmax(0,40%)_66px] gap-2 items-center"
-                          >
-                            <span className="text-[10px] text-white/55 truncate">
-                              {traitLabel(r.columna, r.caracteristica)}
-                            </span>
-                            <span className="relative h-2">
-                              <span className="absolute inset-y-0 left-1/2 w-px bg-white/15" />
-                              <span
-                                className="absolute inset-y-0 rounded-sm"
-                                style={{
-                                  [positivo ? 'left' : 'right']: '50%',
-                                  width: `max(${largo}%, 2px)`,
-                                  background: positivo ? look.color : 'var(--ghost-slate)',
-                                  opacity: positivo ? 0.85 : 0.55,
-                                }}
-                              />
-                            </span>
-                            <span className="font-data text-[9.5px] text-white/40 text-right whitespace-nowrap">
-                              {t.archetypes.sd(`${positivo ? '+' : ''}${dec(r.desvios, 1)}`)}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
+                  <div className="text-[12px] text-white/55 mt-2">
+                    {n(p.direcciones)} {t.archetypes.addresses}
                   </div>
                 </div>
-              </div>
+
+                <p className="text-[12.5px] text-white/65 leading-relaxed mt-6">{c.blurb}</p>
+
+                {/* Los tres números que separan un compromiso real de un intento */}
+                <ul className="retrato-lista mt-auto pt-6">
+                  {[
+                    { label: t.archetypes.ranCommands, value: p.pct_ejecuto_comandos },
+                    { label: t.archetypes.downloaded, value: p.pct_descargo_archivo },
+                    { label: t.archetypes.gotIn, value: p.pct_logro_acceso },
+                  ].map((m) => (
+                    <li key={m.label}>
+                      <span>{m.label}</span>
+                      <span className="font-data">{dec(m.value, 1)}%</span>
+                    </li>
+                  ))}
+                </ul>
+
+                {/* En qué se apoyó el agrupamiento: cuántos desvíos se aparta cada rasgo del
+                    promedio de todas las direcciones, hacia arriba o hacia abajo. */}
+                <div className="mt-5 pt-4 border-t border-white/10">
+                  <div className="rotulo mb-2.5">{t.archetypes.traitsTitle}</div>
+                  <div className="flex flex-col gap-1.5">
+                    {p.rasgos.map((r) => {
+                      const largo = (Math.abs(r.desvios) / maxDesvio) * 50;
+                      const positivo = r.desvios > 0;
+                      return (
+                        <div
+                          key={r.columna}
+                          className="grid grid-cols-[minmax(0,1fr)_minmax(0,40%)_66px] gap-2 items-center"
+                        >
+                          <span className="text-[10.5px] text-white/60 truncate">
+                            {traitLabel(r.columna, r.caracteristica)}
+                          </span>
+                          <span className="relative h-2">
+                            <span className="absolute inset-y-0 left-1/2 w-px bg-white/15" />
+                            <span
+                              className="absolute inset-y-0 rounded-sm"
+                              style={{
+                                [positivo ? 'left' : 'right']: '50%',
+                                width: `max(${largo}%, 2px)`,
+                                background: positivo ? look.color : 'var(--ghost-slate)',
+                                opacity: positivo ? 0.85 : 0.55,
+                              }}
+                            />
+                          </span>
+                          <span className="font-data text-[9.5px] text-white/40 text-right whitespace-nowrap">
+                            {t.archetypes.sd(`${positivo ? '+' : ''}${dec(r.desvios, 1)}`)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </article>
             </Reveal>
           );
         })}
       </div>
 
-      <Reveal delay={300}>
-        <div className="panel panel-tenue p-3.5">
-          <div className="text-[10px] text-white/40 leading-relaxed">
-            {t.archetypes.method(n(data.direcciones_analizadas), data.caracteristicas, data.grupos)}
-          </div>
-        </div>
+      <Reveal>
+        <p className="text-[11px] text-white/40 leading-relaxed max-w-[64rem]">
+          {t.archetypes.method(n(data.direcciones_analizadas), data.caracteristicas, data.grupos)}
+        </p>
       </Reveal>
     </section>
+  );
+}
+
+/**
+ * El radar de la presentación: un semicírculo por grupo, todos con el mismo centro al pie, con el
+ * área de su porcentaje. El grupo más chico, el de la intrusión efectiva, queda como un punto en el
+ * centro de todo lo demás.
+ */
+function Radar({
+  perfiles,
+  nombre,
+}: {
+  perfiles: ArchetypeData['perfiles'];
+  nombre: (k: string) => string;
+}) {
+  const ANCHO = 1000;
+  const ALTO = 340;
+  const cx = ANCHO / 2;
+  const R = ALTO - 24;
+  return (
+    <svg
+      viewBox={`0 0 ${ANCHO} ${ALTO}`}
+      preserveAspectRatio="xMidYMax meet"
+      className="block w-full max-w-[1100px] mx-auto mt-6"
+      role="img"
+      aria-label={perfiles.map((p) => `${nombre(p.nombre)} ${dec(p.porcentaje, 1)}%`).join(', ')}
+    >
+      {[0.25, 0.5, 0.75, 1].map((f) => (
+        <path
+          key={f}
+          d={`M ${cx - R * f * 1.5} ${ALTO} A ${R * f * 1.5} ${R * f * 1.5} 0 0 1 ${cx + R * f * 1.5} ${ALTO}`}
+          className="radar-guia"
+        />
+      ))}
+      {perfiles.map((p, i) => {
+        const look = LOOK[p.nombre] ?? FALLBACK;
+        const r = Math.max(9, R * Math.sqrt(p.porcentaje / 100));
+        const lado = i % 2 === 0 ? 1 : -1;
+        const ang = (lado > 0 ? 58 : 122) * (Math.PI / 180);
+        const px = cx + r * Math.cos(ang);
+        const py = ALTO - r * Math.sin(ang);
+        return (
+          <g key={p.nombre} className="radar-grupo" style={{ '--i': i } as React.CSSProperties}>
+            <path
+              d={`M ${cx - r} ${ALTO} A ${r} ${r} 0 0 1 ${cx + r} ${ALTO} Z`}
+              style={{
+                fill: look.color,
+                fillOpacity: i === perfiles.length - 1 ? 0.9 : 0.06 + i * 0.07,
+                stroke: look.color,
+                strokeOpacity: 0.7,
+              }}
+            />
+            <circle cx={px} cy={py} r={3} style={{ fill: look.color }} />
+            <line
+              x1={px}
+              y1={py}
+              x2={px + lado * 34}
+              y2={py - 26}
+              style={{ stroke: look.color, strokeOpacity: 0.6 }}
+            />
+            <text
+              x={px + lado * 40}
+              y={py - 30}
+              textAnchor={lado > 0 ? 'start' : 'end'}
+              className="radar-rotulo"
+            >
+              {nombre(p.nombre)} {dec(p.porcentaje, 1)}%
+            </text>
+          </g>
+        );
+      })}
+    </svg>
   );
 }

@@ -67,7 +67,7 @@ export default function PasswordCheck() {
   }
 
   return (
-    <div className="panel p-4">
+    <div className="vidrio p-5 sm:p-6">
       <div className="flex items-center gap-2.5">
         <Hexagono color="var(--honey-amber)">
           <Lock className="w-3.5 h-3.5" />

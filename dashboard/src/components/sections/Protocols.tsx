@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { ProtocolDetail } from '../../lib/api';
 import Reveal from '../Reveal';
+import { Palabras } from '../Titular';
 import Tooltip, { useTooltip } from '../Tooltip';
 import ManoAlzada, { type Nota, type Trazo } from '../ManoAlzada';
 import { compacto, n, pct } from '../../lib/format';
@@ -426,28 +427,74 @@ export default function Protocols({ detail }: { detail: ProtocolDetail[] }) {
     </div>
   );
 
+  const puertos = vectors.filter((d) => d.port).map((d) => String(d.port));
+
   return (
-    <section className="flex flex-col gap-4">
+    <section className="flex flex-col gap-14">
       <Tooltip content={tip.content} at={tip.at} />
 
-      <Reveal>
-        <div className="panel p-4">
-          <div className="text-[11px] text-white/60 leading-relaxed">
-            {t.protocols.intro1} <span className="text-white/85">{t.protocols.introStrong}</span>{' '}
-            {t.protocols.intro2}
+      {/* La presentación: los puertos abiertos pasando de fondo y el contraste que deja la sección */}
+      <div className="presentacion presentacion-puertas">
+        <div className="puertas-fondo" aria-hidden>
+          <div className="puertas-pista">
+            {[0, 1].map((copia) => puertos.map((p) => <span key={`${copia}-${p}`}>{p}</span>))}
           </div>
         </div>
-      </Reveal>
+        <div className="relative max-w-[1320px] mx-auto px-4 md:px-8 pt-16 sm:pt-24 pb-12 grid lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] gap-10 lg:gap-14 items-end">
+          <div className="min-w-0">
+            <span className="ceja section-in">{t.protocols.heroBadge(vectors.length)}</span>
+            <h1 className="titular-landing mt-5">
+              <Palabras texto={t.nav.protocolos} />
+            </h1>
+            <p className="portada-bajada section-in">{t.lead.protocolos}</p>
+            <p className="text-[13px] text-white/50 leading-relaxed mt-4 max-w-[36rem] section-in">
+              {t.protocols.intro1} <span className="text-white/80">{t.protocols.introStrong}</span>{' '}
+              {t.protocols.intro2}
+            </p>
+          </div>
+          {brecha > 2 && insistente && disperso && (
+            <div className="section-in">
+              <span className="ceja">{t.protocols.perSourceLabel}</span>
+              <div className="flex flex-wrap items-end gap-x-5 gap-y-4 mt-5">
+                {[insistente, disperso].map((d, i) => (
+                  <div key={d.protocol} className="flex items-end gap-5">
+                    {i > 0 && <span className="barra-oblicua" aria-hidden />}
+                    <div className="flex flex-col gap-1.5">
+                      <span className="cifra-fina" style={{ color: info(d).color }}>
+                        {n(Math.round(porOrigen(d)))}
+                      </span>
+                      <span className="text-[12px] text-white/55 leading-snug">
+                        <span className="text-white/85">{info(d).name}</span>,{' '}
+                        {t.protocols.fromSources(n(d.sources))}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-5 text-[13px] text-white/60">
+                <span className="font-data text-[var(--agent-coral)]">
+                  {t.protocols.times(n(Math.round(brecha)))}
+                </span>{' '}
+                {t.protocols.gap}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
 
-      <Reveal delay={60}>
-        <div className="panel p-4">
-          <div className="flex items-baseline justify-between gap-3 flex-wrap">
-            <span className="rotulo">{t.protocols.contrastTitle}</span>
-            <span className="text-[10px]" style={{ color: 'rgba(212,134,10,0.65)' }}>
+      {/* La dispersión, abierta y a todo el ancho */}
+      <Reveal>
+        <div className="pliego">
+          <div className="flex items-end justify-between gap-3 flex-wrap">
+            <div className="flex flex-col gap-3">
+              <span className="ceja">{t.protocols.axisY}</span>
+              <h2 className="titulo-bloque">{t.protocols.contrastTitle}</h2>
+            </div>
+            <span className="text-[11px]" style={{ color: 'rgba(212,134,10,0.75)' }}>
               {t.protocols.isoNote}
             </span>
           </div>
-          <div className="grid lg:grid-cols-[minmax(0,1fr)_240px] gap-4 mt-3 items-center">
+          <div className="mt-6">
             <Dispersion
               vectores={vectors}
               info={info}
@@ -457,117 +504,95 @@ export default function Protocols({ detail }: { detail: ProtocolDetail[] }) {
               onPasar={(e, d) => tip.show(e, detalle(d))}
               onSalir={tip.hide}
             />
-            {brecha > 2 && insistente && disperso && (
-              <div className="flex flex-col gap-3">
-                <div className="grid grid-cols-[1fr_auto_1fr] lg:grid-cols-1 gap-3 items-center">
-                  {[insistente, disperso].map((d, i) => (
-                    <div
-                      key={d.protocol}
-                      className={`rounded-lg bg-white/[0.03] p-3 ${i === 1 ? 'order-3 lg:order-none' : ''}`}
-                    >
-                      <div className="titulo text-[12px]" style={{ color: info(d).color }}>
-                        {info(d).name}
-                      </div>
-                      <div className="cifra mt-1">{n(Math.round(porOrigen(d)))}</div>
-                      <div className="text-[10px] text-white/40 mt-0.5">
-                        {t.protocols.perSourceLabel}
-                      </div>
-                      <div className="font-data text-[10px] text-white/30 mt-1">
-                        {t.protocols.fromSources(n(d.sources))}
-                      </div>
-                    </div>
-                  ))}
-                  <div className="order-2 lg:order-none text-center lg:text-left">
-                    <span className="font-data text-lg" style={{ color: 'var(--agent-coral)' }}>
-                      {t.protocols.times(n(Math.round(brecha)))}
-                    </span>
-                    <div className="rotulo mt-0.5">{t.protocols.gap}</div>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
           {brecha > 2 && (
-            <div className="text-[11px] text-white/55 leading-relaxed mt-3">
+            <p className="text-[13px] text-white/55 leading-relaxed mt-5 max-w-[60rem]">
               {t.protocols.contrastNote}
-            </div>
+            </p>
           )}
         </div>
       </Reveal>
 
-      <div className="bar-group grid md:grid-cols-2 gap-3">
-        {vectors.map((d, i) => {
-          const datos = info(d);
-          return (
-            <Reveal key={d.protocol} delay={Math.min(i * 60, 300)}>
-              <div
-                className="bar-item panel overflow-hidden p-4 h-full transition-opacity duration-200 cursor-default"
-                onMouseMove={(e) => tip.show(e, detalle(d))}
-                onMouseLeave={tip.hide}
-              >
-                <span
-                  className="absolute inset-x-0 top-0 h-px"
-                  style={{
-                    background: `linear-gradient(90deg, transparent, ${datos.color}, transparent)`,
-                  }}
-                />
-                <div className="flex items-start justify-between gap-3 flex-wrap">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-2 h-2 rounded-sm" style={{ background: datos.color }} />
-                    <span className="titulo">{datos.name}</span>
-                    {d.port && (
-                      <span className="font-data text-[10px] text-white/30">
-                        {t.protocols.port} {d.port}
+      {/* El índice de puertas: una fila por servicio, con su puerto en grande */}
+      <Reveal>
+        <div className="pliego">
+          <span className="ceja">{t.protocols.port}</span>
+          <h2 className="titulo-bloque mt-3">{t.protocols.indexTitle}</h2>
+          <div className="bar-group mt-6">
+            {vectors.map((d) => {
+              const datos = info(d);
+              return (
+                <div
+                  key={d.protocol}
+                  className="indice-fila bar-item"
+                  style={{ '--tono': datos.color } as React.CSSProperties}
+                  onMouseMove={(e) => tip.show(e, detalle(d))}
+                  onMouseLeave={tip.hide}
+                >
+                  <span className="indice-puerto">{d.port ?? '—'}</span>
+                  <div className="min-w-0">
+                    <div className="flex items-baseline gap-3 flex-wrap">
+                      <span className="geist text-[22px] font-medium tracking-tight text-white">
+                        {datos.name}
                       </span>
+                      <span className="font-data text-[11px] text-white/35">
+                        {t.protocols.port} {d.port ?? '—'}
+                      </span>
+                    </div>
+                    <p className="text-[13px] text-white/65 mt-2 leading-relaxed">{datos.what}</p>
+                    {datos.why && (
+                      <p className="text-[12.5px] text-white/45 mt-1 leading-relaxed">
+                        {datos.why}
+                      </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-4 font-data text-[10px]">
-                    <span className="text-white/45">
-                      <span className="text-white/80">{n(d.count)}</span> {t.protocols.events}
-                    </span>
-                    <span className="text-white/45">
-                      <span className="text-white/80">{n(d.sources)}</span> {t.protocols.sources}
-                    </span>
+                  {/* Dos barras, volumen y alcance: juntas cuentan historias muy distintas. */}
+                  <div className="indice-medidas">
+                    {[
+                      {
+                        rotulo: t.protocols.volume,
+                        cifra: `${n(d.count)} ${t.protocols.events}`,
+                        valor: d.count / maxEvents,
+                        opacidad: 1,
+                      },
+                      {
+                        rotulo: t.protocols.reach,
+                        cifra: `${n(d.sources)} ${t.protocols.sources}`,
+                        valor: d.sources / maxSources,
+                        opacidad: 0.45,
+                      },
+                    ].map((b) => (
+                      <div key={b.rotulo}>
+                        <div className="flex items-baseline justify-between gap-3">
+                          <span className="rotulo">{b.rotulo}</span>
+                          <span className="font-data text-[11px] text-white/70">{b.cifra}</span>
+                        </div>
+                        <div className="h-1.5 rounded bg-white/5 overflow-hidden mt-1.5">
+                          <div
+                            className="h-1.5 rounded transition-all duration-700"
+                            style={{
+                              width: `${b.valor * 100}%`,
+                              background: datos.color,
+                              opacity: b.opacidad,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-
-                {/* Dos barras, volumen y alcance: juntas cuentan historias muy distintas. */}
-                <div className="flex flex-col gap-1.5 mt-3">
-                  {[
-                    { rotulo: t.protocols.volume, valor: d.count / maxEvents, opacidad: 1 },
-                    { rotulo: t.protocols.reach, valor: d.sources / maxSources, opacidad: 0.45 },
-                  ].map((b) => (
-                    <div key={b.rotulo} className="flex items-center gap-2">
-                      <span className="rotulo w-16 shrink-0">{b.rotulo}</span>
-                      <div className="flex-1 h-1.5 rounded bg-white/5 overflow-hidden">
-                        <div
-                          className="h-1.5 rounded transition-all duration-700"
-                          style={{
-                            width: `${b.valor * 100}%`,
-                            background: datos.color,
-                            opacity: b.opacidad,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="text-[11px] text-white/60 mt-3 leading-relaxed">{datos.what}</div>
-                {datos.why && (
-                  <div className="text-[11px] text-white/45 mt-1 leading-relaxed">{datos.why}</div>
-                )}
-              </div>
-            </Reveal>
-          );
-        })}
-      </div>
-
-      <Reveal delay={150}>
-        <div className="panel p-4">
-          <div className="rotulo mb-2">{t.protocols.lessonTitle}</div>
-          <div className="text-[11px] text-white/55 leading-relaxed">{t.protocols.lesson}</div>
+              );
+            })}
+          </div>
         </div>
+      </Reveal>
+
+      {/* La lección, como cita y no como tarjeta */}
+      <Reveal>
+        <figure className="cita">
+          <span className="ceja">{t.protocols.lessonTitle}</span>
+          <blockquote className="mt-4">{t.protocols.lesson}</blockquote>
+        </figure>
       </Reveal>
     </section>
   );
