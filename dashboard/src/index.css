@@ -106,6 +106,9 @@
   --rotulo: rgb(var(--tinta) / 0.4);
   --globo-luz: #1b2836;
   --globo-sombra: #0c1219;
+  /* La marca del logo en chico: el hexágono, su centro ámbar al 42 % y el núcleo. Va como máscara,
+     así cada uso le pone su propio color. */
+  --marca-hex: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M22.5 12 17.25 21.09H6.75L1.5 12 6.75 2.91h10.5z' fill='none' stroke='%23000' stroke-width='2.2'/%3E%3Cpath d='M18 12l-3 5.2H9L6 12l3-5.2h6z' fill='%23000' fill-opacity='.42'/%3E%3Cpath d='M14.6 12l-1.3 2.25h-2.6L9.4 12l1.3-2.25h2.6z' fill='%23000'/%3E%3C/svg%3E");
   color-scheme: dark;
 }
 :root[data-tema='claro'] {
@@ -603,71 +606,6 @@ body {
   }
 }
 
-/* Píldora de metal: el disparador de cada grupo y los botones que llevan a otra pantalla. El
-   destello cruza una sola vez al pasar el puntero, como la luz sobre un instrumento. */
-.metal {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  height: 34px;
-  padding: 0 15px;
-  border-radius: 8px;
-  font-size: 13px;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-  color: #f1f3f5;
-  border: 1px solid rgb(198 204 212 / 0.32);
-  background: linear-gradient(105deg, #07090c 0%, #1d222a 48%, #353c47 100%);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08);
-  transition:
-    border-color 0.35s ease,
-    box-shadow 0.35s ease,
-    filter 0.35s ease;
-}
-.metal::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: linear-gradient(
-    115deg,
-    transparent 30%,
-    rgb(255 255 255 / 0.16) 50%,
-    transparent 70%
-  );
-  transform: translateX(-120%);
-  transition: transform 0.6s ease;
-}
-.metal:hover,
-.metal[aria-expanded='true'] {
-  border-color: rgb(235 235 235 / 0.6);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.14),
-    0 0 18px color-mix(in srgb, var(--honey-amber) 22%, transparent);
-  filter: brightness(1.12);
-}
-.metal:hover::before {
-  transform: translateX(120%);
-}
-:root[data-tema='claro'] .metal {
-  color: #1b233a;
-  border-color: rgb(15 23 42 / 0.16);
-  background: linear-gradient(105deg, #ffffff 0%, #eef1f4 50%, #d8dde4 100%);
-  box-shadow:
-    inset 0 1px 0 #ffffff,
-    0 1px 2px rgb(15 23 42 / 0.06);
-}
-:root[data-tema='claro'] .metal::before {
-  background: linear-gradient(115deg, transparent 30%, rgb(255 255 255 / 0.9) 50%, transparent 70%);
-}
-:root[data-tema='claro'] .metal:hover,
-:root[data-tema='claro'] .metal[aria-expanded='true'] {
-  border-color: color-mix(in srgb, var(--honey-amber) 45%, transparent);
-  filter: none;
-}
 .disparador .chevron {
   opacity: 0.6;
   transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
@@ -676,12 +614,24 @@ body {
   transform: rotate(180deg);
 }
 .punto-actual {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--honey-amber);
-  box-shadow: 0 0 8px var(--honey-amber);
   flex: none;
+  width: 13px;
+  height: 13px;
+  background: var(--honey-amber);
+  -webkit-mask: var(--marca-hex) center / contain no-repeat;
+  mask: var(--marca-hex) center / contain no-repeat;
+  animation: marcaLate 2.4s ease-in-out infinite;
+}
+@keyframes marcaLate {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 0 transparent);
+    transform: rotate(0deg);
+  }
+  50% {
+    filter: drop-shadow(0 0 6px var(--honey-amber));
+    transform: rotate(60deg);
+  }
 }
 
 /* El desplegable que cambia de forma. Un solo contenedor para los dos grupos: al pasar de uno al
@@ -702,7 +652,7 @@ body {
   pointer-events: none;
   border-radius: 16px;
   overflow: hidden;
-  background: rgb(var(--elevada) / 0.9);
+  background: rgb(var(--elevada) / 0.97);
   box-shadow:
     inset 0 0 0 1px rgb(var(--tinta) / 0.08),
     0 30px 70px -25px rgb(0 0 0 / 0.65),
@@ -716,7 +666,7 @@ body {
     opacity 0.3s ease;
 }
 :root[data-tema='claro'] .desplegable {
-  background: rgb(255 255 255 / 0.94);
+  background: rgb(255 255 255 / 0.98);
   box-shadow:
     inset 0 0 0 1px rgb(15 23 42 / 0.08),
     0 30px 60px -28px rgb(15 23 42 / 0.35);
@@ -778,6 +728,15 @@ body {
 }
 .fila-dd[aria-current='page'] span {
   color: rgb(var(--tinta));
+}
+/* La fila de la sección en la que se está: un filo ámbar a la izquierda y una luz que se apaga. */
+.fila-dd[aria-current='page'] {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--honey-amber) 14%, transparent),
+    transparent 75%
+  );
+  box-shadow: inset 2px 0 0 var(--honey-amber);
 }
 
 /* El panal de la marca detrás de cada vista previa, desvanecido hacia abajo en una capa aparte
@@ -922,9 +881,7 @@ body {
   .desplegable,
   .panel-dd,
   .previa,
-  .hoja,
-  .metal,
-  .metal::before {
+  .hoja {
     transition-duration: 0.01s !important;
     transition-delay: 0s !important;
   }
@@ -957,16 +914,46 @@ body {
 .enlace-barra[data-actual='si'] {
   color: rgb(var(--tinta));
 }
+/* La sección actual en la barra: un trazo de luz que se apaga hacia los costados, con la marca del
+   logo encendida en el medio, como un nodo sobre la línea. */
 .enlace-barra[aria-current='page']::after,
 .enlace-barra[data-actual='si']::after {
   content: '';
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 2px;
-  height: 2px;
+  left: -6px;
+  right: -6px;
+  bottom: 1px;
+  height: 1.5px;
   border-radius: 2px;
-  background: linear-gradient(90deg, var(--honey-amber), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--honey-amber) 30%,
+    var(--honey-amber) 70%,
+    transparent
+  );
+  box-shadow: 0 0 10px color-mix(in srgb, var(--honey-amber) 70%, transparent);
+}
+.enlace-barra[aria-current='page']::before,
+.enlace-barra[data-actual='si']::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 11px;
+  height: 11px;
+  margin-left: -5.5px;
+  background: var(--honey-amber);
+  -webkit-mask: var(--marca-hex) center / contain no-repeat;
+  mask: var(--marca-hex) center / contain no-repeat;
+  filter: drop-shadow(0 0 4px var(--honey-amber));
+  animation: marcaAparece 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes marcaAparece {
+  from {
+    opacity: 0;
+    transform: scale(0.4) rotate(-60deg);
+  }
 }
 .enlace-barra:focus-visible,
 .boton-cta:focus-visible {
@@ -1113,13 +1100,6 @@ body {
 }
 .motor-sube {
   animation: motorSube 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
-}
-
-.metal.metal-chica {
-  height: 28px;
-  padding: 0 11px;
-  border-radius: 7px;
-  font-size: 11.5px;
 }
 
 /* El panel de vidrio del razonamiento: la única caja del motor. */
@@ -1450,11 +1430,11 @@ body {
 .ceja::after {
   content: '';
   flex: none;
-  width: 5px;
-  height: 5px;
-  border: 1px solid currentColor;
-  transform: rotate(45deg);
-  opacity: 0.7;
+  width: 11px;
+  height: 11px;
+  background: var(--honey-amber);
+  -webkit-mask: var(--marca-hex) center / contain no-repeat;
+  mask: var(--marca-hex) center / contain no-repeat;
 }
 /* El título de un bloque suelto, sin caja alrededor. */
 .titulo-bloque {
@@ -1466,12 +1446,12 @@ body {
   color: rgb(var(--tinta));
 }
 
-/* La portada: una pantalla entera de landing, de borde a borde. Los hilos del fondo son trazos
-   gruesos con degradé que derivan despacio; el velo oscuro del centro sostiene el contraste del
-   titular sin tapar los bordes. */
+/* La portada: una pantalla entera de landing, de borde a borde. El fondo es la colmena de la
+   marca; el velo del centro sostiene el contraste del titular sin tapar los bordes. */
 .portada {
   position: relative;
   isolation: isolate;
+  background: rgb(var(--fondo));
   width: 100vw;
   margin-left: calc(50% - 50vw);
   margin-right: calc(50% - 50vw);
@@ -1511,43 +1491,81 @@ body {
   filter: blur(80px);
   pointer-events: none;
 }
-.hilos-a,
-.hilos-b {
-  transform-box: fill-box;
-  transform-origin: center;
+/* La colmena de la portada: celdas de contorno ámbar con los nodos del logo en los vértices,
+   algunas encendidas. Se desvanece hacia el centro para dejar limpio el titular. */
+.colmena {
+  -webkit-mask-image: radial-gradient(ellipse 62% 58% at 50% 46%, transparent 25%, #000 75%);
+  mask-image: radial-gradient(ellipse 62% 58% at 50% 46%, transparent 25%, #000 75%);
 }
-.hilos-a {
-  animation: deriva 28s ease-in-out infinite alternate;
+.colmena-deriva {
+  animation: derivaColmena 40s ease-in-out infinite alternate;
 }
-.hilos-b {
-  animation: deriva 34s ease-in-out -9s infinite alternate-reverse;
-}
-@keyframes deriva {
-  from {
-    transform: translate(-2%, 1%) rotate(-1.5deg);
-  }
+@keyframes derivaColmena {
   to {
-    transform: translate(2%, -1.5%) rotate(1.5deg);
+    transform: translate(-29px, 18px);
   }
 }
-.hilo-sombra {
-  stroke: #05040b;
-  stroke-opacity: 0.6;
+.celda-borde {
+  fill: none;
+  stroke: var(--honey-amber);
+  stroke-opacity: 0.2;
+  stroke-width: 2;
 }
-.hilo-nucleo {
-  stroke: #000000;
-  stroke-opacity: 0.32;
+.nodo-coral,
+.nodo-verde,
+.nodo-gris {
+  opacity: 0.55;
 }
-:root[data-tema='claro'] .portada-fondo svg {
-  opacity: 0.6;
+.nodo-coral {
+  fill: var(--agent-coral);
 }
-:root[data-tema='claro'] .hilo-sombra {
-  stroke: #1c345c;
-  stroke-opacity: 0.1;
+.nodo-verde {
+  fill: var(--neural-teal);
 }
-:root[data-tema='claro'] .hilo-nucleo {
-  stroke: #1c345c;
-  stroke-opacity: 0.14;
+.nodo-gris {
+  fill: var(--ghost-slate);
+}
+.colmena-enlace {
+  stroke: var(--neural-teal);
+  stroke-opacity: 0.35;
+  stroke-width: 1.5;
+  stroke-dasharray: 3 9;
+  animation: enlaceCorre 2.4s linear infinite;
+}
+@keyframes enlaceCorre {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+.celda-centro {
+  fill: var(--honey-amber);
+  fill-opacity: 0.42;
+}
+.celda-nucleo {
+  fill: var(--honey-amber);
+  fill-opacity: 0.7;
+}
+.celda-punto {
+  fill: var(--honey-amber);
+}
+.celda-viva {
+  animation: celdaLate 6s ease-in-out infinite;
+  animation-delay: var(--d, 0s);
+}
+@keyframes celdaLate {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+:root[data-tema='claro'] .celda-borde {
+  stroke-opacity: 0.28;
+}
+:root[data-tema='claro'] .celda-centro {
+  fill-opacity: 0.3;
 }
 .portada-titulo,
 .portada-titulo * {
@@ -1578,36 +1596,118 @@ body {
   line-height: 1.6;
   color: rgb(var(--tinta) / 0.66);
 }
-/* La insignia de arriba del titular: una lámina de metal con un punto vivo. */
+/* La insignia de arriba del titular: una cápsula de vidrio con la marca del logo girando despacio,
+   como el cargador, y un filo de luz que le da la vuelta. */
+@property --giro {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
 .insignia {
+  position: relative;
+  isolation: isolate;
   display: inline-flex;
   align-items: center;
-  gap: 9px;
-  padding: 8px 14px;
-  border-radius: 6px;
+  gap: 10px;
+  padding: 7px 16px 7px 9px;
+  border-radius: 999px;
+  font-family: 'Geist', 'Inter', sans-serif;
   font-size: 12.5px;
-  letter-spacing: -0.01em;
-  color: #f2f2f2;
-  background: linear-gradient(90deg, #6b6f76 0%, #2a2d33 52%, #0a0c0f 100%);
+  letter-spacing: -0.005em;
+  color: rgb(var(--tinta) / 0.9);
+  background: linear-gradient(135deg, rgb(var(--tinta) / 0.1), rgb(var(--tinta) / 0.03));
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  box-shadow:
+    inset 0 1px 0 rgb(var(--tinta) / 0.12),
+    0 10px 28px -14px rgb(0 0 0 / 0.6);
 }
 :root[data-tema='claro'] .insignia {
-  color: #1b233a;
-  background: linear-gradient(90deg, #ffffff 0%, #eef1f4 52%, #d8dde4 100%);
-  box-shadow: inset 0 0 0 1px rgb(15 23 42 / 0.1);
+  background: linear-gradient(135deg, rgb(255 255 255 / 0.95), rgb(255 255 255 / 0.7));
+  box-shadow: 0 10px 24px -14px rgb(28 52 92 / 0.35);
 }
 .insignia::before {
   content: '';
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--neural-teal);
-  box-shadow: 0 0 0 0 color-mix(in srgb, var(--neural-teal) 60%, transparent);
-  animation: puntoInsignia 2s ease-in-out infinite;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  background: var(--honey-amber);
+  -webkit-mask: var(--marca-hex) center / contain no-repeat;
+  mask: var(--marca-hex) center / contain no-repeat;
+  animation: marcaGira 9s linear infinite;
 }
-@keyframes puntoInsignia {
-  50% {
-    box-shadow: 0 0 0 5px transparent;
+@keyframes marcaGira {
+  to {
+    transform: rotate(360deg);
   }
+}
+.insignia::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--giro),
+    rgb(var(--tinta) / 0.14) 0 62%,
+    var(--honey-amber) 76%,
+    var(--neural-teal) 86%,
+    rgb(var(--tinta) / 0.14) 96%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: giroBorde 6s linear infinite;
+  pointer-events: none;
+}
+@keyframes giroBorde {
+  to {
+    --giro: 360deg;
+  }
+}
+
+/* La etiqueta chica: una cápsula de vidrio con la marca del logo en el color de lo que nombra. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  padding: 0 11px 0 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  color: rgb(var(--tinta) / 0.88);
+  background: linear-gradient(180deg, rgb(var(--tinta) / 0.08), rgb(var(--tinta) / 0.025));
+  box-shadow:
+    inset 0 0 0 1px rgb(var(--tinta) / 0.12),
+    inset 0 1px 0 rgb(var(--tinta) / 0.1);
+}
+:root[data-tema='claro'] .chip {
+  background: linear-gradient(180deg, #ffffff, rgb(255 255 255 / 0.75));
+  box-shadow:
+    inset 0 0 0 1px rgb(15 23 42 / 0.12),
+    0 1px 2px rgb(15 23 42 / 0.06);
+}
+.chip::before {
+  content: '';
+  flex: none;
+  width: 11px;
+  height: 11px;
+  background: var(--chip-tono, var(--honey-amber));
+  -webkit-mask: var(--marca-hex) center / contain no-repeat;
+  mask: var(--marca-hex) center / contain no-repeat;
+}
+.chip[data-vivo='si']::before {
+  animation: marcaLate 2.4s ease-in-out infinite;
+}
+.chip-codigo {
+  font-family: 'Fira Code', monospace;
+  font-variant-ligatures: none;
+  color: rgb(var(--tinta));
 }
 
 /* Los dos botones de una landing: el sólido, que lleva a lo principal, y el de vidrio. */
@@ -1935,10 +2035,14 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hilos-a,
-  .hilos-b,
+  .colmena-deriva,
+  .colmena-enlace,
+  .celda-viva,
   .marquesina-pista,
-  .insignia::before {
+  .insignia::before,
+  .insignia::after,
+  .punto-actual,
+  .chip[data-vivo='si']::before {
     animation: none;
   }
   .lamina,
@@ -2521,10 +2625,12 @@ button.ranking-fila:hover {
 }
 .retrato-lista li span:first-child::before {
   content: '';
-  width: 5px;
-  height: 5px;
-  border: 1px solid var(--tono);
-  transform: rotate(45deg);
+  flex: none;
+  width: 10px;
+  height: 10px;
+  background: var(--tono);
+  -webkit-mask: var(--marca-hex) center / contain no-repeat;
+  mask: var(--marca-hex) center / contain no-repeat;
 }
 @media (prefers-reduced-motion: reduce) {
   .radar-grupo {
@@ -2619,4 +2725,99 @@ button.ranking-fila:hover {
   font-size: 16px;
   letter-spacing: -0.02em;
   color: var(--tono);
+}
+
+/* El cargador de la colmena: el logo gira despacio, con un leve pulso, sobre un velo que entra y
+   sale. Son los mismos valores del sitio público. */
+@keyframes colmenaGiro {
+  from {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.06);
+  }
+  to {
+    transform: rotate(360deg) scale(1);
+  }
+}
+.colmena-giro {
+  animation: colmenaGiro 1.6s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+  filter: drop-shadow(0 0 24px rgba(212, 134, 10, 0.35));
+}
+@keyframes colmenaVeloEntra {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes colmenaVeloSale {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+.colmena-velo-entra {
+  animation: colmenaVeloEntra 0.22s ease-out forwards;
+}
+.colmena-velo-sale {
+  animation: colmenaVeloSale 0.3s ease-in 0.25s forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .colmena-velo-entra,
+  .colmena-velo-sale {
+    animation: none !important;
+  }
+}
+
+/* El contraste del claro. La tinta del claro es casi negra, y con la opacidad baja que en el oscuro
+   da un gris legible, sobre el fondo claro queda un gris pálido que no se lee. Acá se sube cada
+   escalón a un mínimo legible. Va con especificidad de una sola clase, así los estados al pasar el
+   puntero, que llevan más, siguen ganando. */
+:where(:root[data-tema='claro']) .text-white\/20,
+:where(:root[data-tema='claro']) .text-white\/25,
+:where(:root[data-tema='claro']) .text-white\/30 {
+  color: rgb(var(--tinta) / 0.55);
+}
+:where(:root[data-tema='claro']) .text-white\/35,
+:where(:root[data-tema='claro']) .text-white\/40,
+:where(:root[data-tema='claro']) .text-white\/45 {
+  color: rgb(var(--tinta) / 0.64);
+}
+:where(:root[data-tema='claro']) .text-white\/50,
+:where(:root[data-tema='claro']) .text-white\/55 {
+  color: rgb(var(--tinta) / 0.72);
+}
+:where(:root[data-tema='claro']) .text-white\/60,
+:where(:root[data-tema='claro']) .text-white\/65 {
+  color: rgb(var(--tinta) / 0.78);
+}
+:where(:root[data-tema='claro']) .text-white\/70,
+:where(:root[data-tema='claro']) .text-white\/75 {
+  color: rgb(var(--tinta) / 0.85);
+}
+:where(:root[data-tema='claro']) .ceja {
+  color: rgb(var(--tinta) / 0.72);
+}
+:where(:root[data-tema='claro']) .portada-bajada {
+  color: rgb(var(--tinta) / 0.78);
+}
+:where(:root[data-tema='claro']) .ranking-n,
+:where(:root[data-tema='claro']) .cifra-gigante-tenue {
+  color: rgb(var(--tinta) / 0.5);
+}
+:where(:root[data-tema='claro']) .estacion-nombre,
+:where(:root[data-tema='claro']) .estacion-dato,
+:where(:root[data-tema='claro']) .lamina-flecha {
+  color: rgb(var(--tinta) / 0.62);
+}
+:where(:root[data-tema='claro']) .entrada-definicion,
+:where(:root[data-tema='claro']) .cartel-dato {
+  color: rgb(var(--tinta) / 0.7);
+}
+:where(:root[data-tema='claro']) .radar-rotulo {
+  fill: rgb(var(--tinta) / 0.9);
 }

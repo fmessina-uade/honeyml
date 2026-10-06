@@ -278,14 +278,14 @@ export default function MitreMatrix({
                     tipo: 'elipse',
                     x: 100 - 100 / porFila,
                     y: 100 - 50 / filas,
-                    ancho: (200 / porFila) * 1.02,
-                    alto: (100 / filas) * 1.12,
+                    ancho: (200 / porFila) * (filas > 1 ? 1.02 : 1.3),
+                    alto: (100 / filas) * (filas > 1 ? 1.12 : 1.32),
                   },
                 ]}
                 notas={[
                   {
                     x: 99,
-                    y: filas > 1 ? 50 - 7 : -16,
+                    y: filas > 1 ? 50 - 14 : -54,
                     texto: t.mitre.noteUnseen,
                     alinear: 'derecha',
                     ancho: 280,

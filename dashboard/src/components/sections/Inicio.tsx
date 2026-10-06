@@ -120,7 +120,7 @@ export default function Inicio({
       {/* La presentación: la escala de la captura en grande y por dónde entrar */}
       <section className="portada">
         <div className="portada-fondo" aria-hidden>
-          <Hilos />
+          <Colmena />
         </div>
         <div className="portada-velo" aria-hidden />
 
@@ -342,116 +342,93 @@ export default function Inicio({
   );
 }
 
+// Generador pseudoaleatorio con semilla: la colmena se ve igual en cada carga y en cada captura.
+function semilla(n: number) {
+  let a = n;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Los nodos de cada celda, en el orden del logo: arriba a la izquierda coral, arriba a la derecha
+// gris pizarra, a la derecha verde, y lo mismo invertido abajo.
+const NODOS = ['nodo-gris', 'nodo-verde', 'nodo-coral', 'nodo-gris', 'nodo-verde', 'nodo-coral'];
+
 /**
- * Los hilos del fondo de la portada: trazos gruesos que se cruzan. El volumen sale de capas sobre
- * el mismo trazo, una sombra del lado contrario a la luz y un brillo del lado de la luz, corridas
- * hacia donde da. Son dibujo puro, sin imagen ni video externos.
+ * El fondo de la portada es la marca extendida: un panal de hexágonos con los nodos de colores en
+ * los vértices, como en el logo. Algunas celdas se encienden con el centro ámbar y se unen entre sí
+ * con un trazo que va pasando, la parte de red neuronal de la marca. Es dibujo puro, sin imágenes.
  */
-function Hilos() {
-  const hilos = [
-    {
-      d: 'M-160 720 C 220 520, 460 880, 800 640 S 1280 330, 1620 500',
-      ancho: 130,
-      grad: 'hilo-a',
-      grupo: 'hilos-a',
-      luz: [0, -1],
-    },
-    {
-      d: 'M-120 170 C 240 40, 430 360, 720 250 S 1160 30, 1580 140',
-      ancho: 92,
-      grad: 'hilo-b',
-      grupo: 'hilos-b',
-      luz: [0, -1],
-    },
-    {
-      d: 'M1180 -80 C 1060 220, 1420 360, 1290 640 S 1100 980, 1320 1040',
-      ancho: 110,
-      grad: 'hilo-c',
-      grupo: 'hilos-b',
-      luz: [-1, 0],
-    },
-    {
-      d: 'M180 -60 C 40 180, 300 300, 160 520 S -40 860, 120 1000',
-      ancho: 84,
-      grad: 'hilo-c',
-      grupo: 'hilos-a',
-      luz: [-1, 0],
-    },
-  ];
-  const corrida = (luz: number[], k: number) => `translate(${luz[0] * k} ${luz[1] * k})`;
+function Colmena() {
+  const ANCHO = 1440;
+  const ALTO = 900;
+  const r = 58;
+  const h = Math.sqrt(3) * r;
+  const azar = semilla(7);
+  const vertices = (cx: number, cy: number, k: number) =>
+    Array.from({ length: 6 }, (_, i) => {
+      const a = (Math.PI / 3) * i;
+      return [cx + k * Math.cos(a), cy + k * Math.sin(a)] as const;
+    });
+  const camino = (cx: number, cy: number, k: number) =>
+    `M${vertices(cx, cy, k)
+      .map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`)
+      .join(' L')}Z`;
+
+  const celdas: { cx: number; cy: number; viva: boolean; demora: number }[] = [];
+  for (let col = -1; col * 1.5 * r < ANCHO + r; col++) {
+    for (let fila = -1; fila * h < ALTO + h; fila++) {
+      const cx = col * 1.5 * r;
+      const cy = fila * h + (col % 2 ? h / 2 : 0);
+      celdas.push({ cx, cy, viva: azar() < 0.09, demora: azar() * 6 });
+    }
+  }
+  const vivas = celdas.filter((c) => c.viva);
+  // Cada celda encendida se une con la encendida más cercana: la red se arma sola con lo que tocó.
+  const enlaces = vivas.flatMap((a, i) => {
+    const b = vivas
+      .filter((_, j) => j !== i)
+      .sort(
+        (x, y) => Math.hypot(x.cx - a.cx, x.cy - a.cy) - Math.hypot(y.cx - a.cx, y.cy - a.cy),
+      )[0];
+    return b && a.cx < b.cx ? [{ a, b }] : [];
+  });
+
   return (
     <svg
-      viewBox="0 0 1440 900"
+      viewBox={`0 0 ${ANCHO} ${ALTO}`}
       preserveAspectRatio="xMidYMid slice"
-      className="absolute inset-0 w-full h-full"
+      className="colmena absolute inset-0 w-full h-full"
     >
-      <defs>
-        <linearGradient id="hilo-a" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="#0d1117" />
-          <stop offset="0.4" stopColor="#3a4658" />
-          <stop offset="0.75" stopColor="#ff6b35" />
-          <stop offset="1" stopColor="#d4860a" />
-        </linearGradient>
-        <linearGradient id="hilo-b" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="#d4860a" stopOpacity="0.85" />
-          <stop offset="0.5" stopColor="#00b894" stopOpacity="0.85" />
-          <stop offset="1" stopColor="#0d1117" />
-        </linearGradient>
-        <linearGradient id="hilo-c" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#0d1117" />
-          <stop offset="0.55" stopColor="#5b6b80" />
-          <stop offset="1" stopColor="#d4860a" stopOpacity="0.85" />
-        </linearGradient>
-        <filter id="hilo-borde" x="-10%" y="-10%" width="120%" height="120%">
-          <feGaussianBlur stdDeviation="1.6" />
-        </filter>
-        <filter id="hilo-difuso" x="-10%" y="-10%" width="120%" height="120%">
-          <feGaussianBlur stdDeviation="10" />
-        </filter>
-        <filter id="hilo-brillo" x="-10%" y="-10%" width="120%" height="120%">
-          <feGaussianBlur stdDeviation="4" />
-        </filter>
-      </defs>
-      {hilos.map((h, i) => (
-        <g key={i} className={h.grupo} fill="none" strokeLinecap="round">
-          <path
-            d={h.d}
-            className="hilo-sombra"
-            strokeWidth={h.ancho + 26}
-            transform={corrida(h.luz, -h.ancho * 0.12)}
-            filter="url(#hilo-difuso)"
-          />
-          <path
-            d={h.d}
-            stroke={`url(#${h.grad})`}
-            strokeWidth={h.ancho}
-            filter="url(#hilo-borde)"
-          />
-          <path
-            d={h.d}
-            className="hilo-nucleo"
-            strokeWidth={h.ancho * 0.5}
-            transform={corrida(h.luz, -h.ancho * 0.24)}
-            filter="url(#hilo-difuso)"
-          />
-          <path
-            d={h.d}
-            stroke="#ffffff"
-            strokeOpacity="0.12"
-            strokeWidth={h.ancho * 0.5}
-            transform={corrida(h.luz, h.ancho * 0.12)}
-            filter="url(#hilo-difuso)"
-          />
-          <path
-            d={h.d}
-            stroke="#ffffff"
-            strokeOpacity="0.32"
-            strokeWidth={h.ancho * 0.12}
-            transform={corrida(h.luz, h.ancho * 0.3)}
-            filter="url(#hilo-brillo)"
-          />
-        </g>
-      ))}
+      <g className="colmena-deriva">
+        {celdas.map((c, i) => (
+          <g key={i}>
+            <path d={camino(c.cx, c.cy, r * 0.86)} className="celda-borde" />
+            {vertices(c.cx, c.cy, r * 0.86).map(([x, y], k) =>
+              (i + k) % 3 === 0 ? (
+                <circle key={k} cx={x} cy={y} r={3.4} className={NODOS[k]} />
+              ) : null,
+            )}
+          </g>
+        ))}
+        {enlaces.map(({ a, b }, i) => (
+          <line key={i} x1={a.cx} y1={a.cy} x2={b.cx} y2={b.cy} className="colmena-enlace" />
+        ))}
+        {vivas.map((c, i) => (
+          <g
+            key={i}
+            className="celda-viva"
+            style={{ '--d': `${c.demora.toFixed(2)}s` } as React.CSSProperties}
+          >
+            <path d={camino(c.cx, c.cy, r * 0.6)} className="celda-centro" />
+            <path d={camino(c.cx, c.cy, r * 0.3)} className="celda-nucleo" />
+            <circle cx={c.cx} cy={c.cy} r={4} className="celda-punto" />
+          </g>
+        ))}
+      </g>
     </svg>
   );
 }

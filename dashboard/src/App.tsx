@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Archive } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import {
   api,
   type ArchetypeData,
@@ -24,6 +24,11 @@ import Archetypes from './components/sections/Archetypes';
 import Geography from './components/sections/Geography';
 import Triage from './components/sections/Triage';
 import AttackCanvas from './components/AttackCanvas';
+import TransicionColmena, {
+  APERTURA_MS,
+  CIERRE_MS,
+  type Fase,
+} from './components/TransicionColmena';
 
 export type { SectionId };
 
@@ -50,7 +55,11 @@ export default function App() {
   const [health, setHealth] = useState<Health | null>(null);
   const [replays, setReplays] = useState<Replay[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // La sección pedida y la que se muestra van por separado: la barra marca la pedida en el acto, y
+  // el contenido cambia recién cuando el velo de la transición la tapa.
   const [active, setActive] = useState<SectionId>('inicio');
+  const [mostrada, setMostrada] = useState<SectionId>('inicio');
+  const [fase, setFase] = useState<Fase>('inicial');
   const [families, setFamilies] = useState<FingerprintData | null>(null);
   const [archetypes, setArchetypes] = useState<ArchetypeData | null>(null);
   // el modo captura congela todas las animaciones, así las capturas de pantalla se repiten igual
@@ -99,11 +108,41 @@ export default function App() {
     return () => document.removeEventListener('pointermove', mover);
   }, []);
 
-  // Al cambiar de sección se vuelve arriba: si no, en el teléfono la sección nueva abre por la
-  // mitad, a la altura donde había quedado la anterior.
+  // En la primera carga el velo cubre hasta que llegan los datos o el error: así no se llega a ver
+  // la pantalla vacía ni un esqueleto que después cambia de forma.
+  const listo = Boolean(snapshot || error);
   useEffect(() => {
-    principal.current?.scrollTo({ top: 0 });
-  }, [active]);
+    if (listo) setFase('abriendo');
+  }, [listo]);
+
+  // Al cambiar de sección el velo cubre la vieja, se cambia y se descubre la nueva ya arriba de
+  // todo: si no, en el teléfono la sección nueva abre por la mitad, a la altura de la anterior.
+  useEffect(() => {
+    if (active === mostrada) return;
+    const cambiar = () => {
+      setMostrada(active);
+      principal.current?.scrollTo({ top: 0 });
+    };
+    const sinMovimiento =
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+      document.documentElement.dataset.capture === 'on';
+    if (sinMovimiento) {
+      cambiar();
+      return;
+    }
+    setFase('cerrando');
+    const id = window.setTimeout(() => {
+      cambiar();
+      setFase('abriendo');
+    }, CIERRE_MS);
+    return () => window.clearTimeout(id);
+  }, [active, mostrada]);
+
+  useEffect(() => {
+    if (fase !== 'abriendo') return;
+    const id = window.setTimeout(() => setFase('quieta'), APERTURA_MS);
+    return () => window.clearTimeout(id);
+  }, [fase]);
 
   const cifras = useMemo(
     () => (snapshot ? lecciones(snapshot, families, archetypes, replays.length, t) : null),
@@ -115,18 +154,18 @@ export default function App() {
   const estado =
     health?.mode === 'snapshot' ? (
       <span
-        className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] text-white/55 ring-1 ring-white/10 bg-white/[0.03] whitespace-nowrap"
+        className="chip"
         title={`${t.footer.frozenTitle} ${health.generated_at?.slice(0, 16).replace('T', ' ')}`}
       >
-        <Archive className="w-3 h-3 shrink-0 text-[var(--honey-amber)]" />
         {t.footer.frozenShort}
       </span>
     ) : (
       <span
-        className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] text-white/55 ring-1 ring-white/10 bg-white/[0.03] whitespace-nowrap"
+        className="chip"
+        data-vivo="si"
+        style={{ '--chip-tono': 'var(--neural-teal)' } as React.CSSProperties}
         title={snapshot ? t.footer.range(desde, hasta) : undefined}
       >
-        <span className="w-1.5 h-1.5 rounded-full bg-[var(--neural-teal)] animate-pulse" />
         {t.footer.liveShort}
       </span>
     );
@@ -150,13 +189,16 @@ export default function App() {
       >
         <div className="max-w-[1320px] mx-auto px-4 md:px-8 pb-12">
           {/* Las secciones con presentación propia dibujan su encabezado; el resto usa este. */}
-          {!(PRESENTACION_PROPIA.has(active) && snapshot) && (
-            <header key={`h-${active}`} className="relative -mx-4 px-4 md:-mx-8 md:px-8 pt-8 pb-7">
-              {snapshot && <AttackCanvas intensity={snapshot.timeline.map((d) => d.count)} />}
+          {snapshot && !PRESENTACION_PROPIA.has(mostrada) && (
+            <header
+              key={`h-${mostrada}`}
+              className="relative -mx-4 px-4 md:-mx-8 md:px-8 pt-8 pb-7"
+            >
+              <AttackCanvas intensity={snapshot.timeline.map((d) => d.count)} />
               <div className="relative max-w-3xl">
-                <Titular texto={t.nav[active]} />
+                <Titular texto={t.nav[mostrada]} />
                 <p className="text-[14px] text-white/55 mt-3 leading-relaxed section-in">
-                  {t.lead[active]}
+                  {t.lead[mostrada]}
                 </p>
               </div>
             </header>
@@ -175,23 +217,9 @@ export default function App() {
             </div>
           )}
 
-          {/* Un esqueleto en lugar de un indicador que gira: el snapshot hace varias agregaciones
-              sobre todo el corpus y tarda un momento, y una grilla que no salta al llegar los
-              datos se lee como hecha a propósito. */}
-          {!snapshot && !error && (
-            <div className="flex flex-col gap-3 animate-pulse">
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                {[0, 1, 2, 3].map((i) => (
-                  <div key={i} className="h-[104px] panel" />
-                ))}
-              </div>
-              <div className="h-[196px] panel" />
-            </div>
-          )}
-
           {snapshot && (
-            <div key={active} className="section-in">
-              {active === 'inicio' && (
+            <div key={mostrada} className="section-in">
+              {mostrada === 'inicio' && (
                 <Inicio
                   snapshot={snapshot}
                   familias={families}
@@ -200,8 +228,8 @@ export default function App() {
                   onIr={setActive}
                 />
               )}
-              {active === 'triaje' && <Triage />}
-              {active === 'pulso' && (
+              {mostrada === 'triaje' && <Triage />}
+              {mostrada === 'pulso' && (
                 <Pulse
                   overview={snapshot.overview}
                   timeline={snapshot.timeline}
@@ -209,20 +237,21 @@ export default function App() {
                   weekly={snapshot.weekly_rhythm}
                 />
               )}
-              {active === 'anatomia' && <SessionReplay replays={replays} />}
-              {active === 'diccionario' && (
+              {mostrada === 'anatomia' && <SessionReplay replays={replays} />}
+              {mostrada === 'diccionario' && (
                 <Dictionary
                   users={snapshot.credentials.users}
                   passwords={snapshot.credentials.passwords}
                 />
               )}
-              {active === 'protocolos' && <Protocols detail={snapshot.protocol_detail} />}
-              {active === 'huellas' && (families ? <Fingerprints data={families} /> : <SinDatos />)}
-              {active === 'arquetipos' &&
+              {mostrada === 'protocolos' && <Protocols detail={snapshot.protocol_detail} />}
+              {mostrada === 'huellas' &&
+                (families ? <Fingerprints data={families} /> : <SinDatos />)}
+              {mostrada === 'arquetipos' &&
                 (archetypes ? <Archetypes data={archetypes} /> : <SinDatos />)}
-              {active === 'origen' &&
+              {mostrada === 'origen' &&
                 (snapshot.geography ? <Geography data={snapshot.geography} /> : <SinDatos />)}
-              {active === 'mitre' && (
+              {mostrada === 'mitre' && (
                 <MitreMatrix
                   replays={replays}
                   stages={snapshot.stages}
@@ -245,6 +274,7 @@ export default function App() {
         </div>
       </main>
       <div className="grano" aria-hidden />
+      <TransicionColmena fase={fase} />
     </div>
   );
 }

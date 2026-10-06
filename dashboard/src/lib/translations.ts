@@ -616,7 +616,7 @@ const es = {
       timeline: {
         current: 'Ejecución en curso',
         last: 'Última ejecución',
-        run: (id: string) => `ejecución ${id}`,
+        runLabel: 'ejecución',
         bus: 'bus',
         heads: {
           received: 'Llega un evento',
@@ -1382,7 +1382,7 @@ const en: typeof es = {
       timeline: {
         current: 'Run in progress',
         last: 'Latest run',
-        run: (id: string) => `run ${id}`,
+        runLabel: 'run',
         bus: 'bus',
         heads: {
           received: 'An event arrives',

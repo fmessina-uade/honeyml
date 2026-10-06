@@ -1,5 +1,6 @@
 import type { ArchetypeData, FingerprintData, Snapshot } from '../lib/api';
 import { compacto, dec } from '../lib/format';
+import { WORLD } from '../lib/world';
 import { useI18n } from '../lib/i18n';
 import type { LeccionId } from './lecciones';
 import { NOT_OBSERVED, OBSERVED } from './sections/MitreMatrix';
@@ -112,36 +113,63 @@ function Barras({ snapshot, color }: { snapshot: Snapshot; color: string }) {
   );
 }
 
-/** De dónde vienen: un globo de alambre con los países como puntos, del tamaño de su tráfico. */
+/**
+ * De dónde vienen: el globo con las fronteras de los países, los mismos contornos que el globo de
+ * la sección, y los países de origen como puntos del tamaño de su tráfico.
+ */
 function Globo({ snapshot, color }: { snapshot: Snapshot; color: string }) {
   const cx = ANCHO / 2;
   const cy = ALTO / 2 + 4;
   const r = 100;
   const lon0 = (-40 * Math.PI) / 180;
   const lat0 = (24 * Math.PI) / 180;
+  const proyectar = (latG: number, lonG: number) => {
+    const lat = (latG * Math.PI) / 180;
+    const lon = (lonG * Math.PI) / 180 - lon0;
+    return {
+      x: cx + r * Math.cos(lat) * Math.sin(lon),
+      y: cy - r * (Math.cos(lat0) * Math.sin(lat) - Math.sin(lat0) * Math.cos(lat) * Math.cos(lon)),
+      visible: Math.sin(lat0) * Math.sin(lat) + Math.cos(lat0) * Math.cos(lat) * Math.cos(lon) > 0,
+    };
+  };
+  // Cada contorno se corta donde pasa detrás del globo: solo se dibujan los tramos de la cara que
+  // se ve, sin unir un borde con el otro a través de la esfera.
+  const fronteras = WORLD.flatMap((anillo) => {
+    const tramos: string[] = [];
+    let actual: string[] = [];
+    for (const [lon, lat] of anillo) {
+      const p = proyectar(lat, lon);
+      if (p.visible) {
+        actual.push(`${actual.length ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`);
+      } else if (actual.length) {
+        if (actual.length > 1) tramos.push(actual.join(' '));
+        actual = [];
+      }
+    }
+    if (actual.length > 1) tramos.push(actual.join(' '));
+    return tramos;
+  });
   const paises = (snapshot.geography?.countries ?? []).filter(
     (c) => c.lat != null && c.lon != null,
   );
   const max = Math.max(...paises.map((c) => c.count), 1);
   const puntos = paises.flatMap((c) => {
-    const lat = ((c.lat as number) * Math.PI) / 180;
-    const lon = ((c.lon as number) * Math.PI) / 180 - lon0;
-    const visible = Math.sin(lat0) * Math.sin(lat) + Math.cos(lat0) * Math.cos(lat) * Math.cos(lon);
-    if (visible <= 0) return [];
-    return [
-      {
-        iso: c.iso,
-        x: cx + r * Math.cos(lat) * Math.sin(lon),
-        y:
-          cy -
-          r * (Math.cos(lat0) * Math.sin(lat) - Math.sin(lat0) * Math.cos(lat) * Math.cos(lon)),
-        radio: 2.5 + 9 * Math.sqrt(c.count / max),
-      },
-    ];
+    const p = proyectar(c.lat as number, c.lon as number);
+    if (!p.visible) return [];
+    return [{ iso: c.iso, x: p.x, y: p.y, radio: 2.5 + 9 * Math.sqrt(c.count / max) }];
   });
   return (
     <Lienzo>
+      <circle cx={cx} cy={cy} r={r} fill="currentColor" fillOpacity="0.03" />
       <circle cx={cx} cy={cy} r={r} fill="none" stroke="currentColor" strokeOpacity="0.18" />
+      <path
+        d={fronteras.join(' ')}
+        fill="none"
+        stroke={color}
+        strokeOpacity="0.45"
+        strokeWidth="0.8"
+        strokeLinejoin="round"
+      />
       {[-60, -30, 0, 30, 60].map((g) => (
         <ellipse
           key={`m${g}`}

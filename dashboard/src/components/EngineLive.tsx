@@ -360,6 +360,18 @@ export default function EngineLive({
           ? e.paths.retry
           : e.paths.full;
 
+  // El color de la etiqueta del camino: verde la memoria, coral la vuelta por devolución, gris
+  // pizarra el corte sin contexto y ámbar el ciclo completo.
+  const tonoDelCamino = !fila
+    ? undefined
+    : fila.copiada
+      ? 'var(--neural-teal)'
+      : fila.motivo_de_corte === 'sin_contexto'
+        ? 'var(--ghost-slate)'
+        : fila.rechazos
+          ? 'var(--agent-coral)'
+          : 'var(--honey-amber)';
+
   const demora =
     fila?.momento && fila.decidida && !fila.retriaje
       ? (new Date(fila.decidida).getTime() - new Date(fila.momento).getTime()) / 1000
@@ -413,9 +425,18 @@ export default function EngineLive({
               <>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rotulo mr-1">{terminada ? l.last : l.current}</span>
-                  <span className="metal metal-chica">{camino}</span>
-                  <span className="metal metal-chica font-data">
-                    {l.run(fila.doc_id.slice(0, 6))}
+                  <span
+                    className="chip"
+                    style={{ '--chip-tono': tonoDelCamino } as React.CSSProperties}
+                  >
+                    {camino}
+                  </span>
+                  <span
+                    className="chip"
+                    style={{ '--chip-tono': 'var(--ghost-slate)' } as React.CSSProperties}
+                  >
+                    {l.runLabel}
+                    <span className="chip-codigo">{fila.doc_id.slice(0, 6)}</span>
                   </span>
                 </div>
                 <Frase
