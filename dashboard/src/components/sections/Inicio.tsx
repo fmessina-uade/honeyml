@@ -2,15 +2,9 @@ import { useEffect, useState } from 'react';
 import {
   Activity,
   ArrowRight,
-  BookOpen,
   Fingerprint,
-  Globe,
-  Grid3x3,
-  Network,
-  Radar,
   ShieldCheck,
   Terminal,
-  Users,
   Workflow,
   type LucideIcon,
 } from 'lucide-react';
@@ -21,15 +15,13 @@ import {
   type ResumenTriaje,
   type Snapshot,
 } from '../../lib/api';
-import { compacto, dec, duracion, n, nombreDePais, pct } from '../../lib/format';
+import { dec, duracion, n, pct } from '../../lib/format';
 import { useI18n } from '../../lib/i18n';
-import type { SectionId } from '../../App';
+import { LECCIONES, SECCIONES, lecciones, type SectionId } from '../lecciones';
 import CountUp from '../CountUp';
 import Latido from '../Latido';
 import Reveal from '../Reveal';
 import { Hexagono, Indicador } from '../Instrumento';
-import { NOT_OBSERVED, OBSERVED } from './MitreMatrix';
-import { nombreDelServicio } from './Protocols';
 
 const MINUTOS_ACTIVO = 10;
 const REFRESCO_MS = 15000;
@@ -94,79 +86,14 @@ export default function Inicio({
   const hace = ultima ? Math.max(0, (ahora - new Date(ultima).getTime()) / 1000) : null;
   const activo = hace !== null && hace < MINUTOS_ACTIVO * 60;
 
-  // Una cifra por sección, la que resume su lección.
-  const vectores = snapshot.protocol_detail.filter((d) => d.sources > 5);
-  const insistente = [...vectores].sort(
-    (a, b) => b.count / (b.sources || 1) - a.count / (a.sources || 1),
-  )[0];
-  const usuario = snapshot.credentials.users[0];
-  const pais = snapshot.geography?.countries
-    .filter((c) => c.sources > 0)
-    .sort((a, b) => b.count / b.sources - a.count / a.sources)[0];
-  const familia = familias
-    ? [...familias.families].sort((a, b) => b.sessions - a.sessions)[0]
-    : null;
-  const intrusion = arquetipos?.perfiles.find((p) => p.nombre === 'Intrusión efectiva');
   const dias = snapshot.timeline.filter((d) => d.count > 0).length;
-
-  const tarjetas: Tarjeta[] = [
-    {
-      id: 'pulso',
-      icono: Radar,
-      color: 'var(--honey-amber)',
-      cifra: compacto(o.events),
-      texto: h.cards.pulso(dias),
-    },
-    {
-      id: 'anatomia',
-      icono: Terminal,
-      color: 'var(--agent-coral)',
-      cifra: n(sesiones),
-      texto: h.cards.anatomia,
-    },
-    {
-      id: 'protocolos',
-      icono: Network,
-      color: 'var(--neural-teal)',
-      cifra: insistente ? n(Math.round(insistente.count / (insistente.sources || 1))) : '—',
-      texto: insistente ? h.cards.protocolos(nombreDelServicio(insistente.protocol)) : '',
-    },
-    {
-      id: 'diccionario',
-      icono: BookOpen,
-      color: 'var(--honey-amber)',
-      cifra: usuario ? compacto(usuario.count) : '—',
-      texto: usuario ? h.cards.diccionario(usuario.key) : '',
-    },
-    {
-      id: 'huellas',
-      icono: Fingerprint,
-      color: 'var(--agent-coral)',
-      cifra: familia && familias ? `${pct(familia.sessions, familias.total_sessions, 0)}%` : '—',
-      texto: h.cards.huellas,
-    },
-    {
-      id: 'arquetipos',
-      icono: Users,
-      color: 'var(--ghost-slate)',
-      cifra: intrusion ? `${dec(intrusion.porcentaje, 1)}%` : '—',
-      texto: h.cards.arquetipos,
-    },
-    {
-      id: 'origen',
-      icono: Globe,
-      color: 'var(--neural-teal)',
-      cifra: pais ? n(Math.round(pais.count / pais.sources)) : '—',
-      texto: pais ? h.cards.origen(nombreDePais(pais.iso, pais.country)) : '',
-    },
-    {
-      id: 'mitre',
-      icono: Grid3x3,
-      color: 'var(--violeta)',
-      cifra: `${OBSERVED.length} / ${OBSERVED.length + NOT_OBSERVED.length}`,
-      texto: h.cards.mitre,
-    },
-  ];
+  const cifras = lecciones(snapshot, familias, arquetipos, sesiones, t);
+  const tarjetas: Tarjeta[] = LECCIONES.map((id) => ({
+    id,
+    icono: SECCIONES[id].icon,
+    color: SECCIONES[id].color,
+    ...cifras[id],
+  }));
 
   return (
     <section className="flex flex-col gap-4">
