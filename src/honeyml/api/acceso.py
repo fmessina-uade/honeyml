@@ -7,8 +7,9 @@ del suyo, así que el primer superadmin se crea por consola en el servidor y nun
 
 La sesión es una cookie firmada con un secreto que se genera al arrancar la API: no hay ninguna
 clave que guardar, y un reinicio cierra todas las sesiones. Cada pedido confirma contra el índice
-que la cuenta siga activa y con el mismo sello, así una baja, un cambio de rol o de contraseña
-cortan las sesiones abiertas sin esperar a que venzan.
+que la cuenta siga activa y con el mismo sello. El sello cambia con cada ingreso, con la salida y
+con una baja o un cambio de rol o de contraseña, así que una cuenta tiene una sola sesión abierta:
+ingresar desde otro dispositivo cierra la anterior.
 
 El primer superadmin, adentro del contenedor de la API:
     python -m honeyml.api.acceso crear --usuario <nombre> --rol superadmin
@@ -237,6 +238,7 @@ def ingresar(nombre: str, contrasena: str, es_url: str = queries.ES_URL) -> dict
 
     intentos.acierto(nombre)
     datos["ultimo_ingreso"] = _ahora_iso()
+    datos["sello"] = int(datos.get("sello", 0)) + 1
     _guardar(datos, es_url)
     auditoria.registrar(nombre, datos["rol"], "ingreso", es_url=es_url)
     return datos
@@ -397,6 +399,15 @@ def cambiar_propia(sesion: Sesion, cambio: CambioPropio, es_url: str = queries.E
     return int(datos["sello"])
 
 
+def cerrar(sesion: Sesion, es_url: str = queries.ES_URL) -> None:
+    """La salida cambia el sello, así la cookie que quede en el navegador no sirve para nada."""
+    datos = almacen.documento(USUARIOS, sesion.usuario, es_url)
+    if datos is not None:
+        datos["sello"] = int(datos.get("sello", 0)) + 1
+        _guardar(datos, es_url)
+    auditoria.registrar(sesion.usuario, sesion.rol, "salida", es_url=es_url)
+
+
 def listar(por: Sesion, es_url: str = queries.ES_URL) -> list[dict[str, Any]]:
     r = almacen.buscar(
         USUARIOS, {"size": 500, "sort": [{"usuario": "asc"}], "query": {"match_all": {}}}, es_url
@@ -423,8 +434,14 @@ def sesion_actual(request: Request) -> Sesion:
         # Sin el índice, la sesión ya abierta sigue con el rol con que se firmó, así el respaldo
         # congelado se sigue viendo. Ingresar de nuevo no se puede hasta que vuelva.
         return Sesion(datos["u"], datos["r"])
-    if actual is None or not actual.get("activo") or actual.get("sello") != datos["s"]:
-        raise HTTPException(status_code=401, detail="La sesión ya no vale. Volvé a ingresar.")
+    if actual is None or not actual.get("activo"):
+        raise HTTPException(status_code=401, detail="La cuenta no está activa.")
+    if actual.get("sello") != datos["s"]:
+        raise HTTPException(
+            status_code=401,
+            detail="La sesión se cerró: la cuenta se abrió en otro dispositivo o la cambió un "
+            "administrador.",
+        )
     return Sesion(actual["usuario"], actual["rol"])
 
 

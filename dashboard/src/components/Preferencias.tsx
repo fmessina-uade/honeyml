@@ -10,25 +10,25 @@ const OPCIONES: { valor: Preferencia; icono: typeof Sun }[] = [
 ];
 
 /**
- * Lo que cada quien ajusta del panel para sí: idioma, tema y modo captura. No hay usuarios, así que
- * no hace falta una sección de configuración: las tres cosas viven en el navegador de quien mira.
+ * Lo que cada quien ajusta del panel para sí: idioma, tema y modo captura. Viven en el navegador de
+ * quien mira y no en su cuenta, así que también se pueden elegir antes de ingresar.
  *
- * `enLinea` las pone en una sola fila, para la barra de arriba; ahí el tema muestra solo íconos y
- * el nombre queda en el título de cada botón.
+ * `enLinea` las pone en una sola fila; ahí el tema muestra solo íconos y el nombre queda en el
+ * título de cada botón. Sin `onCapture` no aparece el modo captura, que en el ingreso no tiene uso.
  */
 export default function Preferencias({
-  capture,
+  capture = false,
   onCapture,
   enLinea = false,
 }: {
-  capture: boolean;
-  onCapture: () => void;
+  capture?: boolean;
+  onCapture?: () => void;
   enLinea?: boolean;
 }) {
   const { t } = useI18n();
   const { preferencia, elegir } = useTema();
 
-  const captura = (
+  const captura = onCapture && (
     <button
       onClick={onCapture}
       title={t.capture.hint}

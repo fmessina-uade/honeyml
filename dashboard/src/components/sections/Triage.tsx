@@ -269,7 +269,12 @@ export default function Triage() {
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <a
-                href={api.urlDecisionesCsv(filtros)}
+                href={api.urlDecisionesCsv({
+                  estado: filtros.estado,
+                  severidad: filtros.severidad,
+                  tactica: filtros.tactica,
+                  sensor: filtros.sensor,
+                })}
                 download
                 title={t.exportar.decisionesAyuda}
                 className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] text-white/70 ring-1 ring-white/15 hover:text-white hover:bg-white/[0.05] transition"

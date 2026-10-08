@@ -70,7 +70,7 @@ CARD_FILE = Path("models/uwf_tactica.json")
 # particiones cuestan casi el doble y mueven el umbral elegido menos que el paso de la grilla.
 PARTICIONES = 3
 
-# La importancia por permutación reentrena nada pero predice n_repeticiones × n_columnas veces.
+# La importancia por permutación reentrena nada pero predice n_repeticiones por n_columnas veces.
 # Sobre las 474.654 filas de prueba serían 75 pasadas completas; sobre una submuestra estratificada
 # el ranking es el mismo y la corrida baja de media hora a medio minuto.
 MUESTRA_PERMUTACION = 60_000
@@ -95,7 +95,7 @@ def _umbral_fuera_de_muestra(
     honesto el barrido. A diferencia de reservar una porción, no cuesta datos de entrenamiento, así
     que el modelo que se publica se ajusta sobre toda la mitad.
     """
-    print(f"  probabilidades fuera de muestra ({PARTICIONES} particiones)…", end="", flush=True)
+    print(f"  probabilidades fuera de muestra ({PARTICIONES} particiones)", end="", flush=True)
     comenzado = time.monotonic()
     proba = cross_val_predict(
         Pipeline([("prep", _preprocessor(scale=False)), ("clf", _modelo(**BASE))]),
@@ -149,7 +149,7 @@ def _veredicto(defecto: dict[str, Any], con_umbral: dict[str, Any]) -> dict[str,
     if d_macro < -BANDA_RUIDO:
         return {
             "resultado": "no_se_sostiene",
-            "titulo": f"El umbral NO se sostiene sobre prueba: F1 macro {d_macro:+.4f}.",
+            "titulo": f"El umbral no se sostiene sobre prueba: F1 macro {d_macro:+.4f}.",
             "detalle": [
                 "Se exporta igual, pero el punto de operación por defecto es el que hay que citar.",
                 "Señal de que la validación fuera de muestra tiene muy pocos casos para decidir.",
@@ -193,7 +193,7 @@ def _importancia(pipe: Pipeline, x_te: pd.DataFrame, y_te: pd.Series) -> list[di
         x_muestra, y_muestra = x_te, y_te
 
     cuantas = f"{len(x_muestra):,}".replace(",", ".")
-    print(f"  importancia por permutación sobre {cuantas} filas…", end="", flush=True)
+    print(f"  importancia por permutación sobre {cuantas} filas", end="", flush=True)
     comenzado = time.monotonic()
     resultado = permutation_importance(
         pipe,
@@ -233,7 +233,7 @@ def main() -> None:
     print(f"Entrenamiento: {len(x_tr):,}  |  Prueba: {len(x_te):,}".replace(",", "."))
     print(f"Clases: {y_tr.nunique()}  |  Columnas: {len(x_tr.columns)}\n")
 
-    print("  entrenando el modelo final sobre el entrenamiento completo…", end="", flush=True)
+    print("  entrenando el modelo final sobre el entrenamiento completo", end="", flush=True)
     comenzado = time.monotonic()
     pipe = Pipeline([("prep", _preprocessor(scale=False)), ("clf", _modelo(**BASE))])
     pipe.fit(x_tr, y_tr)
@@ -386,7 +386,7 @@ def main() -> None:
     tamano = MODEL_FILE.stat().st_size / 1024
     print(f"\n  Modelo   -> {MODEL_FILE} ({tamano:.0f} KB)")
     print(f"  Tarjeta  -> {CARD_FILE}")
-    print(f"  Digest   -> {digest[:16]}…")
+    print(f"  Digest   -> {digest[:16]}")
 
 
 def cargar_modelo() -> tuple[Pipeline, dict[str, Any]]:
@@ -407,7 +407,8 @@ def cargar_modelo() -> tuple[Pipeline, dict[str, Any]]:
     if actual != tarjeta.get("sha256"):
         raise ValueError(
             f"El modelo en {MODEL_FILE} no es el que describe {CARD_FILE}: "
-            f"digest {actual[:16]}… frente a {str(tarjeta.get('sha256'))[:16]}…. "
+            f"digest {actual[:16]} frente a {str(tarjeta.get('sha256'))[:16]}, "
+            "en sus primeros 16 caracteres. "
             "Reexportar antes de usarlo."
         )
     pipe: Pipeline = joblib.load(MODEL_FILE)

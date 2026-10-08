@@ -128,8 +128,7 @@ def credenciales() -> dict[str, Any]:
         },
     )["count"]
     indice = _artefacto("password_index.json")
-    return {
-        **queries.top_credentials(size=12),
+    return queries.top_credentials(size=12) | {
         "intentos_con_clave_en_vivo": con_clave,
         "indice_de_contrasenas": {
             "generado": indice["generado"],
@@ -277,7 +276,6 @@ def motor() -> dict[str, Any]:
     indice = _es(f"/_cat/indices/{decisiones.DECISIONES}*?format=json&bytes=b")
     grupo = next((g for g in bus.xinfo_groups("honeyml:events") if g["name"] == "triaje"), {})
     return {
-        **{k: v for k, v in r.items() if k != "actividad"},
         "actividad": {k: v for k, v in r["actividad"].items() if k != "por_minuto"},
         "copiadas_pct": _pct(r["copiadas"], r["total"]),
         "razonadas_pct": _pct(razonadas, r["total"]),

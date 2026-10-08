@@ -5,7 +5,7 @@ por defecto. Este módulo responde la pregunta que queda, si esa configuración 
 hace sobre la misma partición, el mismo preprocesamiento y las mismas métricas, así los dos
 resultados se pueden leer uno al lado del otro.
 
-Se busca por halving sucesivo y no por grilla exhaustiva. Con 1,42 millones de filas de
+Se busca por halving sucesivo y no por grilla completa. Con 1,42 millones de filas de
 entrenamiento, un solo ajuste cuesta unos 35 segundos, así que una grilla de cien combinaciones
 sobre tres particiones correría durante horas. El halving gasta poco en muchos candidatos, se queda
 con el mejor tercio y les da más datos, de modo que el presupuesto va a donde todavía puede cambiar
@@ -38,7 +38,7 @@ import pandas as pd
 from sklearn.ensemble import HistGradientBoostingClassifier
 
 # Este import no se usa: habilita el buscador por halving, que sklearn todavía marca como
-# experimental. Tiene que ejecutarse ANTES del import de model_selection de abajo, cosa que el
+# experimental. Tiene que ejecutarse antes del import de model_selection de abajo, cosa que el
 # orden alfabético ya garantiza (experimental < model_selection). Si alguna vez se reordenan a
 # mano, este es el par que no se puede invertir.
 from sklearn.experimental import enable_halving_search_cv  # noqa: F401
@@ -131,8 +131,8 @@ def main() -> None:
     # "exhaust" en lugar de un piso fijo, y no es un detalle.
     #
     # Con un piso elegido a mano, la progresión geométrica casi nunca cae justo sobre el total: con
-    # 200.000 y factor 3 da 200k → 600k → 1,8M, y como 1,8M excede las 1.423.959 filas
-    # disponibles, sklearn corta en 600k. El ganador queda elegido sobre el 42 % de los datos.
+    # 200.000 y factor 3 da 200k, después 600k y después 1,8M, y como 1,8M excede las 1.423.959
+    # filas disponibles, sklearn corta en 600k. El ganador queda elegido sobre el 42 % de los datos.
     #
     # Con "exhaust", sklearn calcula el piso hacia atrás desde el total, de modo que la última
     # ronda use todas las filas. Las primeras rondas quedan más chicas y por lo tanto más ruidosas,
@@ -157,7 +157,7 @@ def main() -> None:
         verbose=1,
     )
 
-    print("  buscando…", flush=True)
+    print("  buscando", flush=True)
     inicio = time.monotonic()
     busqueda.fit(x_tr, y_tr)
     minutos = (time.monotonic() - inicio) / 60
@@ -169,8 +169,8 @@ def main() -> None:
     # comprobación es lo que lo pone a la vista.
     rondas = list(zip(busqueda.n_candidates_, busqueda.n_resources_, strict=True))
     print(
-        "  rondas (candidatos × filas):",
-        "  ".join(f"{c}×{r:,}" for c, r in rondas).replace(",", "."),
+        "  rondas, en candidatos por filas:",
+        "  ".join(f"{c} por {r:,}" for c, r in rondas).replace(",", "."),
     )
     # Con tolerancia y no con `<` a secas: la progresión geométrica deja un resto de unas pocas
     # filas (1.423.953 de 1.423.959 en una corrida) y avisar por eso sería ruido que enseña a
@@ -179,7 +179,7 @@ def main() -> None:
     if not completa:
         faltante = 100 - rondas[-1][1] / len(x_tr) * 100
         print(
-            f"  ATENCIÓN: la última ronda usó {rondas[-1][1]:,} de {len(x_tr):,} filas "
+            f"  Ojo, la última ronda usó {rondas[-1][1]:,} de {len(x_tr):,} filas "
             f"({faltante:.0f} % menos). El ganador no se midió sobre el total.".replace(",", ".")
         )
     print()
@@ -188,11 +188,11 @@ def main() -> None:
 
     # Los dos se entrenan acá, sobre la mitad de entrenamiento completa, así la comparación es
     # entre dos modelos ajustados en las mismas condiciones y medidos sobre el mismo conjunto.
-    print("  entrenando el ajustado sobre el total…", end="", flush=True)
+    print("  entrenando el ajustado sobre el total", end="", flush=True)
     m_ajustado, s_ajustado = evaluar(_modelo(**mejores), x_tr, y_tr, x_te, y_te)
     print(f" {s_ajustado:.0f}s")
 
-    print("  entrenando el de referencia sobre el total…", end="", flush=True)
+    print("  entrenando el de referencia sobre el total", end="", flush=True)
     m_base, s_base = evaluar(_modelo(**BASE), x_tr, y_tr, x_te, y_te)
     print(f" {s_base:.0f}s\n")
 
@@ -224,7 +224,7 @@ def main() -> None:
         print("  Los valores por defecto ya estaban bien para este problema, que también es")
         print("  un resultado: dice que el margen no está en los hiperparámetros.")
     else:
-        print(f"  El ajuste NO mejora ({mejora:+.4f}). Se mantiene la configuración de referencia.")
+        print(f"  El ajuste no mejora ({mejora:+.4f}). Se mantiene la configuración de referencia.")
 
     print(
         f"\n  Recordatorio: el F1 de {WEAK_CLASS} se calcula sobre {n_debil_te} casos. "

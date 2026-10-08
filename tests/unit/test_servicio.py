@@ -49,9 +49,7 @@ def _adaptador(modelo: str | None = None) -> tuple[AdaptadorDeInferencia, _Clien
     return AdaptadorDeInferencia(cliente=cliente, config=config), cliente  # type: ignore[arg-type]
 
 
-# ---- la política ----------------------------------------------------------------------------
-
-
+# La política
 def test_el_primer_intento_usa_el_modelo_economico() -> None:
     assert elegir_modelo(intento=0) == MODELO_ALTERNATIVO
 
@@ -84,9 +82,7 @@ def test_fijar_el_modelo_capaz_tambien_desactiva_la_politica() -> None:
     assert cliente.modelos == [MODELO_POR_DEFECTO] * 3
 
 
-# ---- el adaptador ---------------------------------------------------------------------------
-
-
+# El adaptador
 def test_el_ciclo_correctivo_escala_de_modelo() -> None:
     adaptador, cliente = _adaptador()
     for intento in range(3):

@@ -31,9 +31,9 @@ import Triage from './components/sections/Triage';
 import AttackCanvas from './components/AttackCanvas';
 import Ingreso from './components/acceso/Ingreso';
 import MenuCuenta from './components/acceso/MenuCuenta';
-import Reporte from './components/acceso/Reporte';
 import Refresco from './components/acceso/Refresco';
 import Cuentas from './components/sections/Cuentas';
+import Reportes from './components/sections/Reportes';
 import Auditoria from './components/sections/Auditoria';
 import EnVivo from './components/sections/EnVivo';
 import { fechaHora } from './lib/format';
@@ -78,7 +78,6 @@ export default function App() {
   // undefined mientras se pregunta a la API, null sin sesión.
   const [sesion, setSesion] = useState<SesionAbierta | null | undefined>(undefined);
   const [aviso, setAviso] = useState<string | null>(null);
-  const [reporte, setReporte] = useState(false);
   const [actualizado, setActualizado] = useState<number | null>(null);
   const [refrescando, setRefrescando] = useState(false);
   const [artefactos, setArtefactos] = useState<Artefactos | null>(null);
@@ -109,14 +108,17 @@ export default function App() {
     // la primera pregunta va una sola vez, en el idioma con que arrancó el panel
   }, []);
 
-  // Cualquier 401 de cualquier sección quiere decir que la sesión se cerró: vencida, dada de baja
-  // o con el rol cambiado. Se vuelve al ingreso con el aviso.
+  // Cualquier 401 de cualquier sección quiere decir que la sesión se cerró: vencida, abierta en
+  // otro dispositivo, dada de baja o con el rol cambiado. Se vuelve al ingreso con el motivo que dio
+  // la API. Un solo aviso aunque fallen varios pedidos juntos.
+  const conSesion = useRef(false);
+  conSesion.current = Boolean(sesion);
   useEffect(() => {
-    const alPerderla = () => {
-      setSesion((s) => {
-        if (s) setAviso(t.acceso.vencida);
-        return null;
-      });
+    const alPerderla = (e: Event) => {
+      if (!conSesion.current) return;
+      conSesion.current = false;
+      setAviso((e as CustomEvent<string | undefined>).detail ?? t.acceso.vencida);
+      setSesion(null);
     };
     window.addEventListener(SIN_SESION, alPerderla);
     return () => window.removeEventListener(SIN_SESION, alPerderla);
@@ -226,8 +228,6 @@ export default function App() {
     }, CIERRE_MS);
   }, []);
 
-  const cerrarReporte = useCallback(() => setReporte(false), []);
-
   const delPanel = useMemo<SesionDelPanel | null>(
     () =>
       sesion ? { ...sesion, puede: (minimo: Rol) => alcanza(sesion.rol, minimo), salir } : null,
@@ -328,17 +328,8 @@ export default function App() {
           cifras={cifras}
           estado={estado}
           preferencias={<Preferencias capture={capture} onCapture={() => setCapture((c) => !c)} />}
-          cuenta={
-            <MenuCuenta active={active} onIr={setActive} onReporte={() => setReporte(true)} />
-          }
-          cuentaEnHoja={
-            <MenuCuenta
-              active={active}
-              onIr={setActive}
-              onReporte={() => setReporte(true)}
-              enHoja
-            />
-          }
+          cuenta={<MenuCuenta active={active} onIr={setActive} />}
+          cuentaEnHoja={<MenuCuenta active={active} onIr={setActive} enHoja />}
           refresco={
             <Refresco actualizado={actualizado} refrescando={refrescando} onRefrescar={refrescar} />
           }
@@ -418,6 +409,9 @@ export default function App() {
                   (archetypes ? <Archetypes data={archetypes} /> : <SinDatos />)}
                 {mostrada === 'origen' &&
                   (snapshot.geography ? <Geography data={snapshot.geography} /> : <SinDatos />)}
+                {mostrada === 'reportes' && (
+                  <Reportes primero={desde || hasta} ultimo={hasta || desde} />
+                )}
                 {mostrada === 'cuentas' && <Cuentas />}
                 {mostrada === 'auditoria' && <Auditoria />}
                 {mostrada === 'envivo' && <EnVivo />}
@@ -444,7 +438,6 @@ export default function App() {
           </div>
         </main>
         <div className="grano" aria-hidden />
-        {reporte && snapshot && <Reporte snapshot={snapshot} onCerrar={cerrarReporte} />}
         <TransicionColmena fase={fase} />
       </div>
     </ContextoDeSesion.Provider>

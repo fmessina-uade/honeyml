@@ -1,11 +1,10 @@
-# userdb.txt - Cowrie accepted credentials
-# Format: username:x:password  (field 2 is unused, kept as 'x')
-# '!' prefix on password = deny that password
-# '*' = wildcard (any username or password)
-# ASCII-only: Cowrie reads this file with ascii codec
+# userdb.txt de Cowrie: las credenciales que el sensor acepta.
+# Cada linea va como usuario:x:contrasena. El segundo campo no se usa y queda en x.
+# Un ! adelante de la contrasena la rechaza, y un * vale para cualquier usuario o contrasena.
+# Va en ASCII puro, sin tildes ni enies, porque Cowrie lo lee con el codec ascii.
 #
-# Weak and default credentials commonly seen in brute-force attacks.
-# These are FAKE credentials inside Cowrie's controlled environment.
+# Son credenciales debiles y por defecto, las que mas aparecen en los intentos de fuerza bruta.
+# No abren nada real: solo dejan entrar a la consola emulada de Cowrie.
 # Cowrie never grants real access to the host system.
 
 root:x:root

@@ -444,6 +444,52 @@ export interface EventoEnVivo {
   'source.as.organization.name'?: string;
 }
 
+/** Todo lo que lleva el reporte general para un rango. Sale de `/api/reporte`, sin direcciones. */
+export interface ReporteGeneral {
+  desde: string | null;
+  hasta: string | null;
+  captura: {
+    events: number;
+    unique_ips: number;
+    logins: number;
+    logins_success: number;
+    commands: number;
+    by_sensor: Record<string, number>;
+    first_event: string | null;
+    last_event: string | null;
+    por_dia: { date: string; count: number; logins: number }[];
+    por_hora: number[];
+    protocolos: { protocol: string; count: number; sources: number }[];
+    categorias: Bucket[];
+    paises: CountryOrigin[];
+    con_geo: number;
+    sistemas: { organization: string; count: number; sources: number }[];
+    usuarios: Bucket[];
+    contrasenas: Bucket[];
+    comandos: Bucket[];
+  };
+  motor: {
+    total: number;
+    copiadas: number;
+    costo_usd: number;
+    requieren: number;
+    por_severidad: Bucket[];
+    por_tactica: Bucket[];
+    mediana_s: number | null;
+    p90_s: number | null;
+    confirmadas: number;
+    corregidas: number;
+    a_ciegas: number;
+  } | null;
+}
+
+export interface AvisoDeReporte {
+  formato: 'pdf' | 'csv';
+  conjunto?: string;
+  desde?: string;
+  hasta?: string;
+}
+
 export type Artefactos = Record<
   'huellas' | 'arquetipos' | 'sesiones' | 'contrasenas',
   string | null
@@ -454,7 +500,6 @@ export type Artefactos = Record<
 export const SIN_SESION = 'honeyml:sin-sesion';
 
 async function leer<T>(path: string, res: Response): Promise<T> {
-  if (res.status === 401 && path !== '/sesion') window.dispatchEvent(new Event(SIN_SESION));
   if (!res.ok) {
     // La API explica en `detail` por qué no puede responder (típicamente qué falta levantar), y
     // ese texto es lo único accionable que tiene el lector. Quedarse con el número de estado
@@ -465,6 +510,10 @@ async function leer<T>(path: string, res: Response): Promise<T> {
         Array.isArray(b?.detail) ? b.detail.map((d) => d.msg).join('; ') : b?.detail,
       )
       .catch(() => undefined);
+    // el motivo viaja con el aviso: no es lo mismo una sesión vencida que una abierta en otro lado
+    if (res.status === 401 && path !== '/sesion') {
+      window.dispatchEvent(new CustomEvent<string | undefined>(SIN_SESION, { detail: detalle }));
+    }
     throw new Error(detalle ?? `${path}: ${res.status}`);
   }
   return res.json() as Promise<T>;
@@ -485,13 +534,21 @@ async function enviar<T>(metodo: string, path: string, body?: unknown): Promise<
 
 const put = <T>(path: string, body: unknown) => enviar<T>('PUT', path, body);
 
-function filtrosDeExportacion(
-  f: Pick<FiltrosDecisiones, 'estado' | 'severidad' | 'tactica' | 'sensor'>,
-) {
+type FiltrosDeExportacion = Pick<
+  FiltrosDecisiones,
+  'estado' | 'severidad' | 'tactica' | 'sensor'
+> & {
+  desde?: string;
+  hasta?: string;
+};
+
+function filtrosDeExportacion(f: FiltrosDeExportacion) {
   const q = new URLSearchParams({ estado: f.estado });
   if (f.severidad) q.set('severidad', f.severidad);
   if (f.tactica) q.set('tactica', f.tactica);
   if (f.sensor) q.set('sensor', f.sensor);
+  if (f.desde) q.set('desde', f.desde);
+  if (f.hasta) q.set('hasta', f.hasta);
   return q;
 }
 
@@ -567,8 +624,14 @@ export const api = {
 
   // Las exportaciones van como enlace de descarga y no por fetch: así el navegador guarda el
   // archivo con el nombre que manda la API, también en el teléfono.
-  urlDecisionesCsv: (f: Pick<FiltrosDecisiones, 'estado' | 'severidad' | 'tactica' | 'sensor'>) =>
+  urlDecisionesCsv: (f: FiltrosDeExportacion) =>
     `/api/exportar/decisiones.csv?${filtrosDeExportacion(f)}`,
   urlRevisionesCsv: () => '/api/exportar/revisiones.csv',
-  avisarReporte: () => enviar<{ ok: boolean }>('POST', '/reporte'),
+  reporte: (desde?: string, hasta?: string) => {
+    const q = new URLSearchParams();
+    if (desde) q.set('desde', desde);
+    if (hasta) q.set('hasta', hasta);
+    return get<ReporteGeneral>(`/reporte?${q}`);
+  },
+  avisarReporte: (aviso: AvisoDeReporte) => enviar<{ ok: boolean }>('POST', '/reporte', aviso),
 };

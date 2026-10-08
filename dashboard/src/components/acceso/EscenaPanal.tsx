@@ -2,33 +2,35 @@ import { useEffect, useRef } from 'react';
 import { useQuieto } from '../../lib/useQuieto';
 
 /**
- * El fondo del ingreso: un panal que recibe ataques. Cada ataque cruza la pantalla como una estela
- * gris, cae en una celda que se enciende en ámbar (quedó capturado) y, un momento después, un pulso
- * teal la une al núcleo (el motor lo clasificó). Uno de cada siete llega en coral: los críticos.
+ * El fondo del ingreso: un panal con varios honeypots, cada uno con el servicio que emula, y el
+ * tráfico que les llega. Cada ataque cruza la pantalla como una estela gris hasta un honeypot, que lo
+ * captura: se enciende en ámbar, suma uno a su cuenta y, un momento después, un pulso teal dice que
+ * el motor lo clasificó. Uno de cada siete llega en coral: los críticos.
  *
- * Va en canvas y no en SVG porque en un teléfono cientos de nodos animados por el DOM traban el
- * desplazamiento. La retícula se dibuja una vez en una capa aparte y cada cuadro solo pinta lo que
- * se mueve. Con movimiento reducido o en modo captura queda un cuadro fijo, con algunas celdas
- * encendidas.
+ * Los servicios y cuánto tráfico recibe cada uno siguen el reparto real de la captura: la mayoría
+ * va a SSH. Va en canvas y no en SVG porque en un teléfono cientos de nodos animados por el DOM
+ * traban el desplazamiento; la retícula se dibuja una vez en una capa aparte y cada cuadro pinta
+ * solo lo que se mueve. Con movimiento reducido o en modo captura queda un cuadro fijo.
  */
 
-interface Celda {
+interface Honeypot {
   x: number;
   y: number;
-  /** Cercanía al núcleo, de 0 a 1: los ataques caen más cerca de él que lejos. */
+  servicio: string;
   peso: number;
+  capturas: number;
 }
 
 interface Ataque {
   desde: [number, number];
-  celda: Celda;
+  destino: Honeypot;
   inicio: number;
   duracion: number;
   critico: boolean;
 }
 
 interface Captura {
-  celda: Celda;
+  honeypot: Honeypot;
   inicio: number;
   critico: boolean;
 }
@@ -43,7 +45,17 @@ interface Colores {
   claro: boolean;
 }
 
-const VIDA_CAPTURA_MS = 3400;
+const SERVICIOS: { servicio: string; peso: number }[] = [
+  { servicio: 'SSH :22', peso: 0.5 },
+  { servicio: 'SMB :445', peso: 0.16 },
+  { servicio: 'Telnet :23', peso: 0.14 },
+  { servicio: 'HTTP :80', peso: 0.08 },
+  { servicio: 'MySQL :3306', peso: 0.05 },
+  { servicio: 'FTP :21', peso: 0.04 },
+  { servicio: 'MSSQL :1433', peso: 0.03 },
+];
+
+const VIDA_CAPTURA_MS = 1800;
 const DEMORA_CLASIFICACION_MS = 520;
 
 function leerColores(): Colores {
@@ -72,7 +84,7 @@ function hexagono(ctx: CanvasRenderingContext2D, x: number, y: number, r: number
   ctx.closePath();
 }
 
-// Un generador con semilla: el cuadro fijo sale igual cada vez, y las capturas de pantalla también.
+// Un generador con semilla: la escena sale igual cada vez, y las capturas de pantalla también.
 function semilla(s: number) {
   return () => {
     s = (s * 1664525 + 1013904223) % 4294967296;
@@ -80,11 +92,15 @@ function semilla(s: number) {
   };
 }
 
-/** Dónde queda el núcleo según la forma de la pantalla: lejos de la tarjeta del formulario. */
-function nucleo(w: number, h: number): [number, number] {
-  if (w < 700) return [w * 0.64, h * 0.2];
-  if (w / h < 1.02) return [w * 0.5, h * 0.24];
-  return [w * 0.3, h * 0.42];
+/**
+ * La zona donde van los honeypots, según la forma de la pantalla: lejos de la tarjeta del formulario
+ * y por encima del titular. Devuelve [x0, y0, x1, y1] y cuántos entran.
+ */
+function zona(w: number, h: number): [number, number, number, number, number] {
+  if (w < 700) return [w * 0.12, h * 0.05, w * 0.88, h * 0.36, 3];
+  if (w / h < 1.02) return [w * 0.1, h * 0.04, w * 0.9, h * 0.16, 4];
+  const tarjeta = Math.min(560, Math.max(380, w * 0.38)) + 28;
+  return [w * 0.08, h * 0.12, w - tarjeta - w * 0.07, h * 0.6, 6];
 }
 
 export default function EscenaPanal({ etiqueta }: { etiqueta: string }) {
@@ -96,7 +112,6 @@ export default function EscenaPanal({ etiqueta }: { etiqueta: string }) {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-
     const capa = document.createElement('canvas');
     const capaCtx = capa.getContext('2d');
     if (!capaCtx) return;
@@ -105,8 +120,7 @@ export default function EscenaPanal({ etiqueta }: { etiqueta: string }) {
     let ancho = 0;
     let alto = 0;
     let radio = 40;
-    let centro: [number, number] = [0, 0];
-    let celdas: Celda[] = [];
+    let honeypots: Honeypot[] = [];
     let ataques: Ataque[] = [];
     let capturas: Captura[] = [];
     let proximo = 0;
@@ -114,122 +128,142 @@ export default function EscenaPanal({ etiqueta }: { etiqueta: string }) {
     const azar = semilla(11);
 
     const armar = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, ancho < 700 ? 1.5 : 2);
       ancho = canvas.clientWidth;
       alto = canvas.clientHeight;
+      const dpr = Math.min(window.devicePixelRatio || 1, ancho < 700 ? 1.5 : 2);
       for (const c of [canvas, capa]) {
         c.width = Math.round(ancho * dpr);
         c.height = Math.round(alto * dpr);
       }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       capaCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      radio = Math.max(28, Math.min(52, Math.min(ancho, alto) / 14));
 
-      radio = Math.max(30, Math.min(58, Math.min(ancho, alto) / 13));
-      centro = nucleo(ancho, alto);
+      // Los honeypots caen en celdas de la retícula, separados entre sí, en la zona libre.
       const dx = radio * 1.5;
       const dy = radio * Math.sqrt(3);
-      const alcance = Math.hypot(ancho, alto);
-      celdas = [];
+      const [x0, y0, x1, y1, cuantos] = zona(ancho, alto);
+      const celdas: [number, number][] = [];
       for (let col = -1; col * dx < ancho + radio; col++) {
         for (let fila = -1; fila * dy < alto + radio; fila++) {
           const x = col * dx;
           const y = fila * dy + (col % 2 ? dy / 2 : 0);
-          const d = Math.hypot(x - centro[0], y - centro[1]);
-          celdas.push({ x, y, peso: 1 - Math.min(1, d / (alcance * 0.55)) });
+          if (x >= x0 && x <= x1 && y >= y0 && y <= y1) celdas.push([x, y]);
         }
       }
-      pintarReticula();
+      const elegir = semilla(23);
+      const elegidas: [number, number][] = [];
+      for (let intento = 0; intento < 400 && elegidas.length < cuantos; intento++) {
+        const c = celdas[Math.floor(elegir() * celdas.length)];
+        if (c && elegidas.every((e) => Math.hypot(e[0] - c[0], e[1] - c[1]) > radio * 2.9)) {
+          elegidas.push(c);
+        }
+      }
+      const servicios = SERVICIOS.slice(0, elegidas.length);
+      const total = servicios.reduce((s, x) => s + x.peso, 0);
+      const anteriores = new Map(honeypots.map((h) => [h.servicio, h.capturas]));
+      honeypots = elegidas.map(([x, y], i) => ({
+        x,
+        y,
+        servicio: servicios[i].servicio,
+        peso: servicios[i].peso / total,
+        capturas: anteriores.get(servicios[i].servicio) ?? 0,
+      }));
+      ataques = [];
+      capturas = [];
+      pintarReticula(dx, dy);
     };
 
-    const pintarReticula = () => {
+    const pintarReticula = (dx: number, dy: number) => {
       const c = capaCtx;
       c.clearRect(0, 0, ancho, alto);
       c.fillStyle = colores.fondo;
       c.fillRect(0, 0, ancho, alto);
 
-      // El resplandor del núcleo, que es lo único iluminado de la escena quieta.
-      const brillo = c.createRadialGradient(...centro, 0, ...centro, radio * 7);
-      brillo.addColorStop(0, `${colores.ambar}${colores.claro ? '22' : '2e'}`);
-      brillo.addColorStop(1, `${colores.ambar}00`);
-      c.fillStyle = brillo;
-      c.fillRect(0, 0, ancho, alto);
-
       const azarFijo = semilla(7);
       c.lineWidth = 1;
-      for (const celda of celdas) {
-        const cerca = celda.peso;
-        c.strokeStyle = `rgba(${colores.tinta},${(colores.claro ? 0.07 : 0.05) + cerca * 0.09})`;
-        hexagono(c, celda.x, celda.y, radio * 0.94);
-        c.stroke();
-        // Los nodos del logo en algunos vértices: coral, teal y pizarra.
-        if (azarFijo() < 0.16) {
-          const a = (Math.PI / 3) * Math.floor(azarFijo() * 6);
-          const tono = [colores.coral, colores.teal, colores.pizarra][Math.floor(azarFijo() * 3)];
-          c.fillStyle = tono;
-          c.globalAlpha = 0.28 + cerca * 0.4;
-          c.beginPath();
-          c.arc(
-            celda.x + radio * 0.94 * Math.cos(a),
-            celda.y + radio * 0.94 * Math.sin(a),
-            1.6 + cerca * 1.2,
+      for (let col = -1; col * dx < ancho + radio; col++) {
+        for (let fila = -1; fila * dy < alto + radio; fila++) {
+          const x = col * dx;
+          const y = fila * dy + (col % 2 ? dy / 2 : 0);
+          const cerca = Math.max(
             0,
-            Math.PI * 2,
+            ...honeypots.map((h) => 1 - Math.min(1, Math.hypot(h.x - x, h.y - y) / (radio * 5))),
           );
-          c.fill();
-          c.globalAlpha = 1;
+          c.strokeStyle = `rgba(${colores.tinta},${(colores.claro ? 0.07 : 0.05) + cerca * 0.07})`;
+          hexagono(c, x, y, radio * 0.94);
+          c.stroke();
+          // Los nodos del logo en algunos vértices: coral, teal y pizarra.
+          if (azarFijo() < 0.14) {
+            const a = (Math.PI / 3) * Math.floor(azarFijo() * 6);
+            c.fillStyle = [colores.coral, colores.teal, colores.pizarra][
+              Math.floor(azarFijo() * 3)
+            ];
+            c.globalAlpha = 0.25 + cerca * 0.35;
+            c.beginPath();
+            c.arc(
+              x + radio * 0.94 * Math.cos(a),
+              y + radio * 0.94 * Math.sin(a),
+              1.6,
+              0,
+              Math.PI * 2,
+            );
+            c.fill();
+            c.globalAlpha = 1;
+          }
         }
       }
 
-      // El núcleo es el logo: el hexágono de la celda central relleno en ámbar al 42 %, con el
-      // hexágono interior y su punto.
-      const [nx, ny] = centro;
-      c.fillStyle = colores.ambar;
-      c.globalAlpha = 0.42;
-      hexagono(c, nx, ny, radio * 0.94);
-      c.fill();
-      c.globalAlpha = 1;
-      c.strokeStyle = colores.ambar;
-      c.lineWidth = 2;
-      hexagono(c, nx, ny, radio * 0.94);
-      c.stroke();
-      c.fillStyle = colores.ambar;
-      hexagono(c, nx, ny, radio * 0.32);
-      c.fill();
+      // Cada honeypot es una celda con la marca del logo adentro y el servicio que emula debajo.
+      c.font = `500 ${ancho < 700 ? 10 : 11}px 'JetBrains Mono', monospace`;
+      c.textAlign = 'center';
+      for (const h of honeypots) {
+        c.strokeStyle = colores.ambar;
+        c.globalAlpha = 0.55;
+        c.lineWidth = 1.4;
+        hexagono(c, h.x, h.y, radio * 0.94);
+        c.stroke();
+        c.globalAlpha = colores.claro ? 0.22 : 0.3;
+        c.fillStyle = colores.ambar;
+        hexagono(c, h.x, h.y, radio * 0.6);
+        c.fill();
+        c.globalAlpha = 0.85;
+        hexagono(c, h.x, h.y, radio * 0.22);
+        c.fill();
+        c.globalAlpha = 1;
+        c.fillStyle = `rgba(${colores.tinta},0.55)`;
+        c.fillText(h.servicio, h.x, h.y + radio + 16);
+      }
     };
 
-    const elegirCelda = (): Celda => {
-      // Más probable cerca del núcleo, pero cualquiera puede recibir uno.
-      for (let i = 0; i < 12; i++) {
-        const c = celdas[Math.floor(azar() * celdas.length)];
-        if (
-          c &&
-          azar() < 0.15 + c.peso * 0.85 &&
-          Math.hypot(c.x - centro[0], c.y - centro[1]) > radio
-        )
-          return c;
+    const elegirDestino = (): Honeypot => {
+      let r = azar();
+      for (const h of honeypots) {
+        r -= h.peso;
+        if (r <= 0) return h;
       }
-      return celdas[Math.floor(azar() * celdas.length)];
+      return honeypots[0];
     };
 
     const lanzar = (ahora: number) => {
-      const celda = elegirCelda();
-      // Entran por cualquier borde, con algo más de peso arriba y a la derecha.
+      if (honeypots.length === 0) return;
+      const destino = elegirDestino();
       const borde = azar();
       const margen = 60;
       const desde: [number, number] =
-        borde < 0.38
+        borde < 0.36
           ? [azar() * ancho, -margen]
           : borde < 0.7
-            ? [ancho + margen, azar() * alto * 0.8]
-            : borde < 0.88
+            ? [ancho + margen, azar() * alto * 0.85]
+            : borde < 0.9
               ? [-margen, azar() * alto]
               : [azar() * ancho, alto + margen];
-      const distancia = Math.hypot(celda.x - desde[0], celda.y - desde[1]);
+      const distancia = Math.hypot(destino.x - desde[0], destino.y - desde[1]);
       ataques.push({
         desde,
-        celda,
+        destino,
         inicio: ahora,
-        duracion: Math.max(700, distancia / (0.75 + azar() * 0.5)),
+        duracion: Math.max(650, distancia / (0.8 + azar() * 0.6)),
         critico: azar() < 1 / 7,
       });
     };
@@ -241,66 +275,24 @@ export default function EscenaPanal({ etiqueta }: { etiqueta: string }) {
 
       if (ahora >= proximo) {
         lanzar(ahora);
-        proximo = ahora + 260 + azar() * 620;
+        proximo = ahora + 140 + azar() * 360;
       }
 
-      // Las celdas capturadas: el ámbar sube rápido y se apaga despacio; la clasificación llega
-      // después como un borde teal y una línea punteada hasta el núcleo.
-      capturas = capturas.filter((c) => ahora - c.inicio < VIDA_CAPTURA_MS);
-      for (const c of capturas) {
-        const t = (ahora - c.inicio) / VIDA_CAPTURA_MS;
-        const encendido = t < 0.08 ? t / 0.08 : 1 - (t - 0.08) / 0.92;
-        ctx.fillStyle = colores.ambar;
-        ctx.globalAlpha = 0.42 * encendido;
-        hexagono(ctx, c.celda.x, c.celda.y, radio * 0.94);
-        ctx.fill();
-
-        const onda = Math.min(1, (ahora - c.inicio) / 700);
-        if (onda < 1) {
-          ctx.globalAlpha = (1 - onda) * 0.8;
-          ctx.strokeStyle = c.critico ? colores.coral : colores.ambar;
-          ctx.lineWidth = 1.6;
-          hexagono(ctx, c.celda.x, c.celda.y, radio * (0.94 + onda * 0.7));
-          ctx.stroke();
-        }
-
-        const clasificada = ahora - c.inicio - DEMORA_CLASIFICACION_MS;
-        if (clasificada > 0) {
-          const tc = Math.min(1, clasificada / 1100);
-          ctx.globalAlpha = (1 - tc) * 0.9;
-          ctx.strokeStyle = colores.teal;
-          ctx.lineWidth = 1.8;
-          hexagono(ctx, c.celda.x, c.celda.y, radio * 0.94);
-          ctx.stroke();
-          ctx.setLineDash([3, 5]);
-          ctx.lineWidth = 1.2;
-          ctx.beginPath();
-          ctx.moveTo(c.celda.x, c.celda.y);
-          const largo = suave(Math.min(1, clasificada / 500));
-          ctx.lineTo(
-            c.celda.x + (centro[0] - c.celda.x) * largo,
-            c.celda.y + (centro[1] - c.celda.y) * largo,
-          );
-          ctx.stroke();
-          ctx.setLineDash([]);
-        }
-        ctx.globalAlpha = 1;
-      }
-
-      // Las estelas: una cabeza y una cola que se desvanece hacia atrás.
+      // Las estelas: una cola que se desvanece hacia atrás y una cabeza.
       const siguen: Ataque[] = [];
       for (const a of ataques) {
         const t = (ahora - a.inicio) / a.duracion;
         if (t >= 1) {
-          capturas.push({ celda: a.celda, inicio: ahora, critico: a.critico });
+          a.destino.capturas += 1;
+          capturas.push({ honeypot: a.destino, inicio: ahora, critico: a.critico });
           continue;
         }
         siguen.push(a);
         const p = suave(t);
-        const x = a.desde[0] + (a.celda.x - a.desde[0]) * p;
-        const y = a.desde[1] + (a.celda.y - a.desde[1]) * p;
-        const ang = Math.atan2(a.celda.y - a.desde[1], a.celda.x - a.desde[0]);
-        const cola = Math.min(150, 40 + t * 220);
+        const x = a.desde[0] + (a.destino.x - a.desde[0]) * p;
+        const y = a.desde[1] + (a.destino.y - a.desde[1]) * p;
+        const ang = Math.atan2(a.destino.y - a.desde[1], a.destino.x - a.desde[0]);
+        const cola = Math.min(160, 40 + t * 240);
         const tono = a.critico ? colores.coral : colores.pizarra;
         const estela = ctx.createLinearGradient(
           x - Math.cos(ang) * cola,
@@ -322,20 +314,54 @@ export default function EscenaPanal({ etiqueta }: { etiqueta: string }) {
         ctx.fill();
       }
       ataques = siguen;
-      marco = requestAnimationFrame(cuadro);
-    };
 
-    const fijo = () => {
-      ctx.drawImage(capa, 0, 0, ancho, alto);
-      const azarFijo = semilla(3);
-      ctx.fillStyle = colores.ambar;
-      for (let i = 0; i < 9; i++) {
-        const c = celdas[Math.floor(azarFijo() * celdas.length)];
-        ctx.globalAlpha = 0.12 + c.peso * 0.3;
-        hexagono(ctx, c.x, c.y, radio * 0.94);
+      // La captura: el honeypot se enciende, una onda sale de él, sube un +1, y después llega el
+      // pulso teal de la clasificación.
+      capturas = capturas.filter((c) => ahora - c.inicio < VIDA_CAPTURA_MS);
+      ctx.textAlign = 'center';
+      for (const c of capturas) {
+        const { x, y } = c.honeypot;
+        const t = (ahora - c.inicio) / VIDA_CAPTURA_MS;
+        const tono = c.critico ? colores.coral : colores.ambar;
+
+        ctx.fillStyle = tono;
+        ctx.globalAlpha = 0.5 * (1 - t);
+        hexagono(ctx, x, y, radio * 0.6);
         ctx.fill();
+
+        const onda = Math.min(1, (ahora - c.inicio) / 650);
+        if (onda < 1) {
+          ctx.globalAlpha = (1 - onda) * 0.85;
+          ctx.strokeStyle = tono;
+          ctx.lineWidth = 1.6;
+          hexagono(ctx, x, y, radio * (0.94 + onda * 0.55));
+          ctx.stroke();
+        }
+
+        const clasificada = ahora - c.inicio - DEMORA_CLASIFICACION_MS;
+        if (clasificada > 0) {
+          ctx.globalAlpha = Math.max(0, 1 - clasificada / 900) * 0.9;
+          ctx.strokeStyle = colores.teal;
+          ctx.lineWidth = 2;
+          hexagono(ctx, x, y, radio * 0.94);
+          ctx.stroke();
+        }
+
+        ctx.globalAlpha = Math.max(0, 1 - t * 1.3);
+        ctx.fillStyle = tono;
+        ctx.font = `600 ${ancho < 700 ? 11 : 12}px 'JetBrains Mono', monospace`;
+        ctx.fillText('+1', x + radio * 0.75, y - radio * 0.7 - t * 22);
+        ctx.globalAlpha = 1;
       }
-      ctx.globalAlpha = 1;
+
+      // La cuenta de cada honeypot, debajo de su servicio.
+      ctx.font = `500 ${ancho < 700 ? 10 : 11}px 'JetBrains Mono', monospace`;
+      ctx.fillStyle = colores.ambar;
+      for (const h of honeypots) {
+        if (h.capturas > 0) ctx.fillText(h.capturas.toLocaleString(), h.x, h.y + radio + 30);
+      }
+
+      marco = requestAnimationFrame(cuadro);
     };
 
     const arrancar = () => {
@@ -343,8 +369,7 @@ export default function EscenaPanal({ etiqueta }: { etiqueta: string }) {
       armar();
       // La retícula se pinta ya, sin esperar el primer cuadro: así el fondo nunca aparece vacío.
       ctx.drawImage(capa, 0, 0, ancho, alto);
-      if (quieto) fijo();
-      else marco = requestAnimationFrame(cuadro);
+      if (!quieto) marco = requestAnimationFrame(cuadro);
     };
 
     arrancar();
@@ -355,7 +380,7 @@ export default function EscenaPanal({ etiqueta }: { etiqueta: string }) {
       arrancar();
     });
     tema.observe(document.documentElement, { attributes: true, attributeFilter: ['data-tema'] });
-    // Con la pestaña oculta no se dibuja; al volver, se retoma sin una ráfaga de atrasados.
+    // Con la pestaña oculta no se dibuja; al volver se retoma sin una ráfaga de atrasados.
     const alCambiarVisibilidad = () => {
       if (document.hidden) cancelAnimationFrame(marco);
       else if (!quieto) {

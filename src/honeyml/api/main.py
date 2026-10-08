@@ -26,10 +26,21 @@ from urllib.error import HTTPError, URLError
 
 from fastapi import Depends, FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..education import fingerprints, password_index
 from ..features import arquetipos
-from . import acceso, auditoria, decisiones, exportar, offline, queries, registros, telemetria
+from . import (
+    acceso,
+    auditoria,
+    decisiones,
+    exportar,
+    offline,
+    queries,
+    registros,
+    reporte,
+    telemetria,
+)
 from .acceso import Sesion
 from .privacidad import sin_direcciones
 
@@ -464,7 +475,7 @@ def get_sesion(sesion: Invitado) -> dict[str, Any]:
 
 @app.delete("/api/sesion")
 def delete_sesion(respuesta: Response, sesion: Invitado) -> dict[str, bool]:
-    auditoria.registrar(sesion.usuario, sesion.rol, "salida")
+    _en_vivo(lambda: acceso.cerrar(sesion))
     respuesta.delete_cookie(acceso.COOKIE, path="/api")
     return {"ok": True}
 
@@ -554,6 +565,13 @@ def _adjunto(contenido: str, nombre: str, extra: dict[str, str] | None = None) -
     )
 
 
+def _rango(desde: str | None, hasta: str | None) -> tuple[str | None, str | None]:
+    try:
+        return reporte.validar(desde, hasta)
+    except reporte.RangoInvalidoError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 @app.get("/api/exportar/decisiones.csv")
 def get_exportar_decisiones(
     sesion: Invitado,
@@ -561,22 +579,33 @@ def get_exportar_decisiones(
     tactica: str | None = None,
     sensor: str | None = None,
     estado: Literal["todas", "pendientes", "revisadas"] = "todas",
+    desde: str | None = None,
+    hasta: str | None = None,
 ) -> Response:
-    """Las decisiones del filtro, hasta diez mil. `X-Total` dice cuántas había en el filtro."""
+    """Las decisiones del filtro, hasta diez mil. `X-Total` dice cuántas había en el filtro. El
+    rango es sobre el momento del evento, el mismo del reporte general."""
+    desde, hasta = _rango(desde, hasta)
     datos = _en_vivo(
         lambda: decisiones.para_exportar(
-            severidad=severidad, tactica=tactica, sensor=sensor, estado=estado
+            severidad=severidad,
+            tactica=tactica,
+            sensor=sensor,
+            estado=estado,
+            desde=f"{desde}T00:00:00Z" if desde else None,
+            hasta=f"{hasta}T23:59:59.999Z" if hasta else None,
         )
     )
-    filtro = {
-        k: v for k, v in {"severidad": severidad, "tactica": tactica, "sensor": sensor}.items() if v
+    pedido = {
+        "severidad": severidad,
+        "tactica": tactica,
+        "sensor": sensor,
+        "desde": desde,
+        "hasta": hasta,
+        "estado": estado,
     }
+    detalle = {k: v for k, v in pedido.items() if v} | {"filas": len(datos["items"])}
     auditoria.registrar(
-        sesion.usuario,
-        sesion.rol,
-        "exportacion",
-        objetivo="decisiones",
-        detalle={**filtro, "estado": estado, "filas": len(datos["items"])},
+        sesion.usuario, sesion.rol, "exportacion", objetivo="decisiones", detalle=detalle
     )
     return _adjunto(
         exportar.decisiones_csv(datos["items"]),
@@ -599,10 +628,35 @@ def get_exportar_revisiones(sesion: Invitado) -> Response:
     return _adjunto(exportar.revisiones_csv(filas), "revisiones")
 
 
+@app.get("/api/reporte")
+def get_reporte(
+    sesion: Invitado, desde: str | None = None, hasta: str | None = None
+) -> dict[str, Any]:
+    """Todo lo que lleva el reporte general para un rango de fechas, sin direcciones."""
+    desde, hasta = _rango(desde, hasta)
+    return _en_vivo(lambda: reporte.general(desde, hasta))
+
+
+class AvisoDeReporte(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    formato: Literal["pdf", "csv"]
+    conjunto: str | None = Field(default=None, max_length=40)
+    desde: str | None = Field(default=None, max_length=10)
+    hasta: str | None = Field(default=None, max_length=10)
+
+
 @app.post("/api/reporte")
-def post_reporte(sesion: Invitado) -> dict[str, bool]:
-    """El reporte imprimible lo arma el navegador; esto solo lo deja anotado en la auditoría."""
-    auditoria.registrar(sesion.usuario, sesion.rol, "exportacion", objetivo="reporte")
+def post_reporte(aviso: AvisoDeReporte, sesion: Invitado) -> dict[str, bool]:
+    """La versión impresa y los CSV los arma el navegador con lo que devolvió `get_reporte`;
+    esto solo deja anotado en la auditoría qué se llevó y de qué rango."""
+    auditoria.registrar(
+        sesion.usuario,
+        sesion.rol,
+        "exportacion",
+        objetivo=aviso.conjunto or "reporte",
+        detalle=aviso.model_dump(exclude_none=True),
+    )
     return {"ok": True}
 
 

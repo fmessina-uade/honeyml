@@ -352,3 +352,28 @@ def test_los_registros_del_servidor_se_leen_juntos_y_tapados(tmp_path: Any) -> N
 
 def test_sin_el_montaje_los_registros_dicen_que_no_estan(tmp_path: Any) -> None:
     assert registros.ultimas(directorio=tmp_path / "no-esta")["disponible"] is False
+
+
+def test_ingresar_desde_otro_dispositivo_cierra_el_primero(indice: IndiceFalso) -> None:
+    _cuenta("ana", "analista")
+    telefono, notebook = TestClient(app), TestClient(app)
+    _ingresar(telefono, "ana")
+    assert telefono.get("/api/sesion").status_code == 200
+    _ingresar(notebook, "ana")
+    acceso._cuentas.clear()
+    cerrada = telefono.get("/api/sesion")
+    assert cerrada.status_code == 401
+    assert "otro dispositivo" in cerrada.json()["detail"]
+    assert notebook.get("/api/sesion").status_code == 200
+
+
+def test_salir_deja_inservible_la_cookie(indice: IndiceFalso) -> None:
+    _cuenta("ana", "analista")
+    cliente = TestClient(app)
+    _ingresar(cliente, "ana")
+    cookie = cliente.cookies.get(acceso.COOKIE)
+    assert cliente.delete("/api/sesion").status_code == 200
+    acceso._cuentas.clear()
+    copia = TestClient(app)
+    copia.cookies.set(acceso.COOKIE, cookie or "", path="/api")
+    assert copia.get("/api/sesion").status_code == 401

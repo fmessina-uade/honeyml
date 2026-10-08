@@ -16,8 +16,8 @@ RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-ok()   { echo -e "${GREEN}  ✓${NC} $*"; ((PASS++)) || true; }
-fail() { echo -e "${RED}  ✗${NC} $*"; ((FAIL++)) || true; }
+ok()   { echo -e "${GREEN}  bien ${NC} $*"; ((PASS++)) || true; }
+fail() { echo -e "${RED}  falla${NC} $*"; ((FAIL++)) || true; }
 info() { echo -e "${YELLOW}  ->${NC} $*"; }
 
 cd "$(git rev-parse --show-toplevel 2>/dev/null || echo '.')"
@@ -188,7 +188,7 @@ SENSITIVE_PATTERNS=("*.pkl" "*.pem" "*.key" "*.pcap" "*.malware" ".env" "id_rsa"
 for pattern in "${SENSITIVE_PATTERNS[@]}"; do
     grep -q "$pattern" .gitignore 2>/dev/null \
         && ok ".gitignore cubre: $pattern" \
-        || fail ".gitignore NO cubre: $pattern"
+        || fail ".gitignore no cubre: $pattern"
 done
 
 echo ""

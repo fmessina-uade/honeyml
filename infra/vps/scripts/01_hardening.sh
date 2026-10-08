@@ -224,7 +224,7 @@ if ! docker compose version &>/dev/null 2>&1; then
     apt-get install -y -qq docker-compose-plugin
 fi
 
-# 12. SSH: configuración endurecida, sin activación por socket (estable en Ubuntu 24.04)
+# 12. sshd con configuración endurecida, sin activación por socket (estable en Ubuntu 24.04)
 log "[12/13] Configurando SSH en puerto 2200..."
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

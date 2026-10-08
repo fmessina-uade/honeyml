@@ -34,7 +34,7 @@ from ..state import Decision, EstadoTriaje
 # Cómo se traduce cada clase de error de Pydantic. La clave es el `type` que trae el error, y el
 # valor arma la oración con el campo adentro.
 #
-# El diccionario no pretende ser exhaustivo: `_texto` cae en un mensaje genérico que arrastra el
+# El diccionario no cubre todos los errores: `_texto` cae en un mensaje genérico que arrastra el
 # original cuando aparece un tipo que no está acá. Preferimos eso a una tabla enorme que igual
 # quedaría incompleta cuando Pydantic agregue un caso.
 PLANTILLAS: dict[str, str] = {

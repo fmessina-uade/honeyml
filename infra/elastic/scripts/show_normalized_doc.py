@@ -58,10 +58,10 @@ def mask_value(path: str, value: Any) -> Any:
     if path in ("source.ip", "source.address", "host.ip", "related.ip"):
         return mask_ip(value)
     if path == "cowrie.password":
-        return "•" * min(len(value), 8)
+        return "*" * min(len(value), 8)
     if path == "event.original":
         # el usuario queda, porque es el hallazgo; la contraseña no
-        return _CRED_IN_TEXT.sub(lambda m: f"[{m.group(1)}/{'•' * min(len(m.group(2)), 8)}]", value)
+        return _CRED_IN_TEXT.sub(lambda m: f"[{m.group(1)}/{'*' * min(len(m.group(2)), 8)}]", value)
     return value
 
 
@@ -143,15 +143,17 @@ def main() -> None:
                 if k in native:
                     native[k] = mask_ip(str(native[k]))
             if "password" in native:
-                native["password"] = "•" * min(len(str(native["password"])), 8)
+                native["password"] = "*" * min(len(str(native["password"])), 8)
             if "message" in native:
                 native["message"] = mask_value("event.original", str(native["message"]))
-        show("ANTES: registro nativo del sensor (Cowrie jsonlog)", native)
+        show("Antes, el registro nativo del sensor (Cowrie jsonlog)", native)
     elif raw_msg:
-        print("\nANTES: registro nativo (solo el mensaje; falta la copia local del log):")
+        print(
+            "\nAntes, el registro nativo: solo el mensaje, porque falta la copia local del registro"
+        )
         print(f"  {raw_msg[:300]}")
 
-    show("DESPUÉS: documento normalizado a Elastic Common Schema", shown)
+    show("Después, el documento normalizado a Elastic Common Schema", shown)
 
     ecs = sum(1 for k in shown if k not in ("cowrie", "dionaea", "honeypot"))
     own = len(shown.get("cowrie", {})) + len(shown.get("dionaea", {}))

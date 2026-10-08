@@ -144,7 +144,7 @@ def comprobar() -> int:
     try:
         config = ConfigInferencia.desde_entorno()
     except CredencialAusenteError as exc:
-        print(f"✗ {exc}")
+        print(f"No se pudo configurar el servicio. {exc}")
         return 1
 
     adaptador = AdaptadorDeInferencia(config=config)
@@ -165,17 +165,17 @@ def comprobar() -> int:
     try:
         r = adaptador.completar(
             sistema="Respondés únicamente con el JSON que se te pide.",
-            usuario="Poné listo en verdadero y una frase corta en resumen.",
+            usuario="Devolvé listo en verdadero y una frase corta en el campo resumen.",
             esquema=esquema,
             intento=0,
             nombre_esquema="comprobacion",
         )
     except (ProveedorInalcanzableError, PedidoRechazadoError, CuotaAgotadaError) as exc:
-        print(f"\n✗ {type(exc).__name__}: {exc}")
+        print(f"\nFalló la prueba con {type(exc).__name__}. {exc}")
         return 1
 
     atendio = f" vía {r.proveedor}" if r.proveedor else ""
-    print(f"\n✓ Respondió en {r.segundos:.2f}s con {r.modelo}{atendio}")
+    print(f"\nRespondió en {r.segundos:.2f}s con {r.modelo}{atendio}")
     print(f"  {r.contenido.strip()[:200]}")
     print(adaptador.resumen())
 
@@ -183,6 +183,6 @@ def comprobar() -> int:
     # operativas a reportar, y conviene tenerla a mano antes de lanzar una.
     costo = adaptador.por_modelo[r.modelo].costo_estimado(r.modelo)
     if costo is not None:
-        print(f"\n  A este precio, mil eventos salen ≈ USD {costo * 1000:.2f}")
+        print(f"\n  A este precio, mil eventos salen unos USD {costo * 1000:.2f}")
         print("  (la comprobación usa un contexto mínimo; el real es bastante mayor)")
     return 0

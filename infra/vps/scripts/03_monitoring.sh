@@ -75,7 +75,7 @@ CPU_IDLE=\$(top -bn1 | grep 'Cpu(s)' | awk '{print \$8}' | tr -d '%id,' 2>/dev/n
 CPU_USED=\$(echo "100 - \$CPU_IDLE" | bc 2>/dev/null || echo "0")
 CPU_INT=\${CPU_USED%.*}
 if [[ "\${CPU_INT:-0}" -ge "\$THRESHOLD_CPU" ]]; then
-    send_alert "WARNING" "CPU al \${CPU_USED}% (umbral: \${THRESHOLD_CPU}%)"
+    send_alert "aviso" "CPU al \${CPU_USED}% (umbral: \${THRESHOLD_CPU}%)"
 fi
 
 # memory
@@ -84,7 +84,7 @@ MEM_TOTAL=\$(echo "\$MEM_INFO" | awk '{print \$2}')
 MEM_USED=\$(echo "\$MEM_INFO" | awk '{print \$3}')
 MEM_PCT=\$(( MEM_USED * 100 / MEM_TOTAL ))
 if [[ "\$MEM_PCT" -ge "\$THRESHOLD_MEM" ]]; then
-    send_alert "WARNING" "Memoria al \${MEM_PCT}% (umbral: \${THRESHOLD_MEM}%)"
+    send_alert "aviso" "Memoria al \${MEM_PCT}% (umbral: \${THRESHOLD_MEM}%)"
 fi
 
 # disk
@@ -92,7 +92,7 @@ while IFS= read -r line; do
     PCT=\$(echo "\$line" | awk '{print \$5}' | tr -d '%')
     MOUNT=\$(echo "\$line" | awk '{print \$6}')
     if [[ "\${PCT:-0}" -ge "\$THRESHOLD_DISK" ]]; then
-        send_alert "WARNING" "Disco \${MOUNT} al \${PCT}% (umbral: \${THRESHOLD_DISK}%)"
+        send_alert "aviso" "Disco \${MOUNT} al \${PCT}% (umbral: \${THRESHOLD_DISK}%)"
     fi
 done < <(df -h | tail -n +2 | grep -v tmpfs)
 
@@ -106,7 +106,7 @@ for container in cowrie dionaea elasticsearch logstash filebeat valkey motor api
         continue
     fi
     if [[ "\$STATUS" != "running" ]]; then
-        send_alert "CRITICAL" "Contenedor '\${container}' en estado \${STATUS}"
+        send_alert "critico" "Contenedor '\${container}' en estado \${STATUS}"
     fi
 done
 
@@ -117,9 +117,9 @@ if docker inspect --format='{{.State.Status}}' elasticsearch >/dev/null 2>&1; th
     ES_ESTADO=\$(curl -s --max-time 10 http://localhost:9200/_cluster/health 2>/dev/null \
         | grep -o '"status":"[a-z]*"' | cut -d'"' -f4)
     if [[ "\$ES_ESTADO" == "red" ]]; then
-        send_alert "CRITICAL" "Elasticsearch en rojo"
+        send_alert "critico" "Elasticsearch en rojo"
     elif [[ -z "\$ES_ESTADO" ]]; then
-        send_alert "WARNING" "Elasticsearch no contesta el estado del clúster"
+        send_alert "aviso" "Elasticsearch no contesta el estado del clúster"
     fi
 fi
 
@@ -129,13 +129,13 @@ if docker inspect --format='{{.State.Status}}' valkey >/dev/null 2>&1; then
     ATRASO=\$(docker exec valkey valkey-cli --raw XINFO GROUPS honeyml:events 2>/dev/null \
         | awk '/^lag\$/{getline; print; exit}')
     if [[ "\$ATRASO" =~ ^[0-9]+\$ ]] && [[ "\$ATRASO" -ge $THRESHOLD_ATRASO ]]; then
-        send_alert "WARNING" "El motor no consume: \${ATRASO} eventos de atraso en el bus"
+        send_alert "aviso" "El motor no consume: \${ATRASO} eventos de atraso en el bus"
     fi
 fi
 
 # el servicio SSH de administración
 if ! ss -tlnp | grep -q ":2200 "; then
-    send_alert "CRITICAL" "sshd no escucha en el puerto 2200: se pierde el acceso de administración"
+    send_alert "critico" "sshd no escucha en el puerto 2200: se pierde el acceso de administración"
 fi
 
 log_entry "Health check completado - CPU:\${CPU_USED}% MEM:\${MEM_PCT}% OK"

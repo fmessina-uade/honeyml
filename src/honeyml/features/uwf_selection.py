@@ -69,7 +69,7 @@ def main() -> None:
     for c in ("local_orig", "local_resp"):
         x[c] = x[c].astype(int)
 
-    # se parte ANTES de ajustar cualquier cosa, para que no haya fuga
+    # se parte antes de ajustar cualquier cosa, para que no haya fuga
     x_tr, x_te, y_tr, y_te = train_test_split(x, y, test_size=0.25, stratify=y, random_state=42)
     print(f"Train: {len(x_tr):,}  |  Test: {len(x_te):,}  |  clases: {y.nunique()}")
 

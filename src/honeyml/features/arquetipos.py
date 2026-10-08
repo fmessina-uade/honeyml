@@ -41,8 +41,8 @@ RANDOM_STATE = 42
 # encima de 8 los grupos se vuelven demasiado chicos para describirlos con honestidad.
 KS = range(3, 9)
 
-# La silueta es O(n²): sobre 14.000 puntos son 200 millones de pares. Se calcula sobre una muestra,
-# que es lo habitual y suficiente para comparar k entre sí.
+# La silueta crece con el cuadrado de los puntos: sobre 14.000 puntos son 200 millones de pares. Se
+# calcula sobre una muestra, que es lo habitual y suficiente para comparar k entre sí.
 MUESTRA_SILUETA = 5000
 
 # Cuántas características definen a cada grupo en su perfil. Con 35 disponibles, mostrarlas todas
@@ -105,7 +105,7 @@ def _legible(col: str) -> str:
     if col in LEGIBLE:
         return LEGIBLE[col]
     if col.startswith("cmd_"):
-        return f"usó «{col[4:]}»"
+        return f'usó "{col[4:]}"'
     return col
 
 
@@ -205,8 +205,8 @@ def main() -> None:
             "antes de agrupar: un infinito hace que el escalado deje de tener sentido."
         )
 
-    # Escalar es imprescindible: `horas_activas` llega a 24 y los indicadores de comando valen 0 o
-    # 1. Sin estandarizar, la distancia la domina la columna de mayor rango y el agrupamiento
+    # Escalar es imprescindible: `horas_activas` llega a 24 y los indicadores de comando valen cero
+    # o uno. Sin estandarizar, la distancia la domina la columna de mayor rango y el agrupamiento
     # termina midiendo una sola característica.
     x = StandardScaler().fit_transform(crudo)
 
@@ -221,11 +221,13 @@ def main() -> None:
         n = f"{p['direcciones']:,}".replace(",", ".")
         print(f"  {p['nombre'].upper()}: {n} direcciones ({p['porcentaje']} %)")
         for r in p["rasgos"]:
-            print(f"      {r['direccion']:>5}  {r['caracteristica']}  ({r['desvios']:+.2f} σ)")
+            print(
+                f"      {r['direccion']:>5}  {r['caracteristica']}  ({r['desvios']:+.2f} desvíos)"
+            )
         print(
-            f"      mediana {p['mediana_eventos']} eventos · "
-            f"{p['pct_ejecuto_comandos']} % ejecutó comandos · "
-            f"{p['pct_descargo_archivo']} % descargó · "
+            f"      mediana {p['mediana_eventos']} eventos, "
+            f"{p['pct_ejecuto_comandos']} % ejecutó comandos, "
+            f"{p['pct_descargo_archivo']} % descargó, "
             f"{p['pct_logro_acceso']} % logró acceso\n"
         )
 

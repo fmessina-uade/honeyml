@@ -75,9 +75,7 @@ def test_el_esquema_rechaza_un_nivel_que_no_existe() -> None:
         )
 
 
-# ---- topología ----------------------------------------------------------------------------
-
-
+# Topología
 def test_el_grafo_compila() -> None:
     """Con los nodos que faltan como marcadores: la forma tiene que ser verificable ya."""
     assert graph.construir_grafo() is not None
@@ -133,7 +131,7 @@ def test_el_grafo_recorre_todos_los_nodos_con_implementaciones_de_prueba() -> No
     assert visitados == graph.ORDEN
 
 
-# ---- las guardias del ciclo correctivo ------------------------------------------------------
+# Las guardias del ciclo correctivo
 #
 # Son contratos entre el grafo y los nodos de inferencia y validación. Ninguno se rompe de forma
 # visible: el ciclo sigue andando, más caro o con una decisión que no debería haberse guardado.
@@ -359,9 +357,7 @@ def test_el_techo_de_pasos_sale_de_la_topologia() -> None:
     assert graph.LIMITE_DE_PASOS >= 3 + 2 * MAX_INTENTOS + 1
 
 
-# ---- nodo de contexto ---------------------------------------------------------------------
-
-
+# Nodo de contexto
 def test_un_evento_sin_origen_se_corta() -> None:
     salida = nodo_contexto.construir({"evento": _evento(source_ip="")})
     assert salida == {"motivo_de_corte": "sin_contexto"}
@@ -428,9 +424,7 @@ def test_dionaea_no_pregunta_por_sesion(monkeypatch: pytest.MonkeyPatch) -> None
     assert "sesion" not in ctx.hallazgos
 
 
-# ---- herramientas -------------------------------------------------------------------------
-
-
+# Herramientas
 def test_el_historial_se_corta_en_el_evento(monkeypatch: pytest.MonkeyPatch) -> None:
     """Sin este corte el motor juzga un evento con evidencia que todavía no existía."""
     capturado: dict[str, Any] = {}

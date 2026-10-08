@@ -135,9 +135,9 @@ def _contexto_tls() -> ssl.SSLContext:
     una opción disponible, ni siquiera para depurar.
 
     Lo que sí hace es cubrir un caso concreto y bastante común: el intérprete de python.org en macOS
-    apunta su almacén de certificados a `…/etc/openssl/cert.pem`, un archivo que su instalador crea
-    recién cuando se corre `Install Certificates.command`. Sin ese paso, toda conexión HTTPS
-    falla con un mensaje de OpenSSL que no nombra ninguna causa.
+    apunta su almacén de certificados a `<prefijo>/etc/openssl/cert.pem`, un archivo que su
+    instalador crea recién cuando se corre `Install Certificates.command`. Sin ese paso, toda
+    conexión HTTPS falla con un mensaje de OpenSSL que no nombra ninguna causa.
 
     Cuando el almacén configurado no existe se recurre al paquete de `certifi`, que es el mismo que
     instala ese script. No se sustituye un almacén que funcione, solo se provee uno cuando no hay.
@@ -210,13 +210,13 @@ class Consumo:
     def resumen(self, modelo: str) -> str:
         costo = self.costo_estimado(modelo)
         linea = (
-            f"{self.llamadas} llamadas · {self.tokens_entrada:,} tokens de entrada · "
-            f"{self.tokens_salida:,} de salida · {self.segundos:.1f}s"
+            f"{self.llamadas} llamadas, {self.tokens_entrada:,} tokens de entrada, "
+            f"{self.tokens_salida:,} de salida, {self.segundos:.1f}s"
         ).replace(",", ".")
         if costo is not None:
-            linea += f" · ≈ USD {costo:.4f}"
+            linea += f", unos USD {costo:.4f}"
         if self.esperas_por_limite:
-            linea += f" · {self.esperas_por_limite} esperas por límite de tasa"
+            linea += f", {self.esperas_por_limite} esperas por límite de tasa"
         return linea
 
 
@@ -333,7 +333,7 @@ class ClienteDeInferencia:
         self.config = config or ConfigInferencia.desde_entorno()
         self.consumo = Consumo()
 
-    # -- transporte -----------------------------------------------------------------------
+    # El transporte
 
     def _postear(self, cuerpo: dict[str, Any]) -> dict[str, Any]:
         # Levanta la taxonomía de excepciones que declara el encabezado del módulo.
@@ -432,7 +432,7 @@ class ClienteDeInferencia:
             "El evento vuelve al bus."
         )
 
-    # -- interfaz -------------------------------------------------------------------------
+    # La interfaz
 
     def completar(
         self,

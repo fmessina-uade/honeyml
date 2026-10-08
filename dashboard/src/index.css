@@ -2862,14 +2862,6 @@ button.ranking-fila:hover {
     ),
     linear-gradient(0deg, rgb(var(--fondo) / 0.92) 0%, rgb(var(--fondo) / 0.5) 24%, transparent 50%);
 }
-.ingreso-cabecera {
-  position: absolute;
-  top: clamp(18px, 3.4vh, 32px);
-  left: clamp(20px, 4.4vw, 64px);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
 .ingreso-heroe {
   position: absolute;
   left: clamp(20px, 4.4vw, 64px);
@@ -2936,19 +2928,46 @@ button.ranking-fila:hover {
 .ingreso-boton {
   font-family: 'Geist', 'Inter', sans-serif;
 }
+/* Idioma y tema, también antes de ingresar: arriba a la derecha, sobre la esquina de la tarjeta. */
+.ingreso-preferencias {
+  position: absolute;
+  top: 30px;
+  right: 34px;
+  z-index: 2;
+}
+@media (max-width: 699px) {
+  .ingreso-preferencias {
+    top: calc(14px + env(safe-area-inset-top));
+    right: 16px;
+  }
+}
+/* La marca arriba del formulario: el logo entero y el nombre, nada más. */
+.ingreso-marca {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.ingreso-marca img {
+  width: 60px;
+  height: 60px;
+  filter: drop-shadow(0 6px 18px color-mix(in srgb, var(--honey-amber) 35%, transparent));
+}
+.ingreso-marca span {
+  font-family: 'Geist', 'Inter', sans-serif;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: rgb(var(--tinta) / 0.9);
+}
 .ingreso-h1 {
+  margin-bottom: 32px;
   text-align: center;
   font-size: clamp(28px, 2.5vw, 38px);
   font-weight: 600;
   letter-spacing: -0.05em;
   line-height: 1.1;
-}
-.ingreso-bajada {
-  margin: 10px 0 34px;
-  text-align: center;
-  font-size: 15px;
-  line-height: 1.5;
-  color: rgb(var(--tinta) / 0.62);
 }
 .ingreso-campo {
   display: flex;
@@ -3049,26 +3068,21 @@ button.ranking-fila:hover {
   outline-offset: 3px;
 }
 .ingreso-pie {
-  margin-top: 26px;
+  margin-top: 24px;
   text-align: center;
   font-size: 13.5px;
   line-height: 1.5;
-  color: rgb(var(--tinta) / 0.62);
-}
-.ingreso-nota {
-  margin-top: 6px;
-  font-size: 12px;
-  color: rgb(var(--tinta) / 0.42);
+  color: rgb(var(--tinta) / 0.6);
 }
 /* Hasta que arranca la entrada, lo que va a animarse no se ve. Sin JavaScript la clase no se pone y
    la pantalla aparece entera. */
 .ingreso[data-entrada='pendiente']
   :is(
     .ingreso-tarjeta,
-    .ingreso-cabecera,
+    .ingreso-preferencias,
+    .ingreso-marca,
     .ingreso-insignia,
     .ingreso-h1,
-    .ingreso-bajada,
     .ingreso-campo,
     .ingreso-pie
   ) {
@@ -3113,19 +3127,13 @@ button.ranking-fila:hover {
   .ingreso-velo {
     position: fixed;
   }
-  .ingreso-cabecera {
-    position: relative;
-    top: auto;
-    left: auto;
-    margin: calc(18px + env(safe-area-inset-top)) 22px 0;
-  }
   .ingreso-heroe {
     position: relative;
     left: auto;
     right: auto;
     bottom: auto;
     margin: auto 22px 24px;
-    padding-top: 12vh;
+    padding-top: calc(14vh + env(safe-area-inset-top));
     gap: 14px;
   }
   .ingreso-titular {
@@ -3155,9 +3163,6 @@ button.ranking-fila:hover {
     max-width: 500px;
     margin: 0 auto;
     padding: 32px clamp(22px, 7vw, 38px) max(28px, env(safe-area-inset-bottom));
-  }
-  .ingreso-bajada {
-    margin-bottom: 26px;
   }
   /* 16 px o más: con menos, Safari del iPhone agranda la página al tocar el campo. */
   .ingreso-campo input {
@@ -3316,10 +3321,12 @@ button.ranking-fila:hover {
 
 /* Las secciones que se calculan por lotes lo dicen arriba, con la fecha. */
 .nota-lote {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 9px;
-  margin: 18px 0 -6px;
+  margin: 18px 0 14px;
   font-size: 12px;
   line-height: 1.5;
   color: rgb(var(--tinta) / 0.55);
@@ -3698,235 +3705,522 @@ button.ranking-fila:hover {
   }
 }
 
-/* El reporte. Se ve como una hoja A4 sobre el panel y es lo único que sale al imprimir. Va siempre
-   con los colores del tema oscuro: los tokens se redefinen adentro, así funciona igual si quien lo
-   pide tiene elegido el claro. */
-.reporte-vista {
-  --tinta: 255 255 255;
-  --fondo: 13 17 23;
-  --elevada: 22 27 34;
-  --honey-amber: #d4860a;
-  --neural-teal: #00b894;
-  --agent-coral: #ff6b35;
-  --ghost-slate: #94a3b8;
-  --violeta: #a78bfa;
-  --critico: #e03131;
-  --sobre-ambar: #0d1117;
-  position: fixed;
-  inset: 0;
-  z-index: 150;
-  overflow-y: auto;
-  padding: 0 16px 48px;
-  color: #fff;
-  background: rgb(6 9 13 / 0.94);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
+/* La reportería: los controles a la izquierda y las hojas a la derecha, achicadas para entrar. */
+.reportes {
+  display: grid;
+  gap: 24px;
+  align-items: start;
 }
-.reporte-barra {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  display: flex;
+@media (min-width: 1024px) {
+  .reportes {
+    grid-template-columns: 340px minmax(0, 1fr);
+  }
+  .reportes-mando {
+    position: sticky;
+    top: 16px;
+  }
+}
+.reportes-rotulo {
+  margin-bottom: 10px;
+  font-family: 'Geist', 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: rgb(var(--tinta));
+}
+.reportes-conjuntos li + li {
+  border-top: 1px solid rgb(var(--tinta) / 0.06);
+}
+.reportes-conjuntos :is(button, a) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  max-width: 210mm;
-  margin: 0 auto;
-  padding: 14px 0;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 8px;
+  border-radius: 8px;
+  text-align: left;
+  font-size: 13px;
+  color: rgb(var(--tinta) / 0.85);
+  transition:
+    background 0.18s ease,
+    color 0.18s ease;
 }
-.reporte-hoja {
-  width: min(210mm, 100%);
-  min-height: 297mm;
-  margin: 0 auto;
-  padding: 16mm 15mm 12mm;
+.reportes-conjuntos :is(button, a):hover {
+  color: rgb(var(--tinta));
+  background: rgb(var(--tinta) / 0.05);
+}
+.reportes-conjuntos small {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  color: rgb(var(--tinta) / 0.45);
+}
+.reportes-conjuntos svg {
+  color: var(--honey-amber);
+}
+.previa-hojas {
   display: flex;
   flex-direction: column;
-  gap: 9mm;
-  color: #fff;
-  background:
-    radial-gradient(120% 60% at 0% 0%, rgb(212 134 10 / 0.14), transparent 55%),
-    radial-gradient(90% 50% at 100% 100%, rgb(0 184 148 / 0.08), transparent 60%), #0d1117;
-  border-radius: 6px;
-  box-shadow: 0 40px 80px -30px rgb(0 0 0 / 0.8);
+  align-items: center;
+  gap: 18px;
+  min-height: 420px;
+  padding: 18px;
+  border-radius: 18px;
+  background: #070a0e;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.05);
+  transition: opacity 0.25s ease;
+}
+:root[data-tema='claro'] .previa-hojas {
+  background: #d5dbe3;
+}
+.previa-hojas[data-cargando='si'] {
+  opacity: 0.55;
+}
+.previa-hojas .hoja-reporte {
+  zoom: var(--escala);
+  box-shadow: 0 30px 60px -30px rgb(0 0 0 / 0.8);
+}
+
+/* Las hojas del reporte. Medidas en milímetros, del tamaño de un A4, y con colores sólidos: un
+   degradado o una transparencia se imprimen distinto en cada navegador. */
+.hoja-reporte {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6mm;
+  flex: none;
+  width: 210mm;
+  height: 297mm;
+  padding: 14mm 15mm 11mm;
+  overflow: hidden;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: #e8edf3;
+  background: #0d1117;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
+  break-after: page;
+  page-break-after: always;
 }
-.reporte-cabecera {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-  padding-bottom: 7mm;
-  border-bottom: 1px solid rgb(255 255 255 / 0.1);
+.hoja-reporte:last-child {
+  break-after: auto;
+  page-break-after: auto;
 }
-.reporte-marca,
-.reporte-titulo,
-.reporte-cifra {
+.hoja-reporte
+  :is(h1, h2, h3, .hoja-marca, .hoja-cifra span, .hoja-reparto dd, .portada-marca, .portada-rango) {
   font-family: 'Geist', 'Inter', sans-serif;
 }
-.reporte-marca {
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.03em;
+.hoja-reporte
+  :is(
+    .hoja-mono,
+    .hoja-valor,
+    .hoja-pie,
+    .hoja-cabeza,
+    code,
+    .hoja-iso,
+    .portada-ceja,
+    .portada-sintesis h3,
+    small
+  ) {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }
-.reporte-titulo {
-  font-size: 26px;
+.hoja-cabeza {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 4mm;
+  border-bottom: 1px solid #232b36;
+  font-size: 9.5px;
+  color: #8d97a5;
+}
+.hoja-marca {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #e8edf3;
+}
+.hoja-titulo {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 30px;
   font-weight: 600;
   letter-spacing: -0.045em;
-  background: linear-gradient(100deg, #d4860a, #ff6b35 55%, #00b894);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: #ffffff;
 }
-.reporte-sub {
-  margin-top: 3px;
-  font-size: 11px;
-  color: rgb(255 255 255 / 0.55);
-}
-.reporte-bloque {
-  display: flex;
-  flex-direction: column;
-  gap: 5mm;
-  break-inside: avoid;
-}
-.reporte-ceja {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.hoja-titulo span {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10.5px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
   color: #d4860a;
 }
-.reporte-ceja::before {
-  content: '';
-  width: 11px;
-  height: 11px;
-  background: #d4860a;
-  -webkit-mask: var(--marca-hex) center / contain no-repeat;
-  mask: var(--marca-hex) center / contain no-repeat;
-}
-.reporte-cifras {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-  gap: 6mm;
-}
-.reporte-cifra {
-  font-size: 30px;
-  font-weight: 500;
-  letter-spacing: -0.04em;
-  line-height: 1.05;
-}
-.reporte-cifra-chica {
-  font-size: 22px;
-  color: #fff;
-}
-.reporte-rotulo {
-  margin-top: 4px;
-  font-size: 10.5px;
-  color: rgb(255 255 255 / 0.6);
-}
-.reporte-dos {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 9mm;
-}
-.reporte-subtitulo {
-  margin-bottom: 3mm;
-  font-size: 12px;
-  color: rgb(255 255 255 / 0.85);
-}
-.reporte-barras {
+.hoja-bloque {
   display: flex;
   flex-direction: column;
-  gap: 2.2mm;
+  gap: 3mm;
+  min-width: 0;
 }
-.reporte-barras li {
+.hoja-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 2mm;
+  border-bottom: 1px solid #1a212b;
+  font-size: 12px;
+  font-weight: 500;
+  color: #e8edf3;
+}
+.hoja-clave {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9.5px;
+  font-weight: 400;
+  color: #8d97a5;
+}
+.hoja-clave i,
+.hoja-reparto dt i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+.hoja-dos {
   display: grid;
-  grid-template-columns: 34% 1fr auto;
+  grid-template-columns: 1fr 1fr;
+  gap: 8mm;
+}
+.hoja-dos-ancha {
+  grid-template-columns: 1.2fr 1fr;
+}
+.hoja-grafico,
+.hoja-mapa {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.hoja-mapa {
+  border-radius: 6px;
+}
+.hoja-eje {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px;
+  fill: #8d97a5;
+}
+.hoja-anota {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  fill: #ff6b35;
+}
+.hoja-mapa-rotulo {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 5px;
+  font-weight: 600;
+  fill: #e8edf3;
+}
+.hoja-barras li {
+  display: grid;
+  grid-template-columns: 36% minmax(0, 1fr) 62px;
   align-items: center;
   gap: 8px;
+  padding: 1.3mm 0;
   font-size: 10.5px;
 }
-.reporte-nombre {
+.hoja-nombre {
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
-  color: rgb(255 255 255 / 0.75);
+  text-overflow: ellipsis;
+  color: #c9d1d9;
 }
-.reporte-pista {
+.hoja-mono {
+  font-size: 10px;
+}
+.hoja-pista {
+  display: block;
   height: 6px;
-  border-radius: 999px;
-  background: rgb(255 255 255 / 0.06);
   overflow: hidden;
+  border-radius: 3px;
+  background: #1a212b;
 }
-.reporte-pista > span {
+.hoja-pista > span {
   display: block;
   height: 100%;
-  border-radius: inherit;
+  border-radius: 3px;
 }
-.reporte-valor {
-  font-family: 'JetBrains Mono', monospace;
+.hoja-valor {
+  text-align: right;
+  font-size: 10px;
   font-variant-numeric: tabular-nums;
-  color: rgb(255 255 255 / 0.6);
+  color: #8d97a5;
 }
-.reporte-pie {
-  margin-top: auto;
+.hoja-cifra {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.hoja-cifra span {
+  font-size: 23px;
+  font-weight: 500;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+.hoja-cifra small {
+  font-size: 9px;
+  line-height: 1.4;
+  color: #8d97a5;
+}
+.hoja-kpis {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 5mm;
+  padding: 5mm;
+  border-radius: 6px;
+  background: #141a22;
+}
+.hoja-partida {
+  display: flex;
+  height: 12px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: #1a212b;
+}
+.hoja-partida-alta {
+  height: 18px;
+}
+.hoja-reparto {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4mm;
+}
+.hoja-reparto-cinco {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.hoja-reparto dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: #8d97a5;
+}
+.hoja-reparto dd {
+  margin-top: 2px;
+  font-size: 15px;
+  color: #e8edf3;
+}
+.hoja-reparto dd small {
+  font-size: 9.5px;
+  color: #8d97a5;
+}
+.hoja-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10.5px;
+}
+.hoja-tabla th {
+  padding: 0 0 2mm;
+  text-align: left;
+  font-size: 8.5px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8d97a5;
+}
+.hoja-tabla td {
+  padding: 1.4mm 0;
+  border-top: 1px solid #1a212b;
+  font-variant-numeric: tabular-nums;
+  color: #c9d1d9;
+}
+.hoja-tabla :is(td, th) + :is(td, th) {
+  padding-left: 4mm;
+  text-align: right;
+}
+.hoja-tabla td .hoja-pista {
+  width: 30mm;
+  margin-left: auto;
+}
+.hoja-iso {
+  display: inline-block;
+  width: 22px;
+  margin-right: 6px;
+  font-size: 9px;
+  color: #d4860a;
+}
+.hoja-recorte {
+  max-width: 58mm;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.hoja-comandos li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30mm 52px;
+  align-items: center;
+  gap: 8px;
+  padding: 1.6mm 0;
+  border-top: 1px solid #1a212b;
+}
+.hoja-comandos code {
+  font-size: 9px;
+  overflow-wrap: anywhere;
+  color: #c9d1d9;
+}
+.hoja-veredictos {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4mm;
+  padding-top: 2mm;
+}
+.hoja-nota,
+.hoja-vacio {
+  font-size: 9.5px;
+  line-height: 1.5;
+  color: #8d97a5;
+}
+.hoja-vacio {
+  font-size: 11px;
+}
+.hoja-pie {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  padding-top: 5mm;
-  border-top: 1px solid rgb(255 255 255 / 0.1);
-  font-size: 10px;
-  color: rgb(255 255 255 / 0.45);
+  margin-top: auto;
+  padding-top: 4mm;
+  border-top: 1px solid #232b36;
+  font-size: 9px;
+  color: #8d97a5;
 }
-@media (max-width: 640px) {
-  .reporte-hoja {
-    min-height: 0;
-    padding: 22px 18px;
-  }
-  .reporte-dos {
-    grid-template-columns: 1fr;
-  }
-  .reporte-cabecera {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  .reporte-cabecera > .text-right {
-    text-align: left;
-  }
+.hoja-numero {
+  color: #d4860a;
+}
+
+/* La portada: el nombre del reporte, el rango y la colmena-calendario, con la síntesis al lado. El
+   panal de fondo va dibujado con trazos sólidos, igual que el resto de la hoja. */
+.hoja-reporte[data-portada='si'] {
+  gap: 0;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='420' viewBox='0 0 420 420'%3E%3Cg fill='none' stroke='%23182029' stroke-width='1.2'%3E%3Cpath d='M300 40l69 40v80l-69 40-69-40V80z'/%3E%3Cpath d='M369 160l69 40v80l-69 40-69-40v-80z'/%3E%3Cpath d='M231 160l69 40v80l-69 40-69-40v-80z'/%3E%3Cpath d='M300 280l69 40v80l-69 40-69-40v-80z'/%3E%3Cpath d='M162 40l69 40v80l-69 40-69-40V80z'/%3E%3C/g%3E%3Cpath d='M300 80l35 20v40l-35 20-35-20v-40z' fill='%232b2213'/%3E%3C/svg%3E")
+      right -60px top -40px / 420px 420px no-repeat,
+    #0d1117;
+}
+.hoja-reporte[data-portada='si'] .hoja-pie {
+  margin-top: 0;
+}
+.portada-marca {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+.portada-titulos {
+  margin-top: 30mm;
+}
+.portada-ceja {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #d4860a;
+}
+.portada-titulos h1 {
+  margin-top: 4mm;
+  font-size: 62px;
+  font-weight: 600;
+  line-height: 0.95;
+  letter-spacing: -0.055em;
+  color: #ffffff;
+}
+.portada-rango {
+  margin-top: 5mm;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+  color: #d4860a;
+}
+.portada-cuerpo {
+  display: grid;
+  grid-template-columns: 76mm minmax(0, 1fr);
+  gap: 11mm;
+  align-items: start;
+  margin-top: 16mm;
+}
+.hoja-colmena svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.hoja-colmena figcaption {
+  display: flex;
+  flex-direction: column;
+  gap: 3mm;
+  margin-top: 4mm;
+  font-size: 9.5px;
+  line-height: 1.5;
+  color: #8d97a5;
+}
+.hoja-leyenda {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.hoja-leyenda i {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+}
+.portada-sintesis h3 {
+  margin-bottom: 4mm;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #8d97a5;
+}
+.portada-sintesis p {
+  margin-bottom: 3mm;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #c9d1d9;
+}
+.portada-cifras {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6mm;
+  margin: auto 0 8mm;
+  padding-top: 6mm;
+  border-top: 1px solid #232b36;
+}
+.portada-cifras .hoja-cifra span {
+  font-size: 26px;
+}
+
+/* Al imprimir sale solo el reporte, hoja por hoja y sin márgenes: así el navegador no tiene lugar
+   para su encabezado con la dirección y la fecha. */
+.reporte-impresion {
+  display: none;
 }
 @page {
   size: A4;
   margin: 0;
 }
 @media print {
-  html.con-reporte body > :not(.reporte-vista) {
+  html.con-reporte body > :not(.reporte-impresion) {
     display: none !important;
+  }
+  html.con-reporte .reporte-impresion {
+    display: block;
   }
   html.con-reporte,
   html.con-reporte body {
+    height: auto !important;
+    overflow: visible !important;
+    margin: 0;
     background: #0d1117 !important;
-  }
-  .reporte-vista {
-    position: static;
-    padding: 0;
-    overflow: visible;
-    background: none;
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
-  .reporte-barra {
-    display: none;
-  }
-  .reporte-hoja {
-    width: 210mm;
-    min-height: 297mm;
-    border-radius: 0;
-    box-shadow: none;
-  }
-  .reporte-dos {
-    grid-template-columns: 1fr 1fr;
   }
 }

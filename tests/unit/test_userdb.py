@@ -3,8 +3,8 @@ Tests unitarios para la validación de userdb.txt de Cowrie.
 
 Estos tests documentan las restricciones del formato que impone
 la imagen cowrie/cowrie:latest (auth.py, pwd.py):
-  - El archivo se abre con codec ASCII implícito → solo bytes 0x00-0x7F
-  - El campo 2 debe ser 'x' (no UID numérico) → auth.py lo ignora pero espera 3 campos
+  - El archivo se abre con codec ASCII implícito, así que solo admite bytes 0x00-0x7F
+  - El campo 2 debe ser 'x' y no un UID numérico: auth.py lo ignora, pero espera 3 campos
   - Las contraseñas vacías causan IndexError en auth.py:115 (passwd[0])
 """
 
@@ -30,7 +30,7 @@ def test_userdb_exists():
 
 
 def test_userdb_is_ascii():
-    """Cowrie abre userdb.txt sin encoding= → falla con byte > 0x7F."""
+    """Cowrie abre userdb.txt sin encoding=, así que falla con un byte mayor que 0x7F."""
     raw = USERDB_PATH.read_bytes()
     non_ascii = [(i, b) for i, b in enumerate(raw) if b > 127]
     assert not non_ascii, (

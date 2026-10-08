@@ -43,9 +43,7 @@ def congelado(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(offline, "HORARIO_FILE", horas)
 
 
-# ---- rango y sensor ---------------------------------------------------------------------------
-
-
+# Rango y sensor
 def test_el_ultimo_dia_del_rango_entra(congelado: None) -> None:
     """El panel manda el fin como "2026-08-25T23:59:59": comparar la cadena entera lo excluiría."""
     r = offline.timeline(desde="2026-08-19", hasta="2026-08-25T23:59:59")
@@ -72,9 +70,7 @@ def test_un_sensor_sin_actividad_ese_dia_da_cero_y_no_desaparece(congelado: None
     assert r == [{"date": "2026-08-25", "count": 0, "dionaea": 0}]
 
 
-# ---- intervalos -------------------------------------------------------------------------------
-
-
+# Intervalos
 def test_la_semana_agrupa_en_lunes(congelado: None) -> None:
     """Mismo día que usa Elasticsearch, para que las barras no se corran al cambiar de origen."""
     r = offline.timeline(interval="week")
@@ -117,9 +113,7 @@ def test_sin_respaldo_no_hay_nada_que_responder(
     assert offline.timeline() is None
 
 
-# ---- construcción de la serie horaria ----------------------------------------------------------
-
-
+# Construcción de la serie horaria
 def test_la_serie_horaria_excluye_el_trafico_local(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

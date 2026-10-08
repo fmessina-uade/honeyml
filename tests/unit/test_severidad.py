@@ -26,7 +26,7 @@ from honeyml.agent.severidad import (
     techo,
 )
 
-# Un reparto real del bus, sensor · categoría · resultado · mensajes, para probar la escala sobre
+# Un reparto real del bus, sensor, categoría, resultado y mensajes, para probar la escala sobre
 # las proporciones que de verdad llegan.
 BUS_REAL = [
     ("cowrie", "process", "unknown", 30_334),
@@ -51,9 +51,7 @@ def _evento(categoria: str, outcome: str = "unknown", sensor: str = "cowrie") ->
     )
 
 
-# ---- pisos ---------------------------------------------------------------------------------
-
-
+# Pisos
 @pytest.mark.parametrize(
     ("categoria", "outcome", "esperado"),
     [
@@ -86,9 +84,7 @@ def test_dionaea_sin_resultado_no_se_asume_exitoso() -> None:
     assert piso(_evento("authentication", "success", sensor="dionaea")) is Severidad.MEDIO
 
 
-# ---- límites -------------------------------------------------------------------------------
-
-
+# Límites
 def test_nunca_por_debajo_de_lo_que_prueba_el_registro() -> None:
     """La guarda sobre la que se apoya el nodo de validación del grafo."""
     evento = _evento("file")
@@ -115,9 +111,7 @@ def test_el_margen_declarado_es_el_que_se_aplica() -> None:
     assert ORDEN.index(techo(evento)) - ORDEN.index(piso(evento)) == MARGEN_DE_ESCALADA
 
 
-# ---- reproches -----------------------------------------------------------------------------
-
-
+# Reproches
 def test_un_nivel_valido_no_genera_reproche() -> None:
     assert reproche(Severidad.ALTO, _evento("process")) is None
 
@@ -137,9 +131,7 @@ def test_el_reproche_por_encima_dice_hasta_donde_se_puede() -> None:
     assert "medio" in texto  # el techo admitido
 
 
-# ---- la escala como conjunto ---------------------------------------------------------------
-
-
+# La escala como conjunto
 def test_todos_los_niveles_tienen_criterio() -> None:
     """Un nivel sin criterio no se puede ni verificar ni explicar en el panel."""
     assert set(CRITERIOS) == set(ORDEN)

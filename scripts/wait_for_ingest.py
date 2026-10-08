@@ -82,7 +82,7 @@ def main() -> int:
         else:
             if stable:  # se volvió a mover después de parecer quieto
                 stable = 0
-            print(f"  ingiriendo… {miles(current)} (+{miles(current - previous)})")
+            print(f"  ingiriendo, van {miles(current)} (+{miles(current - previous)})")
         previous = current
 
     print(f"  se agotó la espera de {args.timeout}s; la ingesta sigue en curso.")

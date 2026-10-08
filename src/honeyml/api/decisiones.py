@@ -191,6 +191,23 @@ def ids_revisados(es_url: str = queries.ES_URL) -> list[str]:
     return [h["_id"] for h in r["hits"]["hits"]] if r else []
 
 
+# Cuánto tardó en concluirse cada evento, desde que ocurrió hasta que se guardó la decisión. Se
+# calcula al consultar porque es la resta de dos campos que ya están. Lo usan el resumen del motor y
+# el reporte general.
+DEMORA_MS: dict[str, Any] = {
+    "demora_ms": {
+        "type": "long",
+        "script": {
+            "source": (
+                "if (doc['evento.momento'].size() == 0) return; "
+                "emit(doc['@timestamp'].value.toInstant().toEpochMilli() "
+                "- doc['evento.momento'].value.toInstant().toEpochMilli());"
+            )
+        },
+    }
+}
+
+
 def _cubos(agg: dict[str, Any]) -> list[dict[str, Any]]:
     return [{"key": b["key"], "count": b["doc_count"]} for b in agg["buckets"]]
 
@@ -201,20 +218,7 @@ def resumen(es_url: str = queries.ES_URL) -> dict[str, Any]:
     cuerpo = {
         "size": 0,
         "track_total_hits": True,
-        # Cuánto tardó en concluirse cada evento, desde que ocurrió hasta que se guardó la
-        # decisión. Se calcula al consultar porque es la resta de dos campos que ya están.
-        "runtime_mappings": {
-            "demora_ms": {
-                "type": "long",
-                "script": {
-                    "source": (
-                        "if (doc['evento.momento'].size() == 0) return; "
-                        "emit(doc['@timestamp'].value.toInstant().toEpochMilli() "
-                        "- doc['evento.momento'].value.toInstant().toEpochMilli());"
-                    )
-                },
-            }
-        },
+        "runtime_mappings": DEMORA_MS,
         "aggs": {
             "severidad": {"terms": {"field": "decision.severidad", "size": 10}},
             "tactica": {
@@ -470,15 +474,22 @@ def para_exportar(
     tactica: str | None = None,
     sensor: str | None = None,
     estado: str = "todas",
+    desde: str | None = None,
+    hasta: str | None = None,
     es_url: str = queries.ES_URL,
 ) -> dict[str, Any]:
     """Las decisiones de un filtro para un reporte, con el mismo orden y las mismas filas que el
-    listado, hasta `MAX_EXPORTACION`. `total` dice cuántas había, por si quedó alguna afuera."""
+    listado, hasta `MAX_EXPORTACION`. `total` dice cuántas había, por si quedó alguna afuera. El
+    rango, si viene, es sobre el momento del evento, como el del reporte general."""
     revisados = ids_revisados(es_url)
+    consulta = _filtros(severidad, tactica, sensor, estado, revisados)
+    if desde or hasta:
+        rango = {k: v for k, v in (("gte", desde), ("lte", hasta)) if v}
+        consulta["bool"]["filter"].append({"range": {"evento.momento": rango}})
     cuerpo = {
         "size": MAX_EXPORTACION,
         "track_total_hits": True,
-        "query": _filtros(severidad, tactica, sensor, estado, revisados),
+        "query": consulta,
         "sort": [{"evento.momento": {"order": "desc", "missing": "_last"}}],
     }
     r = queries._search(cuerpo, es_url, index=DECISIONES)

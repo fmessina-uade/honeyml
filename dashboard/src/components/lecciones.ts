@@ -1,6 +1,7 @@
 import {
   Activity,
   BookOpen,
+  FileText,
   Fingerprint,
   Globe,
   Grid3x3,
@@ -39,11 +40,12 @@ export const SECCIONES = {
   cuentas: { icon: UserCog, color: 'var(--neural-teal)' },
   auditoria: { icon: ScrollText, color: 'var(--honey-amber)' },
   envivo: { icon: Activity, color: 'var(--agent-coral)' },
+  reportes: { icon: FileText, color: 'var(--honey-amber)' },
 } as const satisfies Record<string, { icon: LucideIcon; color: string }>;
 
 export type SectionId = keyof typeof SECCIONES;
 export type AdminId = 'cuentas' | 'auditoria' | 'envivo';
-export type LeccionId = Exclude<SectionId, 'inicio' | 'triaje' | AdminId>;
+export type LeccionId = Exclude<SectionId, 'inicio' | 'triaje' | 'reportes' | AdminId>;
 
 export const LECCIONES: readonly LeccionId[] = [
   'pulso',

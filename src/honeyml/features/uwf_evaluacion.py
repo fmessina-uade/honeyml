@@ -262,7 +262,7 @@ def main() -> None:
     ap.add_argument("--rapido", action="store_true", help="submuestrea, para validar el armado")
     args = ap.parse_args()
 
-    print("Cargando el conjunto de referencia…", flush=True)
+    print("Cargando el conjunto de referencia", flush=True)
     x, y = cargar()
     if args.rapido:
         x, _, y, _ = train_test_split(x, y, train_size=0.1, stratify=y, random_state=RANDOM_STATE)
@@ -272,12 +272,12 @@ def main() -> None:
     x_tr, x_te, y_tr, y_te = particion
     print(f"Entrenamiento: {len(x_tr):,}  |  Prueba: {len(x_te):,}".replace(",", "."))
 
-    print("\n[1/4] Ajustando el modelo de referencia…", flush=True)
+    print("\n[1/4] Ajustando el modelo de referencia", flush=True)
     pipe = _ajustar(x_tr, y_tr)
     f1_modelo = float(f1_score(y_te, pipe.predict(x_te), average="macro", zero_division=0))
     print(f"  F1 macro del modelo: {f1_modelo:.4f}")
 
-    print("\n[2/4] Línea base trivial…", flush=True)
+    print("\n[2/4] Línea base trivial", flush=True)
     base = linea_base(x_tr, y_tr, x_te, y_te, f1_modelo)
     for r in base["triviales"]:
         print(
@@ -285,7 +285,7 @@ def main() -> None:
         )
     print(f"  ventaja del modelo: {base['ventaja_sobre_el_mejor_trivial']:+.4f} de F1 macro")
 
-    print("\n[3/4] Matriz de confusión…", flush=True)
+    print("\n[3/4] Matriz de confusión", flush=True)
     conf = confusion(pipe, x_te, y_te)
     print(
         f"  {WEAK_CLASS}: {conf['verdaderos_positivos']} aciertos y "
@@ -294,7 +294,7 @@ def main() -> None:
     for clase, n in conf["origen_de_los_falsos_positivos"].items():
         print(f"    {n:>5} eran en realidad {clase}")
 
-    print(f"\n[4/4] Peso de {PUERTO}…", flush=True)
+    print(f"\n[4/4] Peso de {PUERTO}", flush=True)
     puerto = dominio_del_puerto(x, y, particion, f1_modelo)
     print(
         f"  entrenado con esa columna sola: F1 macro {puerto['f1_macro_con_una_sola']:.4f}"
@@ -311,16 +311,16 @@ def main() -> None:
         listado = ", ".join(str(p) for p in sin_ver)
         print(f"  de esos puertos, nuestros sensores nunca registraron: {listado}")
 
-    print(f"\nDispersión sobre {len(SEMILLAS)} particiones…", flush=True)
+    print(f"\nDispersión sobre {len(SEMILLAS)} particiones", flush=True)
     disp = dispersion(x, y)
     m = disp["f1_macro"]
     d = disp["f1_clase_debil"]
     print(
-        f"  F1 macro       {m['media']:.4f} ± {m['desvio']:.4f}"
+        f"  F1 macro       {m['media']:.4f}, desvío {m['desvio']:.4f}"
         f"  (de {m['minimo']:.4f} a {m['maximo']:.4f})"
     )
     print(
-        f"  F1 clase débil {d['media']:.4f} ± {d['desvio']:.4f}"
+        f"  F1 clase débil {d['media']:.4f}, desvío {d['desvio']:.4f}"
         f"  (de {d['minimo']:.4f} a {d['maximo']:.4f})"
     )
 

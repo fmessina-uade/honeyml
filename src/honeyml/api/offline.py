@@ -61,7 +61,7 @@ def construir_serie_horaria() -> list[dict[str, Any]]:
     `match_all` mientras que todas las consultas del panel excluyen el healthcheck del contenedor.
     Sin él las dos series no cuadran y el gráfico se contradice al cambiar de intervalo.
     """
-    # Import local: la API necesita pandas para *armar* el archivo, no para leerlo. Al nivel del
+    # Import local: la API necesita pandas para armar el archivo, no para leerlo. Al nivel del
     # módulo, levantar la API cargaría pandas sin usarlo nunca.
     import pandas as pd
 
@@ -167,7 +167,7 @@ def _acotar(
 
 
 def _por_semana(dias: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Agrupa los cubos diarios en semanas que arrancan el lunes, como las etiqueta Elasticsearch.
+    """Agrupa los cubos diarios en semanas ISO, como las etiqueta Elasticsearch.
 
     Misma clave que `calendar_interval: week`, así pasar de vivo a congelado no corre las barras
     unos días para el costado.

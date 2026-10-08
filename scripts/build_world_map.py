@@ -152,7 +152,7 @@ def main() -> None:
         "// Generado por scripts/build_world_map.py, no editar a mano.\n"
         "//\n"
         "// Contornos de países del atlas world-atlas (Natural Earth 110m, dominio público),\n"
-        f"// simplificados con Douglas-Peucker a {args.tolerancia}° de tolerancia.\n"
+        f"// simplificados con Douglas-Peucker a {args.tolerancia} grados de tolerancia.\n"
         f"// {len(figuras)} anillos, {puntos} puntos.\n"
         "//\n"
         "// Cada anillo es una lista de pares [longitud, latitud] en grados.\n"

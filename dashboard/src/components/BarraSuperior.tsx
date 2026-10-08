@@ -203,11 +203,8 @@ export default function BarraSuperior({
           aria-label={t.brand.name}
         >
           <img src="/favicon.png" alt="" aria-hidden className="w-7 h-7 rounded-lg shrink-0" />
-          <span className="flex flex-col items-start leading-none">
-            <span className="geist text-[15px] font-semibold text-white tracking-tight">
-              {t.brand.name}
-            </span>
-            <span className="geist text-[11px] text-white/45 mt-1">{t.brand.subtitle}</span>
+          <span className="geist text-[16px] font-semibold text-white tracking-tight leading-none">
+            {t.brand.name}
           </span>
         </button>
 

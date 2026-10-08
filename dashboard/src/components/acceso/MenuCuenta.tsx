@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { FileDown, KeyRound, LogOut } from 'lucide-react';
+import { FileText, KeyRound, LogOut } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import { useSesion } from '../../lib/sesion';
@@ -17,18 +17,16 @@ const VISTAS: { id: AdminId; rol: 'admin' | 'superadmin' }[] = [
 ];
 
 /**
- * La cuenta, en la barra: quién está adentro y con qué rol, las vistas que ese rol habilita, el
- * reporte, el cambio de contraseña y la salida. En el teléfono va dentro de la hoja, abierto.
+ * La cuenta, en la barra: quién está adentro y con qué rol, las vistas que ese rol habilita, los
+ * reportes, el cambio de contraseña y la salida. En el teléfono va dentro de la hoja, abierto.
  */
 export default function MenuCuenta({
   active,
   onIr,
-  onReporte,
   enHoja = false,
 }: {
   active: SectionId;
   onIr: (id: SectionId) => void;
-  onReporte: () => void;
   enHoja?: boolean;
 }) {
   const { t } = useI18n();
@@ -94,9 +92,14 @@ export default function MenuCuenta({
         </div>
       )}
       <div className="flex flex-col border-t border-white/[0.06] pt-1.5">
-        <button onClick={() => elegir(onReporte)} className="fila-dd fila-cuenta">
-          <FileDown className="w-4 h-4 text-white/60" aria-hidden />
+        <button
+          onClick={() => elegir(() => onIr('reportes'))}
+          aria-current={active === 'reportes' ? 'page' : undefined}
+          className="fila-dd fila-cuenta"
+        >
+          <FileText className="w-4 h-4 text-[var(--honey-amber)]" aria-hidden />
           {t.cuenta.reporte}
+          {active === 'reportes' && <span className="punto-actual ml-auto" aria-hidden />}
         </button>
         <button onClick={() => elegir(() => setCambiando(true))} className="fila-dd fila-cuenta">
           <KeyRound className="w-4 h-4 text-white/60" aria-hidden />
@@ -180,7 +183,7 @@ function CambioDeContrasena({ abierto, onCerrar }: { abierto: boolean; onCerrar:
         <div className="flex flex-col gap-4">
           <p className="text-[14px] text-white/80">{c.hecho}</p>
           <button onClick={onCerrar} className="boton-formulario self-end">
-            {t.reporte.cerrar}
+            {c.cerrar}
           </button>
         </div>
       ) : (

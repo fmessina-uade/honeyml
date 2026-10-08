@@ -92,7 +92,7 @@ def main() -> None:
     print()
 
     pipe = Pipeline([("prep", _preprocessor(scale=False)), ("clf", _modelo(**BASE))])
-    print("  entrenando…", end="", flush=True)
+    print("  entrenando", end="", flush=True)
     pipe.fit(x_tr, y_tr)
     print(" listo\n")
 
@@ -161,7 +161,7 @@ def main() -> None:
         print("  El valor de esto no es la mejora sino la frontera: muestra qué se puede comprar")
         print("  y a qué precio, en lugar de dejar el punto de operación como algo dado.")
     else:
-        print(f"  El umbral elegido NO se sostiene fuera de validación ({diferencia:+.4f}).")
+        print(f"  El umbral elegido no se sostiene fuera de validación ({diferencia:+.4f}).")
         print("  Señal de que la validación tiene muy pocos casos de la clase para decidir.")
 
     OUT_FILE.parent.mkdir(parents=True, exist_ok=True)

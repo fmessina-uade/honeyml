@@ -53,9 +53,7 @@ def entorno_limpio(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> pytest.Mon
     return monkeypatch
 
 
-# ---- credenciales ----------------------------------------------------------------------------
-
-
+# Credenciales
 def test_sin_clave_no_arranca_y_dice_como_arreglarlo(entorno_limpio: pytest.MonkeyPatch) -> None:
     with pytest.raises(CredencialAusenteError) as exc:
         ConfigInferencia.desde_entorno()
@@ -66,8 +64,8 @@ def test_sin_clave_no_arranca_y_dice_como_arreglarlo(entorno_limpio: pytest.Monk
 def test_el_entorno_le_gana_al_archivo(entorno_limpio: pytest.MonkeyPatch, tmp_path: Any) -> None:
     """Poner la variable a mano para probar otra clave tiene que funcionar.
 
-    Con la precedencia invertida, una corrida con `HONEYML_INFERENCIA_CLAVE=… make …` usaría en
-    silencio la clave del archivo, y una prueba con una clave inválida a propósito daría éxito.
+    Con la precedencia invertida, una corrida con `HONEYML_INFERENCIA_CLAVE=otra make algo` usaría
+    en silencio la clave del archivo, y una prueba con una clave inválida a propósito daría éxito.
     """
     env = tmp_path / ".env"
     env.write_text("HONEYML_INFERENCIA_CLAVE=del_archivo\n", encoding="utf-8")
@@ -152,9 +150,7 @@ def test_sin_modelo_pedido_ni_fijado_el_cliente_usa_el_de_produccion() -> None:
     assert MODELO_POR_DEFECTO in inferencia.PRECIOS  # y tiene precio conocido
 
 
-# ---- esquema estricto -----------------------------------------------------------------------
-
-
+# Esquema estricto
 def test_el_esquema_de_la_decision_cumple_el_modo_estricto() -> None:
     """Todo obligatorio y objetos cerrados: los dos requisitos que impone el proveedor."""
     estricto = inferencia.esquema_estricto(Decision.model_json_schema())
@@ -187,9 +183,7 @@ def test_no_se_muta_el_esquema_original() -> None:
     assert json.dumps(original, sort_keys=True) == antes
 
 
-# ---- consumo ---------------------------------------------------------------------------------
-
-
+# Consumo
 def test_la_contabilidad_traduce_tokens_a_dinero() -> None:
     c = inferencia.Consumo()
     c.sumar(entrada=1_000_000, salida=1_000_000, segundos=1.0)
@@ -282,9 +276,7 @@ def test_un_pedido_mal_formado_no_se_reintenta(monkeypatch: pytest.MonkeyPatch) 
     assert intentos["n"] == 1
 
 
-# ---- enrutador -------------------------------------------------------------------------------
-
-
+# Enrutador
 def test_con_un_enrutador_el_pedido_exige_esquema_y_privacidad() -> None:
     """El pedido a un enrutador pide proveedores que cumplan el esquema y no guarden datos.
 
@@ -337,9 +329,7 @@ def test_el_costo_informado_le_gana_a_la_tabla() -> None:
     assert cliente.consumo.costo_estimado(MODELO_POR_DEFECTO) == pytest.approx(0.00042)
 
 
-# ---- verificación TLS -----------------------------------------------------------------------
-
-
+# Verificación TLS
 def test_nunca_se_desactiva_la_verificacion() -> None:
     """Por esta conexión viaja la credencial: no verificar no es una opción, ni para depurar."""
     ctx = inferencia._contexto_tls()
@@ -553,9 +543,7 @@ def test_un_400_cualquiera_sigue_siendo_un_rechazo(monkeypatch: pytest.MonkeyPat
         cli._postear({})
 
 
-# ---- cuota -----------------------------------------------------------------------------------
-
-
+# Cuota
 def test_una_espera_mas_larga_que_el_techo_es_cuota_y_no_se_reintenta(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 're
 import { ArrowRight, Eye, EyeOff, KeyRound, LoaderCircle, UserRound } from 'lucide-react';
 import { api, type SesionAbierta } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
+import Preferencias from '../Preferencias';
 import EscenaPanal from './EscenaPanal';
 
 const EXPO = 'cubic-bezier(.16,1,.3,1)';
@@ -27,11 +28,11 @@ const PASOS: Paso[] = [
     desde: { opacity: 0, transform: 'translateY(12px) scale(.988)' },
   },
   {
-    sel: '.ingreso-cabecera',
-    demora: 90,
-    duracion: 540,
+    sel: '.ingreso-preferencias',
+    demora: 160,
+    duracion: 480,
     curva: SUAVE,
-    desde: { opacity: 0, transform: 'translateY(9px)' },
+    desde: { opacity: 0, transform: 'translateY(-6px)' },
   },
   {
     sel: '.ingreso-insignia',
@@ -57,16 +58,16 @@ const PASOS: Paso[] = [
     hasta: { transform: 'none' },
   },
   {
-    sel: '.ingreso-h1',
-    demora: 470,
-    duracion: 620,
+    sel: '.ingreso-marca',
+    demora: 380,
+    duracion: 700,
     curva: EXPO,
-    desde: { opacity: 0, transform: 'translateY(10px)' },
+    desde: { opacity: 0, transform: 'translateY(10px) scale(.94)' },
   },
   {
-    sel: '.ingreso-bajada',
-    demora: 570,
-    duracion: 560,
+    sel: '.ingreso-h1',
+    demora: 500,
+    duracion: 620,
     curva: EXPO,
     desde: { opacity: 0, transform: 'translateY(10px)' },
   },
@@ -197,16 +198,9 @@ export default function Ingreso({
     <div ref={raiz} className="ingreso" data-entrada={pendiente ? 'pendiente' : undefined}>
       <EscenaPanal etiqueta={a.escena} />
       <div className="ingreso-velo" aria-hidden />
-
-      <header className="ingreso-cabecera">
-        <img src="/favicon.png" alt="" aria-hidden className="w-8 h-8 rounded-lg" />
-        <span className="flex flex-col leading-none">
-          <span className="geist text-[17px] font-semibold tracking-tight text-white">
-            {t.brand.name}
-          </span>
-          <span className="geist text-[11.5px] text-white/55 mt-1">{t.brand.subtitle}</span>
-        </span>
-      </header>
+      <div className="ingreso-preferencias">
+        <Preferencias enLinea />
+      </div>
 
       <section className="ingreso-heroe">
         <span className="insignia ingreso-insignia">{a.insignia}</span>
@@ -222,8 +216,11 @@ export default function Ingreso({
 
       <main className="ingreso-tarjeta">
         <form className="ingreso-form" onSubmit={enviar} noValidate>
+          <div className="ingreso-marca">
+            <img src="/logo.png" alt="" aria-hidden width={60} height={60} />
+            <span>{t.brand.name}</span>
+          </div>
           <h1 className="ingreso-h1">{a.titulo}</h1>
-          <p className="ingreso-bajada">{a.bajada}</p>
 
           <label className="ingreso-campo" data-campo="usuario">
             <UserRound className="w-[18px] h-[18px]" aria-hidden />
@@ -286,10 +283,7 @@ export default function Ingreso({
             )}
           </button>
 
-          <div className="ingreso-pie">
-            <p>{a.pie}</p>
-            <p className="ingreso-nota">{a.registro}</p>
-          </div>
+          <p className="ingreso-pie">{a.pie}</p>
         </form>
       </main>
     </div>

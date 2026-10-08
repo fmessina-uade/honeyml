@@ -1,4 +1,4 @@
-# Filebeat, desarrollo local. Lee datos reales bajados del VPS (data/logs/ -> /logs).
+# Filebeat, desarrollo local. Lee datos reales bajados del VPS (data/logs/, montado en /logs).
 # Reprocesa archivos históricos completos, así podemos iterar la normalización ECS.
 
 filebeat.inputs:

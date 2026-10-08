@@ -1,7 +1,7 @@
 # Enciende la salida JSON estructurada de Dionaea (un evento por linea) para el pipeline ECS.
 # El Dockerfile copia este archivo a ihandlers-enabled/ en la plantilla de la imagen.
 # Salida: /opt/dionaea/var/lib/dionaea/dionaea.json  (Filebeat la sigue).
-# OJO: tiene que ser ASCII puro. El lector YAML de Dionaea usa el codec ascii y muere con acentos.
+# Este archivo va en ASCII puro, porque el lector YAML de Dionaea usa el codec ascii y se cae con un acento.
 - name: log_json
   config:
     # flat_data aplana las listas de objetos, asi indexan limpio en Elasticsearch/ELK.

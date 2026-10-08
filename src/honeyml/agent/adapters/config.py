@@ -59,7 +59,7 @@ def _del_archivo(clave: str) -> str | None:
     """Lee una variable de `.env`, o None. Nunca pisa lo que ya está en el entorno.
 
     El orden importa: el entorno le gana al archivo. Con la precedencia invertida, poner
-    `HONEYML_INFERENCIA_CLAVE=… make lo-que-sea` para probar otra clave usaría la del archivo sin
+    `HONEYML_INFERENCIA_CLAVE=otra make lo-que-sea` para probar otra clave usaría la del archivo sin
     avisar, y una prueba con una clave inválida a propósito daría éxito.
     """
     if not ARCHIVO_ENV.exists():
@@ -111,7 +111,7 @@ class ConfigInferencia:
             raise CredencialAusenteError(
                 f"{VARIABLE_DE_CLAVE} no está definida. Obtené una clave del proveedor de "
                 f"inferencia y definila en .env o exportala:\n"
-                f'    export {VARIABLE_DE_CLAVE}="…"\n'
+                f'    export {VARIABLE_DE_CLAVE}="<la clave>"\n'
                 f"Con Groq directo también sirve {VARIABLE_DE_CLAVE_GROQ}. "
                 f"Nunca la escribas en un archivo del repositorio."
             )
@@ -133,5 +133,5 @@ class ConfigInferencia:
     def enmascarada(self) -> str:
         """Alcanza para distinguir dos claves, nunca para usar una."""
         if len(self.api_key) <= 8:
-            return "…"
-        return f"{self.api_key[:4]}…{self.api_key[-4:]}"
+            return "..."
+        return f"{self.api_key[:4]}...{self.api_key[-4:]}"

@@ -55,9 +55,7 @@ def _estado(**kw: Any) -> Any:
     return base
 
 
-# ---- el camino que funciona -------------------------------------------------------------------
-
-
+# El camino que funciona
 def test_un_borrador_correcto_produce_una_decision() -> None:
     salida = nodo.validar(_estado())
 
@@ -73,9 +71,7 @@ def test_la_tactica_puede_venir_nula() -> None:
     assert "decision" in salida
 
 
-# ---- lo que el esquema atrapa -----------------------------------------------------------------
-
-
+# Lo que el esquema atrapa
 def test_un_campo_que_falta_se_nombra_en_el_reproche() -> None:
     borrador = _borrador()
     del borrador["justificacion"]
@@ -108,7 +104,9 @@ def test_un_campo_de_mas_no_pasa() -> None:
 
 
 def test_una_respuesta_que_no_era_json_pide_json() -> None:
-    salida = nodo.validar(_estado(borrador={nodo.CLAVE_SIN_PARSEAR: "Claro, con gusto: ..."}))
+    salida = nodo.validar(
+        _estado(borrador={nodo.CLAVE_SIN_PARSEAR: "Severidad alta, táctica Ejecución"})
+    )
 
     assert "decision" not in salida
     assert any("JSON" in r for r in salida["reproches"])
@@ -126,9 +124,7 @@ def test_el_reproche_no_arrastra_el_texto_crudo_de_pydantic() -> None:
     assert "obligatorio" in texto
 
 
-# ---- lo que el esquema no puede atrapar --------------------------------------------------------
-
-
+# Lo que el esquema no puede atrapar
 def test_el_esquema_no_le_pide_el_identificador_al_modelo() -> None:
     """Es un SHA-256 de 64 caracteres que habría que copiar exacto.
 
@@ -188,9 +184,7 @@ def test_la_escalada_dentro_del_margen_se_acepta() -> None:
     assert "decision" in salida
 
 
-# ---- el contrato con el grafo ------------------------------------------------------------------
-
-
+# El contrato con el grafo
 def test_los_problemas_salen_todos_juntos() -> None:
     """De a uno por intento, un borrador con tres problemas se come el presupuesto entero."""
     salida = nodo.validar(
