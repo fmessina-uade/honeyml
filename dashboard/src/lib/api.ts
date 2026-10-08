@@ -371,7 +371,90 @@ export interface ClasificacionACiegas {
   nota?: string;
 }
 
+export type Rol = 'invitado' | 'analista' | 'admin' | 'superadmin';
+export const ROLES: readonly Rol[] = ['invitado', 'analista', 'admin', 'superadmin'];
+
+export interface SesionAbierta {
+  usuario: string;
+  rol: Rol;
+}
+
+export interface Cuenta {
+  usuario: string;
+  rol: Rol;
+  activo: boolean;
+  creada?: string;
+  creada_por?: string;
+  modificada?: string;
+  modificada_por?: string;
+  ultimo_ingreso?: string;
+  administrable: boolean;
+}
+
+export interface CambioDeCuenta {
+  rol?: Rol;
+  activo?: boolean;
+  contrasena?: string;
+}
+
+export interface EntradaDeAuditoria {
+  '@timestamp': string;
+  usuario: string;
+  rol: Rol | null;
+  accion: string;
+  objetivo: string | null;
+  detalle: Record<string, unknown>;
+}
+
+export interface Auditoria {
+  total: number;
+  items: EntradaDeAuditoria[];
+  acciones: Record<string, number>;
+}
+
+export interface RegistroDelServidor {
+  fuente: 'despliegues' | 'vigilante' | 'salud' | 'respaldo';
+  momento: string | null;
+  texto: string;
+  alerta: boolean;
+}
+
+export interface RegistrosDelServidor {
+  disponible: boolean;
+  fuentes: Record<string, boolean>;
+  entradas: RegistroDelServidor[];
+}
+
+/** Un evento de la telemetría en vivo: los campos ECS con su nombre punteado, sin direcciones. */
+export interface EventoEnVivo {
+  id: string;
+  '@timestamp': string;
+  honeypot?: string;
+  'event.category'?: string | string[];
+  'event.action'?: string;
+  'event.outcome'?: string;
+  'network.protocol'?: string;
+  'destination.port'?: number;
+  'user.name'?: string;
+  'process.command_line'?: string;
+  'url.original'?: string;
+  'file.name'?: string;
+  'source.geo.country_name'?: string;
+  'source.geo.country_iso_code'?: string;
+  'source.as.organization.name'?: string;
+}
+
+export type Artefactos = Record<
+  'huellas' | 'arquetipos' | 'sesiones' | 'contrasenas',
+  string | null
+>;
+
+// Cualquier respuesta 401 quiere decir que no hay una sesión válida. Se avisa una sola vez
+// a quien escuche, que es el panel entero: vuelve al ingreso sin que cada sección lo maneje.
+export const SIN_SESION = 'honeyml:sin-sesion';
+
 async function leer<T>(path: string, res: Response): Promise<T> {
+  if (res.status === 401 && path !== '/sesion') window.dispatchEvent(new Event(SIN_SESION));
   if (!res.ok) {
     // La API explica en `detail` por qué no puede responder (típicamente qué falta levantar), y
     // ese texto es lo único accionable que tiene el lector. Quedarse con el número de estado
@@ -391,13 +474,25 @@ async function get<T>(path: string): Promise<T> {
   return leer<T>(path, await fetch(`/api${path}`));
 }
 
-async function put<T>(path: string, body: unknown): Promise<T> {
+async function enviar<T>(metodo: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`/api${path}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    method: metodo,
+    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
   return leer<T>(path, res);
+}
+
+const put = <T>(path: string, body: unknown) => enviar<T>('PUT', path, body);
+
+function filtrosDeExportacion(
+  f: Pick<FiltrosDecisiones, 'estado' | 'severidad' | 'tactica' | 'sensor'>,
+) {
+  const q = new URLSearchParams({ estado: f.estado });
+  if (f.severidad) q.set('severidad', f.severidad);
+  if (f.tactica) q.set('tactica', f.tactica);
+  if (f.sensor) q.set('sensor', f.sensor);
+  return q;
 }
 
 export const api = {
@@ -440,4 +535,40 @@ export const api = {
   siguienteACiegas: () => get<ItemACiegas>('/decisiones/a-ciegas/siguiente'),
   revisarACiegas: (docId: string, c: ClasificacionACiegas) =>
     put<Revision>(`/decisiones/${encodeURIComponent(docId)}/revision-a-ciegas`, c),
+
+  /** La sesión abierta, o null si no hay: no tener sesión es un estado y no un error. */
+  sesion: async (): Promise<SesionAbierta | null> => {
+    const res = await fetch('/api/sesion');
+    return res.status === 401 ? null : leer<SesionAbierta>('/sesion', res);
+  },
+  ingresar: (usuario: string, contrasena: string) =>
+    enviar<SesionAbierta>('POST', '/sesion', { usuario, contrasena }),
+  salir: () => enviar<{ ok: boolean }>('DELETE', '/sesion'),
+  cambiarContrasena: (actual: string, nueva: string) =>
+    put<SesionAbierta>('/sesion/contrasena', { actual, nueva }),
+
+  cuentas: () => get<Cuenta[]>('/usuarios'),
+  crearCuenta: (usuario: string, rol: Rol, contrasena: string) =>
+    enviar<Cuenta>('POST', '/usuarios', { usuario, rol, contrasena }),
+  cambiarCuenta: (usuario: string, cambio: CambioDeCuenta) =>
+    enviar<Cuenta>('PATCH', `/usuarios/${encodeURIComponent(usuario)}`, cambio),
+
+  auditoria: (desde: number, accion?: string) => {
+    const q = new URLSearchParams({ desde: String(desde), tamano: '50' });
+    if (accion) q.set('accion', accion);
+    return get<Auditoria>(`/auditoria?${q}`);
+  },
+  registrosDelServidor: () => get<RegistrosDelServidor>('/auditoria/servidor'),
+  enVivo: (despues?: string) =>
+    get<{ eventos: EventoEnVivo[] }>(
+      `/telemetria/en-vivo${despues ? `?despues=${encodeURIComponent(despues)}` : ''}`,
+    ),
+  artefactos: () => get<Artefactos>('/artefactos'),
+
+  // Las exportaciones van como enlace de descarga y no por fetch: así el navegador guarda el
+  // archivo con el nombre que manda la API, también en el teléfono.
+  urlDecisionesCsv: (f: Pick<FiltrosDecisiones, 'estado' | 'severidad' | 'tactica' | 'sensor'>) =>
+    `/api/exportar/decisiones.csv?${filtrosDeExportacion(f)}`,
+  urlRevisionesCsv: () => '/api/exportar/revisiones.csv',
+  avisarReporte: () => enviar<{ ok: boolean }>('POST', '/reporte'),
 };

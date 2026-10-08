@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   CircleHelp,
   Coins,
+  Download,
   EyeOff,
   Inbox,
   PencilLine,
@@ -20,6 +21,7 @@ import {
 import { dec, duracion, fechaHora, n } from '../../lib/format';
 import { useI18n } from '../../lib/i18n';
 import { useMotorEnVivo } from '../../lib/useMotorEnVivo';
+import { useSesion } from '../../lib/sesion';
 import Reveal from '../Reveal';
 import EngineLive from '../EngineLive';
 import { Indicador } from '../Instrumento';
@@ -57,6 +59,8 @@ function guiaCerrada(): boolean {
 export default function Triage() {
   const { t } = useI18n();
   const { resumen, recientes, llegada, error, recargarResumen } = useMotorEnVivo();
+  // El invitado mira y exporta: la revisión a ciegas y el veredicto quedan para el analista.
+  const escribe = useSesion().puede('analista');
   const [filtros, setFiltros] = useState<FiltrosDecisiones>(FILTROS_INICIALES);
   const [listado, setListado] = useState<ListadoDecisiones | null>(null);
   const [elegida, setElegida] = useState<string | null>(null);
@@ -264,13 +268,32 @@ export default function Triage() {
               )}
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <button
-                onClick={() => setACiegas(true)}
-                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] text-[var(--honey-amber)] ring-1 ring-[var(--honey-amber)]/35 hover:bg-[var(--honey-amber)]/10 transition"
+              <a
+                href={api.urlDecisionesCsv(filtros)}
+                download
+                title={t.exportar.decisionesAyuda}
+                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] text-white/70 ring-1 ring-white/15 hover:text-white hover:bg-white/[0.05] transition"
               >
-                <EyeOff className="w-3.5 h-3.5" />
-                {t.triage.blind.open}
-              </button>
+                <Download className="w-3.5 h-3.5" />
+                {t.exportar.decisiones}
+              </a>
+              <a
+                href={api.urlRevisionesCsv()}
+                download
+                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] text-white/70 ring-1 ring-white/15 hover:text-white hover:bg-white/[0.05] transition"
+              >
+                <Download className="w-3.5 h-3.5" />
+                {t.exportar.revisiones}
+              </a>
+              {escribe && (
+                <button
+                  onClick={() => setACiegas(true)}
+                  className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] text-[var(--honey-amber)] ring-1 ring-[var(--honey-amber)]/35 hover:bg-[var(--honey-amber)]/10 transition"
+                >
+                  <EyeOff className="w-3.5 h-3.5" />
+                  {t.triage.blind.open}
+                </button>
+              )}
               <div
                 role="tablist"
                 className="flex rounded-lg ring-1 ring-white/10 bg-white/[0.03] p-0.5"
@@ -383,6 +406,7 @@ export default function Triage() {
         titulo={t.triage.detail.title}
         pie={
           detalle &&
+          escribe &&
           (detalle.revision?.a_ciegas ? (
             <p className="text-[11px] text-white/50 text-center leading-relaxed">
               {t.triage.verdict.blindLocked}

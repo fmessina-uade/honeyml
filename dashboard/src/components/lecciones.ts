@@ -1,4 +1,5 @@
 import {
+  Activity,
   BookOpen,
   Fingerprint,
   Globe,
@@ -6,8 +7,10 @@ import {
   LayoutDashboard,
   Network,
   Radar,
+  ScrollText,
   ShieldCheck,
   Terminal,
+  UserCog,
   Users,
   type LucideIcon,
 } from 'lucide-react';
@@ -31,10 +34,16 @@ export const SECCIONES = {
   arquetipos: { icon: Users, color: 'var(--ghost-slate)' },
   origen: { icon: Globe, color: 'var(--neural-teal)' },
   mitre: { icon: Grid3x3, color: 'var(--violeta)' },
+  // Las de administración no son lecciones: no están en la portada ni en los desplegables, se llega
+  // desde el menú de la cuenta y solo con el rol que las ve.
+  cuentas: { icon: UserCog, color: 'var(--neural-teal)' },
+  auditoria: { icon: ScrollText, color: 'var(--honey-amber)' },
+  envivo: { icon: Activity, color: 'var(--agent-coral)' },
 } as const satisfies Record<string, { icon: LucideIcon; color: string }>;
 
 export type SectionId = keyof typeof SECCIONES;
-export type LeccionId = Exclude<SectionId, 'inicio' | 'triaje'>;
+export type AdminId = 'cuentas' | 'auditoria' | 'envivo';
+export type LeccionId = Exclude<SectionId, 'inicio' | 'triaje' | AdminId>;
 
 export const LECCIONES: readonly LeccionId[] = [
   'pulso',

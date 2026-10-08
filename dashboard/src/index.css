@@ -975,6 +975,8 @@ body {
   gap: 8px;
   height: 34px;
   padding: 0 16px;
+  white-space: nowrap;
+  flex: none;
   border-radius: 999px;
   font-family: 'Geist', 'Inter', sans-serif;
   font-size: 14px;
@@ -2827,4 +2829,1104 @@ button.ranking-fila:hover {
 }
 :where(:root[data-tema='claro']) .radar-rotulo {
   fill: rgb(var(--tinta) / 0.9);
+}
+
+/* El ingreso. La escena ocupa toda la pantalla y no se mueve con nada; la tarjeta del formulario
+   flota a la derecha, y la promesa de la marca se apoya abajo a la izquierda, lejos de ella. En el
+   teléfono la tarjeta sube desde abajo como una hoja, y la escena queda arriba, detrás del titular. */
+.ingreso {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  overflow: hidden;
+  color: rgb(var(--tinta));
+  background: rgb(var(--fondo));
+}
+.escena-panal {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.ingreso-velo {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      180deg,
+      rgb(var(--fondo) / 0.85) 0%,
+      rgb(var(--fondo) / 0.35) 13%,
+      transparent 30%
+    ),
+    linear-gradient(0deg, rgb(var(--fondo) / 0.92) 0%, rgb(var(--fondo) / 0.5) 24%, transparent 50%);
+}
+.ingreso-cabecera {
+  position: absolute;
+  top: clamp(18px, 3.4vh, 32px);
+  left: clamp(20px, 4.4vw, 64px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ingreso-heroe {
+  position: absolute;
+  left: clamp(20px, 4.4vw, 64px);
+  right: calc(clamp(380px, 38vw, 560px) + 64px);
+  bottom: clamp(28px, 7vh, 72px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 20px;
+}
+.ingreso-titular,
+.ingreso-titular * {
+  font-family: 'Geist', 'Inter', sans-serif;
+}
+.ingreso-titular {
+  font-size: clamp(40px, 5vw, 76px);
+  font-weight: 600;
+  line-height: 1.02;
+  letter-spacing: -0.05em;
+  color: rgb(var(--tinta));
+}
+/* Cada línea es una ventana fija: el texto sube desde abajo y la ventana lo recorta. Los márgenes
+   negativos dejan lugar a los acentos y a las colas de las letras. */
+.ingreso-titular .ln {
+  display: block;
+  clip-path: inset(-40% -8% -10% -8%);
+}
+.ingreso-titular .ln > span {
+  display: inline-block;
+  padding-bottom: 0.06em;
+}
+.ingreso-tarjeta {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  bottom: 14px;
+  width: clamp(380px, 38vw, 560px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  border-radius: 26px;
+  background: rgb(var(--elevada) / 0.74);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  backdrop-filter: blur(28px) saturate(160%);
+  border: 1px solid rgb(var(--tinta) / 0.08);
+  box-shadow:
+    0 30px 70px -28px rgb(0 0 0 / 0.6),
+    inset 0 1px 0 rgb(var(--tinta) / 0.06);
+}
+:root[data-tema='claro'] .ingreso-tarjeta {
+  background: rgb(255 255 255 / 0.86);
+  box-shadow:
+    1px 10px 14px rgb(10 14 20 / 0.08),
+    0 1px 3px rgb(10 14 20 / 0.05);
+}
+.ingreso-form {
+  width: min(400px, 100% - 64px);
+  padding: 32px 0;
+  display: flex;
+  flex-direction: column;
+}
+.ingreso-h1,
+.ingreso-boton {
+  font-family: 'Geist', 'Inter', sans-serif;
+}
+.ingreso-h1 {
+  text-align: center;
+  font-size: clamp(28px, 2.5vw, 38px);
+  font-weight: 600;
+  letter-spacing: -0.05em;
+  line-height: 1.1;
+}
+.ingreso-bajada {
+  margin: 10px 0 34px;
+  text-align: center;
+  font-size: 15px;
+  line-height: 1.5;
+  color: rgb(var(--tinta) / 0.62);
+}
+.ingreso-campo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 56px;
+  padding: 0 8px 0 16px;
+  border-radius: 12px;
+  color: rgb(var(--tinta) / 0.45);
+  background: rgb(var(--tinta) / 0.035);
+  border: 1.5px solid rgb(var(--tinta) / 0.14);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease;
+}
+.ingreso-campo + .ingreso-campo {
+  margin-top: 10px;
+}
+.ingreso-campo:focus-within {
+  color: var(--honey-amber);
+  border-color: var(--honey-amber);
+  background: rgb(var(--tinta) / 0.05);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--honey-amber) 16%, transparent);
+}
+.ingreso-campo input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-size: 15.5px;
+  color: rgb(var(--tinta));
+}
+.ingreso-campo input::placeholder {
+  color: rgb(var(--tinta) / 0.42);
+}
+.ingreso-ver {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  color: rgb(var(--tinta) / 0.5);
+  transition:
+    color 0.18s ease,
+    background 0.18s ease;
+}
+.ingreso-ver:hover {
+  color: rgb(var(--tinta) / 0.9);
+  background: rgb(var(--tinta) / 0.06);
+}
+.ingreso-error {
+  min-height: 20px;
+  margin: 12px 2px 6px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--agent-coral);
+}
+.ingreso-boton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 56px;
+  border-radius: 999px;
+  font-size: 15.5px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: #1a1205;
+  background: linear-gradient(180deg, #e9a334 0%, var(--honey-amber) 100%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.35),
+    0 12px 28px -12px color-mix(in srgb, var(--honey-amber) 75%, transparent);
+  transition:
+    filter 0.18s ease,
+    transform 0.18s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+:root[data-tema='claro'] .ingreso-boton {
+  color: #fff;
+  background: linear-gradient(180deg, #c97c0c 0%, var(--honey-amber) 100%);
+}
+.ingreso-boton:hover {
+  filter: brightness(1.08);
+}
+.ingreso-boton:active {
+  transform: translateY(1px);
+}
+.ingreso-boton:disabled {
+  cursor: progress;
+  filter: saturate(0.7);
+}
+.ingreso-boton:focus-visible,
+.ingreso-ver:focus-visible {
+  outline: 2px solid var(--honey-amber);
+  outline-offset: 3px;
+}
+.ingreso-pie {
+  margin-top: 26px;
+  text-align: center;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: rgb(var(--tinta) / 0.62);
+}
+.ingreso-nota {
+  margin-top: 6px;
+  font-size: 12px;
+  color: rgb(var(--tinta) / 0.42);
+}
+/* Hasta que arranca la entrada, lo que va a animarse no se ve. Sin JavaScript la clase no se pone y
+   la pantalla aparece entera. */
+.ingreso[data-entrada='pendiente']
+  :is(
+    .ingreso-tarjeta,
+    .ingreso-cabecera,
+    .ingreso-insignia,
+    .ingreso-h1,
+    .ingreso-bajada,
+    .ingreso-campo,
+    .ingreso-pie
+  ) {
+  opacity: 0;
+}
+.ingreso[data-entrada='pendiente'] .ingreso-titular .ln > span {
+  transform: translateY(112%);
+}
+.ingreso[data-entrada='pendiente'] .ingreso-boton {
+  clip-path: inset(0 100% 0 0);
+}
+
+/* Tableta vertical: la promesa arriba, la tarjeta abajo y centrada. */
+@media (min-width: 700px) and (max-aspect-ratio: 51/50) {
+  .ingreso-heroe {
+    top: 18vh;
+    right: 5vw;
+    bottom: auto;
+    left: 5vw;
+  }
+  .ingreso-titular {
+    font-size: clamp(44px, 7vw, 72px);
+  }
+  .ingreso-tarjeta {
+    top: auto;
+    right: 0;
+    left: 0;
+    bottom: 3vh;
+    width: min(560px, 90vw);
+    margin-inline: auto;
+  }
+}
+
+/* Teléfono: todo en el flujo del documento, así la pantalla corta se desplaza en lugar de apretar. */
+@media (max-width: 699px) {
+  .ingreso {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .escena-panal,
+  .ingreso-velo {
+    position: fixed;
+  }
+  .ingreso-cabecera {
+    position: relative;
+    top: auto;
+    left: auto;
+    margin: calc(18px + env(safe-area-inset-top)) 22px 0;
+  }
+  .ingreso-heroe {
+    position: relative;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    margin: auto 22px 24px;
+    padding-top: 12vh;
+    gap: 14px;
+  }
+  .ingreso-titular {
+    font-size: clamp(34px, 10.4vw, 46px);
+  }
+  .ingreso-insignia {
+    font-size: 11.5px;
+  }
+  .ingreso-tarjeta {
+    position: relative;
+    inset: auto;
+    width: auto;
+    display: block;
+    flex: none;
+    overflow: visible;
+    border-radius: 28px 28px 0 0;
+    border-bottom: 0;
+    background: rgb(var(--elevada) / 0.94);
+    box-shadow: 0 -10px 28px rgb(0 0 0 / 0.25);
+  }
+  :root[data-tema='claro'] .ingreso-tarjeta {
+    background: rgb(255 255 255 / 0.97);
+    box-shadow: 0 -10px 28px rgb(20 28 36 / 0.1);
+  }
+  .ingreso-form {
+    width: auto;
+    max-width: 500px;
+    margin: 0 auto;
+    padding: 32px clamp(22px, 7vw, 38px) max(28px, env(safe-area-inset-bottom));
+  }
+  .ingreso-bajada {
+    margin-bottom: 26px;
+  }
+  /* 16 px o más: con menos, Safari del iPhone agranda la página al tocar el campo. */
+  .ingreso-campo input {
+    font-size: 16px;
+  }
+}
+
+/* La cuenta en la barra: la inicial en un hexágono de la marca y el rol en su color. Cada rol tiene
+   el suyo: pizarra el que mira, ámbar el que decide, teal el que administra y coral el que vigila. */
+[data-rol='invitado'] {
+  --rol: var(--ghost-slate);
+}
+[data-rol='analista'] {
+  --rol: var(--honey-amber);
+}
+[data-rol='admin'] {
+  --rol: var(--neural-teal);
+}
+[data-rol='superadmin'] {
+  --rol: var(--agent-coral);
+}
+.avatar-cuenta {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  font-family: 'Geist', 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sobre-ambar);
+  background: var(--honey-amber);
+  clip-path: polygon(25% 3%, 75% 3%, 100% 50%, 75% 97%, 25% 97%, 0 50%);
+}
+.rol-cuenta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--rol, var(--ghost-slate));
+}
+.rol-cuenta::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+}
+.boton-cuenta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px 0 4px;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgb(var(--tinta) / 0.12);
+  transition:
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+.boton-cuenta:hover,
+.boton-cuenta[aria-expanded='true'] {
+  background: rgb(var(--tinta) / 0.05);
+  box-shadow: inset 0 0 0 1px rgb(var(--tinta) / 0.25);
+}
+.menu-cuenta {
+  min-width: 280px;
+  padding: 6px;
+}
+.fila-cuenta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  text-align: left;
+  font-size: 13.5px;
+  color: rgb(var(--tinta) / 0.85);
+}
+.refresco {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  padding: 0 11px 0 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  white-space: nowrap;
+  color: rgb(var(--tinta) / 0.62);
+  box-shadow: inset 0 0 0 1px rgb(var(--tinta) / 0.1);
+  transition:
+    color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.refresco:hover {
+  color: rgb(var(--tinta) / 0.92);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--honey-amber) 55%, transparent);
+}
+.refresco svg {
+  transition: transform 0.5s ease;
+}
+.refresco:hover svg {
+  transform: rotate(90deg);
+}
+.refresco svg[data-girando='si'] {
+  animation: refrescoGira 0.8s linear infinite;
+}
+@keyframes refrescoGira {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Una cifra en vivo que acaba de subir: un destello ámbar mientras cuenta. */
+[data-sube='si'] {
+  color: var(--honey-amber);
+  text-shadow: 0 0 18px color-mix(in srgb, var(--honey-amber) 45%, transparent);
+  transition: color 0.3s ease;
+}
+.rodillo {
+  display: inline-flex;
+}
+.rodillo-celda {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+}
+.rodillo-celda[data-gira='si'] {
+  animation: rodilloEntra 0.62s cubic-bezier(0.16, 1, 0.3, 1) calc(var(--orden) * 45ms) both;
+}
+.rodillo-viejo {
+  position: absolute;
+  inset: 0;
+  animation: rodilloSale 0.62s cubic-bezier(0.16, 1, 0.3, 1) calc(var(--orden) * 45ms) both;
+}
+@keyframes rodilloEntra {
+  from {
+    color: var(--honey-amber);
+    clip-path: inset(0 0 100% 0);
+    transform: translateY(70%);
+  }
+  to {
+    clip-path: inset(0);
+    transform: none;
+  }
+}
+@keyframes rodilloSale {
+  to {
+    transform: translateY(-110%);
+    opacity: 0;
+  }
+}
+
+/* Las secciones que se calculan por lotes lo dicen arriba, con la fecha. */
+.nota-lote {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 18px 0 -6px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgb(var(--tinta) / 0.55);
+}
+.nota-lote::before {
+  content: '';
+  flex: none;
+  width: 12px;
+  height: 12px;
+  background: var(--ghost-slate);
+  -webkit-mask: var(--marca-hex) center / contain no-repeat;
+  mask: var(--marca-hex) center / contain no-repeat;
+}
+
+/* Los formularios de administración. */
+.campo-formulario {
+  height: 42px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  color: rgb(var(--tinta));
+  background: rgb(var(--tinta) / 0.04);
+  border: 1px solid rgb(var(--tinta) / 0.14);
+  outline: 0;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.campo-formulario:focus {
+  border-color: var(--honey-amber);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--honey-amber) 16%, transparent);
+}
+.boton-formulario {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  white-space: nowrap;
+  flex: none;
+  border-radius: 999px;
+  font-family: 'Geist', 'Inter', sans-serif;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--sobre-ambar);
+  background: var(--honey-amber);
+  transition:
+    filter 0.18s ease,
+    transform 0.18s ease;
+}
+.boton-formulario:hover {
+  filter: brightness(1.08);
+}
+.boton-formulario:active {
+  transform: translateY(1px);
+}
+.boton-formulario:disabled {
+  filter: saturate(0.5);
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+.boton-formulario[data-tipo='suave'] {
+  color: rgb(var(--tinta) / 0.85);
+  background: rgb(var(--tinta) / 0.06);
+  box-shadow: inset 0 0 0 1px rgb(var(--tinta) / 0.12);
+}
+.boton-icono {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: rgb(var(--tinta) / 0.6);
+  box-shadow: inset 0 0 0 1px rgb(var(--tinta) / 0.1);
+  transition:
+    color 0.18s ease,
+    background 0.18s ease;
+}
+.boton-icono:hover {
+  color: rgb(var(--tinta));
+  background: rgb(var(--tinta) / 0.06);
+}
+.boton-icono[data-peligro='si']:hover {
+  color: var(--agent-coral);
+}
+.opcion-rol {
+  height: 32px;
+  padding: 0 13px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  color: rgb(var(--tinta) / 0.65);
+  box-shadow: inset 0 0 0 1px rgb(var(--tinta) / 0.12);
+  transition:
+    color 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease;
+}
+.opcion-rol[aria-pressed='true'] {
+  color: var(--rol);
+  background: color-mix(in srgb, var(--rol) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rol) 55%, transparent);
+}
+.opcion-rol-chica {
+  height: 24px;
+  padding: 0 9px;
+  font-size: 11px;
+}
+.chip-baja {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--agent-coral);
+  background: color-mix(in srgb, var(--agent-coral) 12%, transparent);
+}
+.fila-cuenta-admin {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 14px;
+  padding: 14px 4px;
+  border-top: 1px solid rgb(var(--tinta) / 0.06);
+}
+.fila-cuenta-admin:not([data-activa='si']) > :is(.avatar-cuenta, div:first-of-type) {
+  opacity: 0.5;
+}
+
+/* La escalera de roles: cada escalón sube un poco más que el anterior, y los que alcanza quien mira
+   quedan encendidos en el color de su rol. */
+.escalera-roles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: end;
+  gap: 10px;
+  margin-top: 6px;
+}
+.escalera-roles li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px 16px 16px;
+  min-height: calc(120px + var(--escalon) * 26px);
+  border-radius: 16px 16px 4px 4px;
+  background: linear-gradient(180deg, rgb(var(--tinta) / 0.035), transparent);
+  box-shadow: inset 0 1px 0 rgb(var(--tinta) / 0.08);
+  opacity: 0.55;
+}
+.escalera-roles li[data-alcanza='si'] {
+  opacity: 1;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--rol) 12%, transparent), transparent);
+  box-shadow: inset 0 2px 0 var(--rol);
+}
+.escalera-roles li[data-propio='si'] {
+  box-shadow:
+    inset 0 2px 0 var(--rol),
+    0 0 0 1px color-mix(in srgb, var(--rol) 40%, transparent);
+}
+.escalon-marca {
+  width: 16px;
+  height: 16px;
+  background: var(--rol);
+  -webkit-mask: var(--marca-hex) center / contain no-repeat;
+  mask: var(--marca-hex) center / contain no-repeat;
+}
+@media (max-width: 767px) {
+  .escalera-roles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .escalera-roles li {
+    min-height: 0;
+  }
+}
+
+/* La auditoría. */
+.pestanas {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgb(var(--tinta) / 0.1);
+  align-self: flex-start;
+}
+.pestana {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  color: rgb(var(--tinta) / 0.6);
+  transition:
+    color 0.2s ease,
+    background 0.2s ease;
+}
+.pestana[aria-selected='true'] {
+  color: rgb(var(--tinta));
+  background: rgb(var(--tinta) / 0.08);
+}
+.filtro-auditoria {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: rgb(var(--tinta) / 0.7);
+  box-shadow: inset 0 0 0 1px rgb(var(--tinta) / 0.1);
+}
+.filtro-auditoria::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--tono, rgb(var(--tinta) / 0.4));
+}
+.filtro-auditoria[aria-pressed='true'] {
+  color: rgb(var(--tinta));
+  box-shadow: inset 0 0 0 1px var(--tono, rgb(var(--tinta) / 0.4));
+  background: color-mix(in srgb, var(--tono, rgb(var(--tinta))) 10%, transparent);
+}
+.filtro-auditoria:disabled {
+  opacity: 0.5;
+}
+.linea-auditoria {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding-left: 18px;
+  border-left: 1px solid rgb(var(--tinta) / 0.1);
+}
+.entrada-auditoria {
+  position: relative;
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  column-gap: 16px;
+  row-gap: 2px;
+  padding: 11px 0;
+}
+.entrada-auditoria::before {
+  content: '';
+  position: absolute;
+  left: -24px;
+  top: 15px;
+  width: 11px;
+  height: 11px;
+  background: var(--tono);
+  -webkit-mask: var(--marca-hex) center / contain no-repeat;
+  mask: var(--marca-hex) center / contain no-repeat;
+}
+.entrada-auditoria > :nth-child(n + 3) {
+  grid-column: 2;
+}
+@media (max-width: 640px) {
+  .entrada-auditoria {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .entrada-auditoria > * {
+    grid-column: 1 !important;
+  }
+}
+.registro-servidor {
+  display: flex;
+  flex-direction: column;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 12px;
+}
+.registro-servidor li {
+  display: grid;
+  grid-template-columns: 140px 96px minmax(0, 1fr);
+  gap: 12px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  color: rgb(var(--tinta) / 0.72);
+}
+.registro-servidor li:nth-child(odd) {
+  background: rgb(var(--tinta) / 0.025);
+}
+.registro-servidor li[data-alerta='si'] {
+  color: var(--agent-coral);
+  background: color-mix(in srgb, var(--agent-coral) 8%, transparent);
+}
+.registro-servidor time {
+  color: rgb(var(--tinta) / 0.45);
+}
+.registro-fuente {
+  color: var(--tono);
+}
+.registro-texto {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .registro-servidor li {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .registro-texto {
+    grid-column: 1 / -1;
+  }
+}
+
+/* La telemetría en vivo: una terminal donde lo nuevo entra por arriba. */
+.consola-en-vivo {
+  position: relative;
+  min-height: 420px;
+  max-height: min(70vh, 720px);
+  overflow-y: auto;
+  padding: 12px;
+  border-radius: 16px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  background: #0a0e13;
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.06),
+    0 30px 60px -30px rgb(0 0 0 / 0.6);
+  --tinta: 255 255 255;
+}
+.consola-en-vivo[data-pausa='si'] {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--honey-amber) 40%, transparent),
+    0 30px 60px -30px rgb(0 0 0 / 0.6);
+}
+.consola-aviso {
+  padding: 8px 10px;
+  color: rgb(255 255 255 / 0.5);
+}
+.consola-en-vivo li {
+  display: grid;
+  grid-template-columns: 74px 72px minmax(120px, 0.9fr) minmax(0, 2fr) minmax(0, 1fr);
+  gap: 12px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  color: rgb(255 255 255 / 0.78);
+}
+.consola-en-vivo li[data-nuevo='si'] {
+  animation: consolaEntra 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes consolaEntra {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+    background: color-mix(in srgb, var(--honey-amber) 22%, transparent);
+  }
+  to {
+    background: transparent;
+  }
+}
+.consola-en-vivo time {
+  color: rgb(255 255 255 / 0.4);
+}
+.consola-sensor {
+  color: var(--neural-teal);
+}
+.consola-sensor[data-sensor='dionaea'] {
+  color: #60a5fa;
+}
+.consola-accion[data-resultado='success'] {
+  color: var(--agent-coral);
+}
+.consola-detalle,
+.consola-origen {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.consola-origen {
+  color: rgb(255 255 255 / 0.6);
+}
+@media (max-width: 760px) {
+  .consola-en-vivo li {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+  .consola-en-vivo li > :nth-child(n + 3) {
+    grid-column: 2;
+  }
+}
+
+/* El reporte. Se ve como una hoja A4 sobre el panel y es lo único que sale al imprimir. Va siempre
+   con los colores del tema oscuro: los tokens se redefinen adentro, así funciona igual si quien lo
+   pide tiene elegido el claro. */
+.reporte-vista {
+  --tinta: 255 255 255;
+  --fondo: 13 17 23;
+  --elevada: 22 27 34;
+  --honey-amber: #d4860a;
+  --neural-teal: #00b894;
+  --agent-coral: #ff6b35;
+  --ghost-slate: #94a3b8;
+  --violeta: #a78bfa;
+  --critico: #e03131;
+  --sobre-ambar: #0d1117;
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  overflow-y: auto;
+  padding: 0 16px 48px;
+  color: #fff;
+  background: rgb(6 9 13 / 0.94);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.reporte-barra {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 210mm;
+  margin: 0 auto;
+  padding: 14px 0;
+}
+.reporte-hoja {
+  width: min(210mm, 100%);
+  min-height: 297mm;
+  margin: 0 auto;
+  padding: 16mm 15mm 12mm;
+  display: flex;
+  flex-direction: column;
+  gap: 9mm;
+  color: #fff;
+  background:
+    radial-gradient(120% 60% at 0% 0%, rgb(212 134 10 / 0.14), transparent 55%),
+    radial-gradient(90% 50% at 100% 100%, rgb(0 184 148 / 0.08), transparent 60%), #0d1117;
+  border-radius: 6px;
+  box-shadow: 0 40px 80px -30px rgb(0 0 0 / 0.8);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.reporte-cabecera {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 7mm;
+  border-bottom: 1px solid rgb(255 255 255 / 0.1);
+}
+.reporte-marca,
+.reporte-titulo,
+.reporte-cifra {
+  font-family: 'Geist', 'Inter', sans-serif;
+}
+.reporte-marca {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+.reporte-titulo {
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.045em;
+  background: linear-gradient(100deg, #d4860a, #ff6b35 55%, #00b894);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.reporte-sub {
+  margin-top: 3px;
+  font-size: 11px;
+  color: rgb(255 255 255 / 0.55);
+}
+.reporte-bloque {
+  display: flex;
+  flex-direction: column;
+  gap: 5mm;
+  break-inside: avoid;
+}
+.reporte-ceja {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #d4860a;
+}
+.reporte-ceja::before {
+  content: '';
+  width: 11px;
+  height: 11px;
+  background: #d4860a;
+  -webkit-mask: var(--marca-hex) center / contain no-repeat;
+  mask: var(--marca-hex) center / contain no-repeat;
+}
+.reporte-cifras {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 6mm;
+}
+.reporte-cifra {
+  font-size: 30px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+}
+.reporte-cifra-chica {
+  font-size: 22px;
+  color: #fff;
+}
+.reporte-rotulo {
+  margin-top: 4px;
+  font-size: 10.5px;
+  color: rgb(255 255 255 / 0.6);
+}
+.reporte-dos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9mm;
+}
+.reporte-subtitulo {
+  margin-bottom: 3mm;
+  font-size: 12px;
+  color: rgb(255 255 255 / 0.85);
+}
+.reporte-barras {
+  display: flex;
+  flex-direction: column;
+  gap: 2.2mm;
+}
+.reporte-barras li {
+  display: grid;
+  grid-template-columns: 34% 1fr auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 10.5px;
+}
+.reporte-nombre {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgb(255 255 255 / 0.75);
+}
+.reporte-pista {
+  height: 6px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.06);
+  overflow: hidden;
+}
+.reporte-pista > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+.reporte-valor {
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  color: rgb(255 255 255 / 0.6);
+}
+.reporte-pie {
+  margin-top: auto;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 5mm;
+  border-top: 1px solid rgb(255 255 255 / 0.1);
+  font-size: 10px;
+  color: rgb(255 255 255 / 0.45);
+}
+@media (max-width: 640px) {
+  .reporte-hoja {
+    min-height: 0;
+    padding: 22px 18px;
+  }
+  .reporte-dos {
+    grid-template-columns: 1fr;
+  }
+  .reporte-cabecera {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .reporte-cabecera > .text-right {
+    text-align: left;
+  }
+}
+@page {
+  size: A4;
+  margin: 0;
+}
+@media print {
+  html.con-reporte body > :not(.reporte-vista) {
+    display: none !important;
+  }
+  html.con-reporte,
+  html.con-reporte body {
+    background: #0d1117 !important;
+  }
+  .reporte-vista {
+    position: static;
+    padding: 0;
+    overflow: visible;
+    background: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .reporte-barra {
+    display: none;
+  }
+  .reporte-hoja {
+    width: 210mm;
+    min-height: 297mm;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .reporte-dos {
+    grid-template-columns: 1fr 1fr;
+  }
 }

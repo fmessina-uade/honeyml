@@ -1,6 +1,6 @@
 .PHONY: help up down logs status ps clean deploy-vps dev-up dev-down dev-logs validate lint test \
         test-integration consumer triaje retriaje grafo arquetipos modelo evaluacion comparacion clasificar muestra \
-        api dash replays \
+        api dash demo replays \
         elastic-up elastic-down elastic-logs elastic-dev-up elastic-dev-down elastic-dev-logs \
         es-bootstrap validate-indexing pull-logs \
         analisis-up analisis-down analisis-logs publicar-artefactos tunel \
@@ -48,6 +48,7 @@ help:
 	@echo "    make replays   Extraer sesiones de ataque anotadas"
 	@echo "    make api       Levantar la API (FastAPI, puerto 8000)"
 	@echo "    make dash      Levantar el panel (Vite, puerto 5173)"
+	@echo "    make demo      Publicar el panel en la red local para los teléfonos (con make tunel)"
 	@echo ""
 	@echo "  Producción (VPS):"
 	@echo "    make up        Iniciar contenedores en el VPS (puertos reales)"
@@ -192,6 +193,14 @@ endif
 			-e "ssh -p $(SSH_PORT) -i $(SSH_KEY) -o IdentitiesOnly=yes" \
 			"$$tmp/" $(SSH_USER)@$(VPS_IP):/opt/honeyml/honeyml/ && \
 		echo "$(if $(SECO),Simulado,Desplegado) $$(git rev-parse --short HEAD) en /opt/honeyml/honeyml"
+	@# Cada despliegue queda en un registro del servidor que lee la auditoría del panel. La línea
+	@# viaja por la entrada estándar y no como argumento: así el asunto del commit nunca llega a la
+	@# línea de comandos del servidor.
+	@$(if $(SECO),true,printf '[%s] Desplegado %s por %s: %s\n' \
+		"$$(date -u '+%Y-%m-%d %H:%M:%S')" "$$(git rev-parse --short HEAD)" \
+		"$$(git config user.name)" "$$(git log -1 --format=%s)" \
+		| ssh -p $(SSH_PORT) -i $(SSH_KEY) -o IdentitiesOnly=yes $(SSH_USER)@$(VPS_IP) \
+			"sudo tee -a /var/log/honeyml_despliegues.log >/dev/null")
 
 # pipeline de datos: Elastic Stack + ECS
 
@@ -484,6 +493,12 @@ api:
 
 dash:
 	@cd dashboard && npm run dev
+
+# El panel para una demostración con teléfonos: lo compila y lo publica en la red local, con /api
+# reenviado al túnel. Necesita `make tunel` corriendo en otra terminal. El porqué de cada cosa
+# está en dashboard/demo.mjs.
+demo:
+	@cd dashboard && npm run build && node demo.mjs
 
 # Comprobación en vivo del proveedor de inferencia. Necesita la clave en .env o en el entorno.
 inferencia-ok:

@@ -17,6 +17,8 @@ from pydantic import ValidationError
 from honeyml.api import decisiones
 from honeyml.api.main import app
 
+pytestmark = pytest.mark.usefixtures("como_analista")
+
 DECISION = {
     "@timestamp": "2026-10-01T12:00:05+00:00",
     "evento": {

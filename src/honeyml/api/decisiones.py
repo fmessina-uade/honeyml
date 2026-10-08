@@ -44,6 +44,10 @@ SIN_TACTICA = "ninguna"
 # índice entero de una vez.
 MAX_TAMANO = 100
 
+# Tope de una exportación: la ventana de resultados de Elasticsearch. Más allá de ese número una
+# exportación deja de leerse como reporte, y el filtro es la forma de acotarla.
+MAX_EXPORTACION = 10_000
+
 # Ventana del tiempo de conclusión. Mide el motor en marcha continua: las decisiones de una tanda
 # sobre el atraso tardan días por construcción, y mezcladas arruinarían la mediana.
 VENTANA_CONCLUSION = "now-7d"
@@ -461,6 +465,42 @@ def listar(
     }
 
 
+def para_exportar(
+    severidad: str | None = None,
+    tactica: str | None = None,
+    sensor: str | None = None,
+    estado: str = "todas",
+    es_url: str = queries.ES_URL,
+) -> dict[str, Any]:
+    """Las decisiones de un filtro para un reporte, con el mismo orden y las mismas filas que el
+    listado, hasta `MAX_EXPORTACION`. `total` dice cuántas había, por si quedó alguna afuera."""
+    revisados = ids_revisados(es_url)
+    cuerpo = {
+        "size": MAX_EXPORTACION,
+        "track_total_hits": True,
+        "query": _filtros(severidad, tactica, sensor, estado, revisados),
+        "sort": [{"evento.momento": {"order": "desc", "missing": "_last"}}],
+    }
+    r = queries._search(cuerpo, es_url, index=DECISIONES)
+    hits = r["hits"]["hits"]
+    con_veredicto = set(revisados)
+    ids = [h["_id"] for h in hits if h["_id"] in con_veredicto]
+    revisiones: dict[str, dict[str, Any]] = {}
+    if ids:
+        m = _pedir("POST", f"/{REVISIONES}/_mget", {"ids": ids}, es_url)
+        revisiones = {d["_id"]: d["_source"] for d in m["docs"] if d.get("found")}
+    return {
+        "total": r["hits"]["total"]["value"],
+        "items": [_fila(h["_id"], h["_source"], revisiones.get(h["_id"])) for h in hits],
+    }
+
+
+def revisiones(es_url: str = queries.ES_URL) -> list[dict[str, Any]]:
+    """Todos los veredictos, del más nuevo al más viejo. Son pocos: los escribe una persona."""
+    r = _buscar(REVISIONES, {"size": 10000, "sort": [{"@timestamp": {"order": "desc"}}]}, es_url)
+    return [{"doc_id": h["_id"], **h["_source"]} for h in r["hits"]["hits"]] if r else []
+
+
 def _aplanar(d: dict[str, Any], prefijo: str = "") -> dict[str, Any]:
     plano: dict[str, Any] = {}
     for clave, valor in d.items():
@@ -522,7 +562,7 @@ def _guardar_revision(doc_id: str, documento: dict[str, Any], es_url: str) -> No
 
 
 def revisar(
-    doc_id: str, veredicto: Veredicto, es_url: str = queries.ES_URL
+    doc_id: str, veredicto: Veredicto, es_url: str = queries.ES_URL, usuario: str | None = None
 ) -> dict[str, Any] | None:
     """Guarda el veredicto del analista. None si el evento no tiene decisión del motor.
 
@@ -547,12 +587,13 @@ def revisar(
             "motor, y un veredicto tomado después de ver su clasificación no la reemplaza."
         )
 
-    documento = {
-        "@timestamp": datetime.now(UTC).isoformat(timespec="seconds"),
-        "doc_id": doc_id,
-        **veredicto.model_dump(mode="json"),
-        "motor": _lo_que_dijo_el_motor(decision),
-    }
+    documento = (
+        {"@timestamp": datetime.now(UTC).isoformat(timespec="seconds"), "doc_id": doc_id}
+        | veredicto.model_dump(mode="json")
+        | {"motor": _lo_que_dijo_el_motor(decision)}
+    )
+    if usuario:
+        documento["usuario"] = usuario
     _guardar_revision(doc_id, documento, es_url)
     return documento
 
@@ -606,7 +647,10 @@ def siguiente_a_ciegas(es_url: str = queries.ES_URL) -> dict[str, Any]:
 
 
 def revisar_a_ciegas(
-    doc_id: str, clasificacion: ClasificacionACiegas, es_url: str = queries.ES_URL
+    doc_id: str,
+    clasificacion: ClasificacionACiegas,
+    es_url: str = queries.ES_URL,
+    usuario: str | None = None,
 ) -> dict[str, Any] | None:
     """Guarda lo que el analista eligió a ciegas y lo compara con la clasificación del motor.
 
@@ -627,14 +671,16 @@ def revisar_a_ciegas(
     except SinMuestraError:
         estratos = {}
 
-    documento = {
-        "@timestamp": datetime.now(UTC).isoformat(timespec="seconds"),
-        "doc_id": doc_id,
-        "veredicto": "confirma" if coincide else "corrige",
-        **clasificacion.model_dump(mode="json"),
-        "a_ciegas": True,
-        "estrato": estratos.get(doc_id),
-        "motor": motor,
-    }
+    documento = (
+        {
+            "@timestamp": datetime.now(UTC).isoformat(timespec="seconds"),
+            "doc_id": doc_id,
+            "veredicto": "confirma" if coincide else "corrige",
+        }
+        | clasificacion.model_dump(mode="json")
+        | {"a_ciegas": True, "estrato": estratos.get(doc_id), "motor": motor}
+    )
+    if usuario:
+        documento["usuario"] = usuario
     _guardar_revision(doc_id, documento, es_url)
     return documento

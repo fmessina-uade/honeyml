@@ -19,6 +19,7 @@
         "nota": { "type": "text" },
         "a_ciegas": { "type": "boolean" },
         "estrato": { "type": "keyword" },
+        "usuario": { "type": "keyword" },
         "motor": {
           "properties": {
             "severidad": { "type": "keyword" },

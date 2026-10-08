@@ -8,6 +8,8 @@ from fastapi.testclient import TestClient
 from honeyml.api.main import app
 from honeyml.education import password_index
 
+pytestmark = pytest.mark.usefixtures("como_analista")
+
 
 def test_el_resumen_da_las_cifras_y_ningun_hash(monkeypatch: pytest.MonkeyPatch) -> None:
     indice = {"prefix_len": 5, "distinct": 3, "attempts": 10, "buckets": {"abcde": [["f0", 7]]}}

@@ -1,0 +1,27 @@
+{
+  "index_patterns": [
+    "honeyml-usuarios"
+  ],
+  "priority": 200,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0
+    },
+    "mappings": {
+      "dynamic": "strict",
+      "properties": {
+        "usuario": { "type": "keyword" },
+        "rol": { "type": "keyword" },
+        "contrasena": { "type": "keyword", "index": false, "doc_values": false },
+        "activo": { "type": "boolean" },
+        "sello": { "type": "integer" },
+        "creada": { "type": "date" },
+        "creada_por": { "type": "keyword" },
+        "modificada": { "type": "date" },
+        "modificada_por": { "type": "keyword" },
+        "ultimo_ingreso": { "type": "date" }
+      }
+    }
+  }
+}

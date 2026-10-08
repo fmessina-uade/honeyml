@@ -1,0 +1,23 @@
+{
+  "index_patterns": [
+    "honeyml-auditoria"
+  ],
+  "priority": 200,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0
+    },
+    "mappings": {
+      "dynamic": "strict",
+      "properties": {
+        "@timestamp": { "type": "date" },
+        "usuario": { "type": "keyword" },
+        "rol": { "type": "keyword" },
+        "accion": { "type": "keyword" },
+        "objetivo": { "type": "keyword" },
+        "detalle": { "type": "object", "enabled": false }
+      }
+    }
+  }
+}

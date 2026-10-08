@@ -59,6 +59,13 @@ services:
     command: ["uvicorn", "honeyml.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
     environment:
       - ES_URL=http://elasticsearch:9200
+    volumes:
+      - ../../data/processed:/app/data/processed:ro
+      # Los registros que escriben los scripts del anfitrión, para la auditoría del superadmin. Va el
+      # directorio entero porque Docker crea un directorio en el lugar de un archivo que todavía no
+      # existe, y eso rompería al script que después quiera escribirlo. La API corre sin privilegios
+      # y solo abre los que nombra registros.py; los del sistema que importan son ilegibles para ella.
+      - /var/log:/registros-del-servidor:ro
     ports:
       - "127.0.0.1:8000:8000"
     healthcheck:

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Respaldo diario de la telemetría, de las decisiones del motor y de los veredictos del analista.
-# Lo corre el cron todos los días a las 03:00 UTC.
+# Respaldo diario de la telemetría, de las decisiones del motor, de los veredictos del analista y de
+# las cuentas del panel con su auditoría. Lo corre el cron todos los días a las 03:00 UTC.
 #
 # Los sensores rotan sus registros y borran los viejos, así que el volumen de Docker no guarda la
 # historia: sin este respaldo, lo que sale de la ventana de rotación se pierde para siempre.
@@ -10,8 +10,10 @@
 # cambia todo el tiempo y se guarda una instantánea comprimida por día, que sí se purga, porque el
 # rotado del día siguiente la cubre. Las decisiones y los veredictos son lo que más importa: los
 # eventos se reingieren desde los registros crudos, pero cada decisión costó una llamada paga y cada
-# veredicto es trabajo de una persona, y ninguno de los dos se rehace. Se vuelcan los dos índices
-# enteros, que son chicos, y se restauran con la misma operación masiva con que se los escribió.
+# veredicto es trabajo de una persona, y ninguno de los dos se rehace. Las cuentas y la auditoría
+# tampoco: sin las primeras nadie entra al panel, y la segunda es la prueba de quién hizo qué. Se
+# vuelcan los cuatro índices enteros, que son chicos, y se restauran con la misma operación masiva
+# con que se los escribió.
 #
 # Todo esto queda en el mismo disco que produce los datos, así que es la mitad del respaldo. La otra
 # mitad es sacarlo del servidor, y eso lo hace `make respaldar-decisiones` desde la estación.
@@ -59,8 +61,8 @@ instantanea_activo() {
 
 volcar_indice() {
     local indice="$1" prefijo="$2" dest_dir="$3" volcadas=0
-    # Los índices solo existen donde corre la zona de análisis, y el de revisiones recién aparece
-    # con el primer veredicto. En los dos casos no hay nada que volcar, y eso no es una falla.
+    # Los índices solo existen donde corre la zona de análisis, y los demás aparecen recién con su
+    # primer documento. En los dos casos no hay nada que volcar, y eso no es una falla.
     if ! curl -sf --max-time 10 "$ES_URL/$indice/_count" >/dev/null 2>&1; then
         echo 0
         return 0
@@ -116,13 +118,15 @@ main() {
     # Dionaea no rota: solo hay archivo activo
     instantanea_activo "$DIONAEA_SRC/dionaea.json" "$BACKUP_ROOT/dionaea" "dionaea"
 
-    local decisiones revisiones
+    local decisiones revisiones cuentas auditoria
     decisiones=$(volcar_indice honeyml-decisiones decisiones "$BACKUP_ROOT/decisiones")
     [[ "$decisiones" -gt 0 ]] || log "AVISO: no se volcó ninguna decisión"
     revisiones=$(volcar_indice honeyml-revisiones revisiones "$BACKUP_ROOT/decisiones")
+    cuentas=$(volcar_indice honeyml-usuarios cuentas "$BACKUP_ROOT/decisiones")
+    auditoria=$(volcar_indice honeyml-auditoria auditoria "$BACKUP_ROOT/decisiones")
 
-    # purga las instantáneas del activo y los volcados viejos de decisiones y revisiones; los
-    # rotados de los sensores son el archivo histórico y no se tocan
+    # purga las instantáneas del activo y los volcados viejos de los índices; los rotados de los
+    # sensores son el archivo histórico y no se tocan
     local purgadas
     purgadas=$(find "$BACKUP_ROOT" -name '*-activo-*.json.gz' \
         -mtime "+$SNAPSHOT_RETENTION_DAYS" -print -delete 2>/dev/null | wc -l)
@@ -134,7 +138,7 @@ main() {
     local total tamano
     total=$(find "$BACKUP_ROOT" -name '*.gz' | wc -l)
     tamano=$(du -sh "$BACKUP_ROOT" | cut -f1)
-    log "OK: ${rotados_cowrie} rotados nuevos, instantáneas del día guardadas, ${decisiones} decisiones, ${revisiones} revisiones, ${purgadas} purgadas. Total: ${total} archivos, ${tamano}."
+    log "OK: ${rotados_cowrie} rotados nuevos, instantáneas del día guardadas, ${decisiones} decisiones, ${revisiones} revisiones, ${cuentas} cuentas, ${auditoria} de auditoría, ${purgadas} purgadas. Total: ${total} archivos, ${tamano}."
 }
 
 main "$@"

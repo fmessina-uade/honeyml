@@ -1,7 +1,7 @@
 """La lectura de las decisiones y el veredicto del analista, sin Elasticsearch.
 
-Tres cosas se rompen sin hacer ruido y por eso se fijan acá. Que los veredictos sean las únicas
-escrituras de la API, y que vayan a su propio índice sin tocar la decisión del motor. Que un
+Tres cosas se rompen sin hacer ruido y por eso se fijan acá. Que la API no escriba más que lo
+previsto, y que el veredicto vaya a su propio índice sin tocar la decisión del motor. Que un
 veredicto incoherente (una confirmación con clasificación propia, una corrección sin severidad, una
 táctica fuera del vocabulario) no llegue a guardarse. Y que "pendiente" sea lo que requiere
 revisión y todavía no la tiene, y no cualquier decisión sin revisar.
@@ -19,6 +19,8 @@ from pydantic import ValidationError
 
 from honeyml.api import decisiones, queries
 from honeyml.api.main import app
+
+pytestmark = pytest.mark.usefixtures("como_analista")
 
 DECISION = {
     "@timestamp": "2026-09-24T12:00:05+00:00",
@@ -224,7 +226,8 @@ def test_el_resumen_descuenta_de_pendientes_lo_ya_revisado(
 # Las rutas
 
 
-def test_los_veredictos_son_las_unicas_escrituras_de_la_api() -> None:
+def test_la_api_escribe_solo_lo_previsto() -> None:
+    """Los veredictos, las cuentas y la sesión. Ninguna ruta escribe telemetría ni decisiones."""
     escrituras = {
         ruta.path  # type: ignore[attr-defined]
         for ruta in app.routes
@@ -233,6 +236,11 @@ def test_los_veredictos_son_las_unicas_escrituras_de_la_api() -> None:
     assert escrituras == {
         "/api/decisiones/{doc_id}/revision",
         "/api/decisiones/{doc_id}/revision-a-ciegas",
+        "/api/sesion",
+        "/api/sesion/contrasena",
+        "/api/usuarios",
+        "/api/usuarios/{nombre}",
+        "/api/reporte",
     }
 
 

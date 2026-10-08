@@ -14,6 +14,7 @@ import CountUp from '../CountUp';
 import Latido from '../Latido';
 import Miniatura from '../Miniatura';
 import Reveal from '../Reveal';
+import Rodillo from '../Rodillo';
 
 const MINUTOS_ACTIVO = 10;
 const REFRESCO_MS = 15000;
@@ -328,7 +329,7 @@ export default function Inicio({
               <ArrowUpRight className="lamina-flecha w-4 h-4" aria-hidden />
               <span className="lamina-pie flex flex-col gap-1.5">
                 <span className="lamina-cifra" style={{ color: SECCIONES[id].color }}>
-                  {cifras[id].cifra}
+                  <Rodillo texto={cifras[id].cifra} />
                 </span>
                 <span className="text-[12px] text-white/60 leading-snug max-w-[28rem]">
                   {cifras[id].texto}

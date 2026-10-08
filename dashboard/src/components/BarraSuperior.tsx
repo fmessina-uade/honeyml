@@ -40,6 +40,9 @@ export default function BarraSuperior({
   cifras,
   estado,
   preferencias,
+  cuenta,
+  cuentaEnHoja,
+  refresco,
 }: {
   active: SectionId;
   onIr: (id: SectionId) => void;
@@ -49,6 +52,9 @@ export default function BarraSuperior({
   cifras: Record<LeccionId, Leccion> | null;
   estado: ReactNode;
   preferencias: ReactNode;
+  cuenta: ReactNode;
+  cuentaEnHoja: ReactNode;
+  refresco: ReactNode;
 }) {
   const { t } = useI18n();
   const [abierto, setAbierto] = useState<MenuId | null>(null);
@@ -171,6 +177,9 @@ export default function BarraSuperior({
       window.clearTimeout(espera.current);
     };
   }, [cerrar, ubicar]);
+
+  // Elegir una vista desde la cuenta, que va adentro de la hoja, también la cierra.
+  useEffect(() => setHoja(false), [active]);
 
   const menuActivo = MENUS.find((m) => (m.secciones as readonly SectionId[]).includes(active))?.id;
 
@@ -301,7 +310,8 @@ export default function BarraSuperior({
         </nav>
 
         <div className="flex items-center gap-2.5 justify-self-end">
-          <span className="hidden min-[981px]:inline-flex">{estado}</span>
+          <span className="hidden min-[1341px]:inline-flex">{refresco}</span>
+          <span className="hidden min-[1181px]:inline-flex">{estado}</span>
           <div ref={ajustesRef} className="relative hidden min-[981px]:block">
             <button
               onClick={() => setAjustes((a) => !a)}
@@ -327,6 +337,7 @@ export default function BarraSuperior({
             </span>
             {t.nav.triaje}
           </button>
+          <div className="hidden min-[981px]:block">{cuenta}</div>
 
           <span className="min-[981px]:hidden geist text-[13px] text-white/65 truncate max-w-[42vw]">
             {t.nav[active]}
@@ -377,9 +388,13 @@ export default function BarraSuperior({
             ))}
           </div>
         ))}
+        <div className="mt-2 border-t border-white/5 pt-2">{cuentaEnHoja}</div>
         <div className="flex flex-col gap-3 px-3 pt-4 pb-2 mt-2 border-t border-white/5">
           {preferencias}
-          {estado}
+          <div className="flex items-center gap-2 flex-wrap">
+            {estado}
+            {refresco}
+          </div>
         </div>
       </div>
     </header>

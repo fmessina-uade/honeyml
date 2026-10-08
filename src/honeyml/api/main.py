@@ -4,9 +4,11 @@ Se pone entre el navegador y Elasticsearch para que la API de búsqueda nunca qu
 cliente, y además sirve las sesiones anotadas del replay. Corre al lado de Elasticsearch en la red
 privada y se alcanza por el túnel SSH, nunca publicado.
 
-Lee y no escribe, con una sola excepción: el veredicto del analista sobre una decisión del motor,
-común o a ciegas, que va a su propio índice y nunca toca la telemetría ni la decisión. Está en
-`decisiones.py`.
+Sobre la telemetría y las decisiones solo lee. Escribe tres cosas, cada una en su propio índice: el
+veredicto del analista sobre una decisión del motor, común o a ciegas (`decisiones.py`), las cuentas
+del panel (`acceso.py`) y la auditoría de lo que hace cada una (`auditoria.py`).
+
+Toda ruta pide sesión salvo las de `acceso.PUBLICAS`, y cada una declara el rol mínimo que exige.
 
 En desarrollo se levanta con `uvicorn honeyml.api.main:app --reload --port 8000`.
 """
@@ -14,17 +16,22 @@ En desarrollo se levanta con `uvicorn honeyml.api.main:app --reload --port 8000`
 from __future__ import annotations
 
 import json
+import threading
+import time
 from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 from urllib.error import HTTPError, URLError
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from ..education import fingerprints, password_index
 from ..features import arquetipos
-from . import decisiones, offline, queries
+from . import acceso, auditoria, decisiones, exportar, offline, queries, registros, telemetria
+from .acceso import Sesion
+from .privacidad import sin_direcciones
 
 REPLAY_FILE = Path("data/processed/replay_sessions.json")
 
@@ -56,16 +63,23 @@ app = FastAPI(
     title="HoneyML API",
     description="Telemetría normalizada del honeypot para el panel educativo",
     version="0.1.0",
+    dependencies=[Depends(acceso.proteger)],
 )
 
-# Durante el desarrollo el panel corre en el servidor de Vite. PUT solo lo usan los veredictos del
-# analista.
+# Durante el desarrollo el panel corre en el servidor de Vite, que reenvía /api: el navegador ve un
+# solo origen y la cookie de sesión viaja sola. Esto cubre al panel abierto contra la API directa.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-    allow_methods=["GET", "PUT"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     allow_headers=["*"],
+    allow_credentials=True,
 )
+
+Invitado = Annotated[Sesion, Depends(acceso.exigir("invitado"))]
+Analista = Annotated[Sesion, Depends(acceso.exigir("analista"))]
+Admin = Annotated[Sesion, Depends(acceso.exigir("admin"))]
+Superadmin = Annotated[Sesion, Depends(acceso.exigir("superadmin"))]
 
 
 def _en_vivo[T](fetch: Callable[[], T]) -> T:
@@ -88,6 +102,14 @@ def _en_vivo[T](fetch: Callable[[], T]) -> T:
                 "respaldo congelado no las guarda."
             ),
         ) from exc
+
+
+def _tapar_si_invitado[T](sesion: Sesion, datos: T) -> T:
+    """El invitado ve las decisiones sin ninguna dirección: está para mirar el panel en una
+    demostración, y no necesita la del atacante para eso. Desde el analista para arriba se ven,
+    porque revisar una clasificación pide el evento como llegó."""
+    tapados: T = sin_direcciones(datos) if not sesion.puede("analista") else datos
+    return tapados
 
 
 @app.get("/api/health")
@@ -183,11 +205,31 @@ def get_hourly() -> list[dict[str, Any]]:
     return _live_or_frozen(queries.hourly, "hourly")
 
 
+# El panel vuelve a pedir el snapshot cada minuto para mostrar lo que llega, y en una demostración
+# puede haber varios teléfonos abiertos a la vez. La consulta recorre el corpus entero, así que
+# dentro de esta ventana todos reciben la misma respuesta.
+SNAPSHOT_VIGENCIA_S = 30.0
+_snapshot: dict[str, Any] = {"momento": 0.0, "datos": None}
+_snapshot_candado = threading.Lock()
+
+
+def _snapshot_reciente() -> dict[str, Any]:
+    with _snapshot_candado:
+        if (
+            _snapshot["datos"] is None
+            or time.monotonic() - _snapshot["momento"] > SNAPSHOT_VIGENCIA_S
+        ):
+            _snapshot["datos"] = queries.snapshot()
+            _snapshot["momento"] = time.monotonic()
+        datos: dict[str, Any] = _snapshot["datos"]
+        return datos
+
+
 @app.get("/api/snapshot")
 def get_snapshot() -> dict[str, Any]:
-    """Todo junto: un solo viaje para la carga inicial del panel."""
+    """Todo junto: un solo viaje para la carga del panel y para cada refresco."""
     try:
-        return queries.snapshot()
+        return _snapshot_reciente()
     except (URLError, ConnectionError, TimeoutError) as exc:
         frozen = offline.load()
         if frozen is None:
@@ -296,6 +338,7 @@ def get_resumen_de_decisiones() -> dict[str, Any]:
 
 @app.get("/api/decisiones")
 def get_decisiones(
+    sesion: Invitado,
     severidad: str | None = None,
     tactica: str | None = None,
     sensor: str | None = None,
@@ -308,22 +351,25 @@ def get_decisiones(
     """Las decisiones del motor, filtradas y de a páginas. `tactica=ninguna` trae las que no
     tienen, `orden=decision` las ordena por cuándo decidió el motor, para seguirlo en vivo, y
     `razonadas` deja solo las que pasaron por el modelo."""
-    return _en_vivo(
-        lambda: decisiones.listar(
-            severidad=severidad,
-            tactica=tactica,
-            sensor=sensor,
-            estado=estado,
-            desde=desde,
-            tamano=tamano,
-            orden=orden,
-            razonadas=razonadas,
-        )
+    return _tapar_si_invitado(
+        sesion,
+        _en_vivo(
+            lambda: decisiones.listar(
+                severidad=severidad,
+                tactica=tactica,
+                sensor=sensor,
+                estado=estado,
+                desde=desde,
+                tamano=tamano,
+                orden=orden,
+                razonadas=razonadas,
+            )
+        ),
     )
 
 
 @app.get("/api/decisiones/a-ciegas/siguiente")
-def get_siguiente_a_ciegas() -> dict[str, Any]:
+def get_siguiente_a_ciegas(sesion: Analista) -> dict[str, Any]:
     """La próxima conducta de la muestra para revisar a ciegas, sin la clasificación del motor."""
     try:
         return _en_vivo(decisiones.siguiente_a_ciegas)
@@ -332,34 +378,253 @@ def get_siguiente_a_ciegas() -> dict[str, Any]:
 
 
 @app.get("/api/decisiones/{doc_id}")
-def get_decision(doc_id: str) -> dict[str, Any]:
+def get_decision(doc_id: str, sesion: Invitado) -> dict[str, Any]:
     """Una decisión con su evento y el veredicto del analista, si lo hay."""
     encontrada = _en_vivo(lambda: decisiones.detalle(doc_id))
     if encontrada is None:
         raise HTTPException(status_code=404, detail="Ese evento no tiene decisión del motor.")
-    return encontrada
+    return _tapar_si_invitado(sesion, encontrada)
 
 
 @app.put("/api/decisiones/{doc_id}/revision")
-def put_revision(doc_id: str, veredicto: decisiones.Veredicto) -> dict[str, Any]:
-    """El veredicto del analista. Con el de a ciegas, son las únicas escrituras de la API."""
+def put_revision(doc_id: str, veredicto: decisiones.Veredicto, sesion: Analista) -> dict[str, Any]:
+    """El veredicto del analista, firmado con su cuenta y anotado en la auditoría."""
     try:
-        guardada = _en_vivo(lambda: decisiones.revisar(doc_id, veredicto))
+        guardada = _en_vivo(lambda: decisiones.revisar(doc_id, veredicto, usuario=sesion.usuario))
     except decisiones.SinClasificacionError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except decisiones.RevisadaACiegasError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if guardada is None:
         raise HTTPException(status_code=404, detail="Ese evento no tiene decisión del motor.")
+    auditoria.registrar(
+        sesion.usuario,
+        sesion.rol,
+        "veredicto",
+        objetivo=doc_id,
+        detalle={"veredicto": guardada["veredicto"]},
+    )
     return guardada
 
 
 @app.put("/api/decisiones/{doc_id}/revision-a-ciegas")
 def put_revision_a_ciegas(
-    doc_id: str, clasificacion: decisiones.ClasificacionACiegas
+    doc_id: str, clasificacion: decisiones.ClasificacionACiegas, sesion: Analista
 ) -> dict[str, Any]:
     """La clasificación elegida a ciegas; la respuesta trae la del motor para mostrarla después."""
-    guardada = _en_vivo(lambda: decisiones.revisar_a_ciegas(doc_id, clasificacion))
+    guardada = _en_vivo(
+        lambda: decisiones.revisar_a_ciegas(doc_id, clasificacion, usuario=sesion.usuario)
+    )
     if guardada is None:
         raise HTTPException(status_code=404, detail="Ese evento no tiene decisión del motor.")
+    auditoria.registrar(
+        sesion.usuario,
+        sesion.rol,
+        "revision_a_ciegas",
+        objetivo=doc_id,
+        detalle={"veredicto": guardada["veredicto"]},
+    )
     return guardada
+
+
+# La sesión
+
+
+def _abrir_sesion(respuesta: Response, cuenta: dict[str, Any]) -> dict[str, Any]:
+    # Sin `secure`: en la demostración el panel se sirve por HTTP en la red local. Lo que la cubre
+    # es que la red es propia y con clave; `samesite=strict` corta que otro sitio la use.
+    respuesta.set_cookie(
+        acceso.COOKIE,
+        acceso.firmar(cuenta["usuario"], cuenta["rol"], int(cuenta["sello"])),
+        max_age=acceso.DURACION_S,
+        httponly=True,
+        samesite="strict",
+        path="/api",
+    )
+    return {"usuario": cuenta["usuario"], "rol": cuenta["rol"]}
+
+
+@app.post("/api/sesion")
+def post_sesion(ingreso: acceso.Ingreso, respuesta: Response) -> dict[str, Any]:
+    """El ingreso. La respuesta no dice si falló el usuario o la contraseña."""
+    try:
+        cuenta = _en_vivo(lambda: acceso.ingresar(ingreso.usuario, ingreso.contrasena))
+    except acceso.CuentaTrabadaError as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
+    except acceso.IngresoRechazadoError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    return _abrir_sesion(respuesta, cuenta)
+
+
+@app.get("/api/sesion")
+def get_sesion(sesion: Invitado) -> dict[str, Any]:
+    """Quién está adentro: el panel lo pregunta al abrir para saber si mostrar el ingreso."""
+    return {"usuario": sesion.usuario, "rol": sesion.rol}
+
+
+@app.delete("/api/sesion")
+def delete_sesion(respuesta: Response, sesion: Invitado) -> dict[str, bool]:
+    auditoria.registrar(sesion.usuario, sesion.rol, "salida")
+    respuesta.delete_cookie(acceso.COOKIE, path="/api")
+    return {"ok": True}
+
+
+@app.put("/api/sesion/contrasena")
+def put_contrasena(
+    cambio: acceso.CambioPropio, respuesta: Response, sesion: Invitado
+) -> dict[str, Any]:
+    """Cambia la contraseña propia. Las demás sesiones de la cuenta quedan cerradas y esta sigue."""
+    try:
+        sello = _en_vivo(lambda: acceso.cambiar_propia(sesion, cambio))
+    except acceso.IngresoRechazadoError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return _abrir_sesion(respuesta, {"usuario": sesion.usuario, "rol": sesion.rol, "sello": sello})
+
+
+# Las cuentas
+
+
+@app.get("/api/usuarios")
+def get_usuarios(sesion: Admin) -> list[dict[str, Any]]:
+    """Las demás cuentas, cada una con si quien pregunta la puede administrar."""
+    return _en_vivo(lambda: acceso.listar(sesion))
+
+
+@app.post("/api/usuarios", status_code=201)
+def post_usuario(alta: acceso.Alta, sesion: Admin) -> dict[str, Any]:
+    try:
+        return _en_vivo(lambda: acceso.crear(alta, sesion))
+    except acceso.SinPermisoError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except acceso.YaExisteError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.patch("/api/usuarios/{nombre}")
+def patch_usuario(nombre: str, cambio: acceso.Cambio, sesion: Admin) -> dict[str, Any]:
+    try:
+        return _en_vivo(lambda: acceso.modificar(nombre, cambio, sesion))
+    except acceso.SinPermisoError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except acceso.NoExisteError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+# La auditoría y la telemetría en vivo
+
+
+@app.get("/api/auditoria")
+def get_auditoria(
+    sesion: Superadmin,
+    desde: int = 0,
+    tamano: int = 50,
+    accion: str | None = None,
+    usuario: str | None = None,
+) -> dict[str, Any]:
+    """Lo que hizo cada cuenta en el panel, de lo más nuevo a lo más viejo."""
+    return _en_vivo(
+        lambda: auditoria.listar(desde=desde, tamano=tamano, accion=accion, usuario=usuario)
+    )
+
+
+@app.get("/api/auditoria/servidor")
+def get_registros_del_servidor(sesion: Superadmin, cuantas: int = 150) -> dict[str, Any]:
+    """Los despliegues, el vigilante, la salud y el respaldo, como los escribe el servidor."""
+    return registros.ultimas(cuantas=min(max(cuantas, 1), 500))
+
+
+@app.get("/api/telemetria/en-vivo")
+def get_telemetria(
+    sesion: Superadmin, despues: str | None = None, tamano: int = 40
+) -> dict[str, Any]:
+    """Los eventos normalizados a medida que llegan, sin direcciones."""
+    return _en_vivo(lambda: telemetria.en_vivo(despues=despues, tamano=tamano))
+
+
+# Los reportes
+
+
+def _adjunto(contenido: str, nombre: str, extra: dict[str, str] | None = None) -> Response:
+    sello = datetime.now(UTC).strftime("%Y%m%d-%H%M")
+    return Response(
+        content=contenido.encode("utf-8"),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="honeyml-{nombre}-{sello}.csv"'}
+        | (extra or {}),
+    )
+
+
+@app.get("/api/exportar/decisiones.csv")
+def get_exportar_decisiones(
+    sesion: Invitado,
+    severidad: str | None = None,
+    tactica: str | None = None,
+    sensor: str | None = None,
+    estado: Literal["todas", "pendientes", "revisadas"] = "todas",
+) -> Response:
+    """Las decisiones del filtro, hasta diez mil. `X-Total` dice cuántas había en el filtro."""
+    datos = _en_vivo(
+        lambda: decisiones.para_exportar(
+            severidad=severidad, tactica=tactica, sensor=sensor, estado=estado
+        )
+    )
+    filtro = {
+        k: v for k, v in {"severidad": severidad, "tactica": tactica, "sensor": sensor}.items() if v
+    }
+    auditoria.registrar(
+        sesion.usuario,
+        sesion.rol,
+        "exportacion",
+        objetivo="decisiones",
+        detalle={**filtro, "estado": estado, "filas": len(datos["items"])},
+    )
+    return _adjunto(
+        exportar.decisiones_csv(datos["items"]),
+        "decisiones",
+        {"X-Total": str(datos["total"]), "Access-Control-Expose-Headers": "X-Total"},
+    )
+
+
+@app.get("/api/exportar/revisiones.csv")
+def get_exportar_revisiones(sesion: Invitado) -> Response:
+    """Todos los veredictos del analista, comunes y a ciegas, con lo que había dicho el motor."""
+    filas = _en_vivo(decisiones.revisiones)
+    auditoria.registrar(
+        sesion.usuario,
+        sesion.rol,
+        "exportacion",
+        objetivo="revisiones",
+        detalle={"filas": len(filas)},
+    )
+    return _adjunto(exportar.revisiones_csv(filas), "revisiones")
+
+
+@app.post("/api/reporte")
+def post_reporte(sesion: Invitado) -> dict[str, bool]:
+    """El reporte imprimible lo arma el navegador; esto solo lo deja anotado en la auditoría."""
+    auditoria.registrar(sesion.usuario, sesion.rol, "exportacion", objetivo="reporte")
+    return {"ok": True}
+
+
+# Cuándo se calculó cada artefacto
+
+ARTEFACTOS = {
+    "huellas": Path("data/processed/fingerprints.json"),
+    "arquetipos": Path("data/processed/arquetipos.json"),
+    "sesiones": REPLAY_FILE,
+    "contrasenas": Path("data/processed/password_index.json"),
+}
+
+
+@app.get("/api/artefactos")
+def get_artefactos() -> dict[str, str | None]:
+    """El momento en que se generó cada artefacto por lotes. Esas secciones no son en vivo, y el
+    panel lo dice con esta fecha. Es la del archivo: la publicación la conserva al copiarlo."""
+    return {
+        nombre: (
+            datetime.fromtimestamp(ruta.stat().st_mtime, UTC).isoformat(timespec="seconds")
+            if ruta.exists()
+            else None
+        )
+        for nombre, ruta in ARTEFACTOS.items()
+    }

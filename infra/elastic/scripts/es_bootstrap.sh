@@ -28,9 +28,9 @@ echo "==> Plantilla aplicada. Verificación:"
 curl -sf "${ES_URL}/_index_template/honeypot-ecs" \
   | python3 -c "import sys,json; t=json.load(sys.stdin)['index_templates'][0]; print('    nombre:', t['name']); print('    patrones:', t['index_template']['index_patterns']); print('    prioridad:', t['index_template']['priority'])"
 
-# Las decisiones del motor y los veredictos del analista. Van en índices propios con mapeo
-# estricto, uno por tipo de documento, y se aplican igual.
-for nombre in honeyml-decisiones honeyml-revisiones; do
+# Las decisiones del motor, los veredictos del analista, las cuentas del panel y su auditoría. Van
+# en índices propios con mapeo estricto, uno por tipo de documento, y se aplican igual.
+for nombre in honeyml-decisiones honeyml-revisiones honeyml-usuarios honeyml-auditoria; do
   plantilla="${SCRIPT_DIR}/../templates/${nombre}-template.json"
   echo "==> Aplicando plantilla componible ${nombre} ..."
   curl -sf -X PUT "${ES_URL}/_index_template/${nombre}" \
