@@ -35,9 +35,9 @@ filebeat.inputs:
     enabled: true
     paths:
       - /logs/dionaea/dionaea.json
-      # logrotate rota este archivo a diario; ver la nota en filebeat.yml
+      # logrotate rota este archivo; ver la nota en filebeat.yml
       - /logs/dionaea/dionaea.json.[0-9]*
-    exclude_files: ['\.gz$']
+    prospector.scanner.exclude_files: ['\.gz$']
     parsers:
       - ndjson:
           target: ""
