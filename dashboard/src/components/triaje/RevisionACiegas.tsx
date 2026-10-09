@@ -5,7 +5,7 @@ import { fechaHora, n } from '../../lib/format';
 import { useI18n } from '../../lib/i18n';
 import { Modal } from '../Superpuesto';
 import { tacticColor } from '../sections/SessionReplay';
-import { ChipSeveridad } from './comunes';
+import { ChipSeveridad, NotaMensajeOculto, sinMensajeRepetido } from './comunes';
 import { SelectorSeveridad, SelectorTactica } from './Selectores';
 
 /**
@@ -209,6 +209,7 @@ function Evento({ item }: { item: ItemACiegas }) {
   const b = t.triage.blind;
   const e = item.evento!;
   const datos = [e.sensor, e.categoria, e.accion, e.resultado, e.protocolo].filter(Boolean);
+  const atributos = item.atributos ? sinMensajeRepetido(item.atributos) : null;
   return (
     <div className="rounded-xl bg-white/[0.03] ring-1 ring-white/[0.07] p-3.5 flex flex-col gap-2.5">
       <div className="rotulo">{b.event}</div>
@@ -236,17 +237,20 @@ function Evento({ item }: { item: ItemACiegas }) {
           <ChevronDown className="w-3.5 h-3.5 text-white/35 transition-transform group-open:rotate-180" />
         </summary>
         <div className="px-3 pb-3">
-          {item.atributos ? (
-            <dl className="grid grid-cols-[minmax(0,40%)_minmax(0,1fr)] gap-x-3 gap-y-1">
-              {Object.entries(item.atributos).map(([k, v]) => (
-                <div key={k} className="contents">
-                  <dt className="font-data text-[10px] text-white/40 truncate">{k}</dt>
-                  <dd className="font-data text-[10px] text-white/75 break-all">
-                    {Array.isArray(v) ? v.join(', ') : typeof v === 'number' ? n(v) : String(v)}
-                  </dd>
-                </div>
-              ))}
-            </dl>
+          {atributos ? (
+            <>
+              <dl className="grid grid-cols-[minmax(0,40%)_minmax(0,1fr)] gap-x-3 gap-y-1">
+                {Object.entries(atributos.atributos).map(([k, v]) => (
+                  <div key={k} className="contents">
+                    <dt className="font-data text-[10px] text-white/40 truncate">{k}</dt>
+                    <dd className="font-data text-[10px] text-white/75 break-all">
+                      {Array.isArray(v) ? v.join(', ') : typeof v === 'number' ? n(v) : String(v)}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+              {atributos.oculto && <NotaMensajeOculto />}
+            </>
           ) : (
             <p className="text-[11px] text-white/50">{b.noEvent}</p>
           )}

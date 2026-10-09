@@ -490,6 +490,8 @@ const es = {
     pendingNone: (r: string) => `el motor cerró todo solo; ${r} con veredicto`,
     inbox: 'Decisiones',
     live: 'en vivo',
+    messageHidden:
+      'message no se muestra: repite process.command_line con el prefijo que le pone Cowrie.',
     newOnes: (c: number) => (c === 1 ? '1 nueva' : `${c} nuevas`),
     allTactics: 'Todas las tácticas',
     allSensors: 'Los dos sensores',
@@ -1500,6 +1502,8 @@ const en: typeof es = {
     pendingNone: (r: string) => `the engine settled everything on its own; ${r} with a verdict`,
     inbox: 'Decisions',
     live: 'live',
+    messageHidden:
+      'message is not shown: it repeats process.command_line with the prefix Cowrie adds.',
     newOnes: (c: number) => (c === 1 ? '1 new' : `${c} new`),
     allTactics: 'All tactics',
     allSensors: 'Both sensors',

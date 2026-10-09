@@ -4,7 +4,7 @@ import type { DetalleDecision, Revision } from '../../lib/api';
 import { dec, duracion, fechaHora, n } from '../../lib/format';
 import { useI18n } from '../../lib/i18n';
 import { tacticColor } from '../sections/SessionReplay';
-import { ChipSeveridad, colorDeSeveridad } from './comunes';
+import { ChipSeveridad, colorDeSeveridad, NotaMensajeOculto, sinMensajeRepetido } from './comunes';
 
 function Seccion({ titulo, children }: { titulo: string; children: ReactNode }) {
   return (
@@ -89,6 +89,7 @@ export default function Detalle({
       : { icono: CircleDashed, color: 'var(--ghost-slate)', texto: d.stateEngine };
 
   const momento = doc.evento.momento ? new Date(doc.evento.momento).getTime() : null;
+  const atributos = detalle.evento ? sinMensajeRepetido(detalle.evento) : null;
   const decidida = new Date(doc['@timestamp']).getTime();
   const demora = momento && !ciclo.retriaje ? (decidida - momento) / 1000 : null;
 
@@ -254,17 +255,20 @@ export default function Detalle({
         </Desplegable>
 
         <Desplegable titulo={d.attributes}>
-          {detalle.evento ? (
-            <dl className="grid grid-cols-[minmax(0,40%)_minmax(0,1fr)] gap-x-3 gap-y-1">
-              {Object.entries(detalle.evento).map(([k, v]) => (
-                <div key={k} className="contents">
-                  <dt className="font-data text-[10px] text-white/40 truncate">{k}</dt>
-                  <dd className="font-data text-[10px] text-white/75 break-all">
-                    {Array.isArray(v) ? v.join(', ') : String(v)}
-                  </dd>
-                </div>
-              ))}
-            </dl>
+          {atributos ? (
+            <>
+              <dl className="grid grid-cols-[minmax(0,40%)_minmax(0,1fr)] gap-x-3 gap-y-1">
+                {Object.entries(atributos.atributos).map(([k, v]) => (
+                  <div key={k} className="contents">
+                    <dt className="font-data text-[10px] text-white/40 truncate">{k}</dt>
+                    <dd className="font-data text-[10px] text-white/75 break-all">
+                      {Array.isArray(v) ? v.join(', ') : String(v)}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+              {atributos.oculto && <NotaMensajeOculto />}
+            </>
           ) : (
             <p className="text-[11px] text-white/50">{d.noEvent}</p>
           )}

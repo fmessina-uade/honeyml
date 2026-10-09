@@ -21,6 +21,33 @@ export const colorDeSeveridad = (s: string | null | undefined) =>
 // Cómo pide la API las decisiones sin táctica, en los filtros.
 export const SIN_TACTICA = 'ninguna';
 
+// Cowrie escribe el comando en `message` con un prefijo según el tipo de evento, y el pipeline lo
+// deja limpio en `process.command_line`. Cuando uno es el otro más el prefijo, mostrar los dos solo
+// repite el renglón más largo de la lista. El dato sigue llegando completo desde la API.
+const PREFIJO_DE_COWRIE = /^(CMD: |Command (not )?found: )/;
+
+export function sinMensajeRepetido<T>(atributos: Record<string, T>): {
+  atributos: Record<string, T>;
+  oculto: boolean;
+} {
+  const comando = atributos['process.command_line'];
+  const mensaje = atributos['message'];
+  const repite =
+    typeof comando === 'string' &&
+    typeof mensaje === 'string' &&
+    mensaje.replace(PREFIJO_DE_COWRIE, '') === comando;
+  if (!repite) return { atributos, oculto: false };
+  return {
+    atributos: Object.fromEntries(Object.entries(atributos).filter(([k]) => k !== 'message')),
+    oculto: true,
+  };
+}
+
+export function NotaMensajeOculto() {
+  const { t } = useI18n();
+  return <p className="font-data text-[10px] text-white/40 mt-2">{t.triage.messageHidden}</p>;
+}
+
 export function ChipSeveridad({
   severidad,
   grande = false,
