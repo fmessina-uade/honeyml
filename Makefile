@@ -1,5 +1,5 @@
 .PHONY: help up down logs status ps clean deploy-vps dev-up dev-down dev-logs validate lint test \
-        test-integration consumer triaje retriaje grafo arquetipos modelo evaluacion comparacion clasificar muestra \
+        test-integration consumer triaje retriaje grafo arquetipos uwf-verificar modelo evaluacion comparacion clasificar muestra procedencia \
         api dash demo replays \
         elastic-up elastic-down elastic-logs elastic-dev-up elastic-dev-down elastic-dev-logs \
         es-bootstrap validate-indexing pull-logs \
@@ -39,6 +39,7 @@ help:
 	@echo "    make elastic-up       Levantar el stack en el VPS (producción)"
 	@echo ""
 	@echo "  Clasificador supervisado (conjunto de referencia UWF-ZeekData24):"
+	@echo "    make uwf-verificar  Comparar la copia local con la de referencia"
 	@echo "    make modelo      Reentrenar y exportar el modelo final con su tarjeta"
 	@echo "    make evaluacion  Las cuatro mediciones del modelo"
 	@echo "    make comparacion Las cuatro familias comparadas"
@@ -59,6 +60,7 @@ help:
 	@echo "    make deploy-vps  Llevar el último commit al VPS (SECO=1 muestra qué cambiaría)"
 	@echo "    make analisis-up Levantar el motor de triaje y la API en contenedores"
 	@echo "    make muestra     Muestra para la revisión a ciegas (en el servidor)"
+	@echo "    make procedencia De dónde viene cada evento del corpus (en el servidor)"
 	@echo "    make publicar-artefactos  Subir los artefactos derivados al VPS"
 	@echo "    make tunel     La API del VPS en esta máquina, por túnel SSH"
 	@echo "    make respaldar-decisiones  Traer los volcados de decisiones del VPS"
@@ -389,6 +391,11 @@ grafo:
 severidad:
 	@./.venv/bin/python -m honeyml.agent.severidad
 
+# Antes de reentrenar: dice si la copia local de UWF-ZeekData24 es la misma con la que se entrenó el
+# modelo informado, semana por semana.
+uwf-verificar:
+	@./.venv/bin/python -m honeyml.eda.uwf_loader --verificar
+
 # Entrena el clasificador final, lo persiste y calcula el ranking por permutación.
 # Tarda unos dos minutos: la parte lenta son las probabilidades fuera de muestra del umbral.
 modelo:
@@ -414,6 +421,15 @@ muestra:
 		--network host --memory 1g --user 0 -e ES_URL=http://127.0.0.1:9200 \
 		-v $(CURDIR)/data/processed:/app/data/processed honeyml-analisis \
 		python -m honeyml.medicion.muestra $(if $(SECO),--seco,) $(if $(REEMPLAZAR),--reemplazar,)
+
+# De dónde viene cada evento del corpus: direcciones públicas, loopback, redes privadas o ninguna,
+# con el conjunto de datos y los días de cada grupo. Solo lee y no imprime direcciones. Corre en el
+# servidor, igual que la muestra.
+#   sudo make procedencia
+procedencia:
+	@docker run --rm --name honeyml-procedencia-no-modificar --label honeyml.aviso="no modificar" \
+		--network host --memory 256m -e ES_URL=http://127.0.0.1:9200 honeyml-analisis \
+		python -m honeyml.medicion.procedencia
 
 # La comparación de las cuatro familias de modelos, ordenada por F1 macro. Imprime la última
 # guardada; con REENTRENAR=1 vuelve a entrenarlas, que tarda unos seis minutos y la reescribe.

@@ -57,6 +57,7 @@ from sklearn.metrics import classification_report, f1_score
 from sklearn.model_selection import StratifiedKFold, cross_val_predict
 from sklearn.pipeline import Pipeline
 
+from ..eda.uwf_loader import verificar
 from .uwf_comparison import RANDOM_STATE, WEAK_CLASS, _preprocessor, cargar_y_partir
 from .uwf_selection import CATEGORICAL, NUMERIC
 from .uwf_tuning import BASE, _modelo
@@ -353,6 +354,7 @@ def main() -> None:
             "reporte": reporte,
         },
         "datos": {
+            "copia_de_referencia": not verificar(),
             "n_entrenamiento": int(len(x_tr)),
             "n_prueba": int(len(x_te)),
             "casos_clase_debil_en_prueba": int((y_te == WEAK_CLASS).sum()),
