@@ -19,6 +19,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
+from .. import redes
+
 PARQUET = Path("data/processed/honeypot_events.parquet")
 FIG_DIR = Path("reports/figures")
 
@@ -40,9 +42,6 @@ STAGE_BY_ACTION = {
 }
 
 
-LOCAL_IP = "127.0.0.1"  # los healthchecks del propio contenedor, no tráfico de atacantes
-
-
 def load() -> pd.DataFrame:
     if not PARQUET.exists():
         raise SystemExit(f"Falta {PARQUET}. Extraé primero con es_loader (ES levantado).")
@@ -56,10 +55,11 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
     print("=" * 70)
     print(f"Eventos crudos:             {len(df):,}")
 
-    # 1. healthchecks locales: el contenedor hablándose a sí mismo, no son ataques
-    hc = (df["source.ip"] == LOCAL_IP).sum()
-    df = df[df["source.ip"] != LOCAL_IP].copy()
-    print(f"Healthchecks 127.0.0.1:     -{hc:,} eliminados")
+    # 1. orígenes internos (healthcheck de los contenedores y pruebas propias): no son ataques
+    externa = redes.mascara_externa(df["source.ip"])
+    internos = int((~externa).sum())
+    df = df[externa].copy()
+    print(f"Orígenes internos:          -{internos:,} eliminados")
 
     # 2. duplicados exactos que hayan quedado; el pipeline ya deduplica por document_id
     dup = df.duplicated().sum()

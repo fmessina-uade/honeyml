@@ -26,6 +26,8 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from .. import redes
+
 ES_URL = os.environ.get("ES_URL", "http://localhost:9200")
 INDEX = "honeypot-*"
 OUT_FILE = Path("data/processed/password_index.json")
@@ -54,7 +56,7 @@ def _pagina(es_url: str, despues: dict[str, Any] | None) -> dict[str, Any]:
         compuesto["after"] = despues
     body = {
         "size": 0,
-        "query": {"bool": {"must_not": [{"term": {"source.ip": "127.0.0.1"}}]}},
+        "query": redes.EXTERNA,
         "aggs": {"p": {"composite": compuesto}},
     }
     req = urllib.request.Request(

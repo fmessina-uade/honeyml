@@ -13,6 +13,8 @@ from typing import Any
 
 import pandas as pd
 
+from .. import redes
+
 # Los campos de Cowrie que nos interesan; el resto se descarta para no cargar memoria de más.
 FIELDS = [
     "eventid",
@@ -43,8 +45,8 @@ def load_cowrie(
     ----------
     logs_dir : el directorio donde están los cowrie.json*.
     pattern : qué archivos leer.
-    drop_local : si es True, descarta los eventos de 127.0.0.1, que son los healthchecks del
-        propio contenedor y no ataques.
+    drop_local : si es True, descarta los eventos de direcciones internas (los healthcheck del
+        contenedor y las pruebas propias), que no son ataques.
     """
     logs_dir = Path(logs_dir)
     rows: list[dict[str, Any]] = []
@@ -63,7 +65,7 @@ def load_cowrie(
     df = pd.DataFrame(rows, columns=FIELDS)
     df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce", utc=True)
     if drop_local:
-        df = df[df["src_ip"] != "127.0.0.1"].reset_index(drop=True)
+        df = df[redes.mascara_externa(df["src_ip"])].reset_index(drop=True)
     return df
 
 

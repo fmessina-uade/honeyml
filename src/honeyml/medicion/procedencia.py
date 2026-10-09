@@ -15,22 +15,12 @@ import json
 import urllib.request
 from typing import Any
 
+from .. import redes
 from ..api import queries
 
-PRIVADAS = [
-    "10.0.0.0/8",
-    "172.16.0.0/12",
-    "192.168.0.0/16",
-    "100.64.0.0/10",
-    "169.254.0.0/16",
-    "fc00::/7",
-    "fe80::/10",
-]
-LOOPBACK = ["127.0.0.0/8", "::1/128"]
-
 GRUPOS: dict[str, dict[str, Any]] = {
-    "loopback": {"bool": {"should": [{"term": {"source.ip": r}} for r in LOOPBACK]}},
-    "privada": {"bool": {"should": [{"term": {"source.ip": r}} for r in PRIVADAS]}},
+    "loopback": {"bool": {"should": [{"term": {"source.ip": r}} for r in redes.LOOPBACK]}},
+    "privada": {"bool": {"should": [{"term": {"source.ip": r}} for r in redes.PRIVADAS]}},
     "sin_direccion": {"bool": {"must_not": [{"exists": {"field": "source.ip"}}]}},
 }
 

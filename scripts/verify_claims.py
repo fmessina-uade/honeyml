@@ -14,8 +14,10 @@ import json
 import urllib.request
 from typing import Any
 
+from honeyml import redes
+
 ES = "http://localhost:9200"
-NOT_LOCAL = {"bool": {"must_not": [{"term": {"source.ip": "127.0.0.1"}}]}}
+NOT_LOCAL = redes.EXTERNA
 
 
 def search(index: str, body: dict[str, Any]) -> dict[str, Any]:

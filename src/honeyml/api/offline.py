@@ -29,6 +29,7 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from .. import redes
 from . import queries
 
 OUT_FILE = Path("data/processed/snapshot.json")
@@ -57,9 +58,9 @@ def construir_serie_horaria() -> list[dict[str, Any]]:
     Se calcula acá y no con una consulta más al índice porque la tabla ya tiene lo necesario y el
     respaldo tiene que poder regenerarse sin levantar el stack.
 
-    El filtro de la dirección local es la única sutileza, y no es opcional: la tabla se carga con
-    `match_all` mientras que todas las consultas del panel excluyen el healthcheck del contenedor.
-    Sin él las dos series no cuadran y el gráfico se contradice al cambiar de intervalo.
+    El filtro de los orígenes internos es la única sutileza, y no es opcional: la tabla se carga con
+    `match_all` mientras que todas las consultas del panel excluyen los healthcheck y las pruebas
+    propias. Sin él las dos series no cuadran y el gráfico se contradice al cambiar de intervalo.
     """
     # Import local: la API necesita pandas para armar el archivo, no para leerlo. Al nivel del
     # módulo, levantar la API cargaría pandas sin usarlo nunca.
@@ -69,7 +70,7 @@ def construir_serie_horaria() -> list[dict[str, Any]]:
         raise FileNotFoundError(f"Falta {TABLA_CONSOLIDADA}. Generala con: make consolidate")
 
     df = pd.read_parquet(TABLA_CONSOLIDADA, columns=["@timestamp", "honeypot", "source.ip"])
-    df = df[df["source.ip"] != queries.LOCAL_IP]
+    df = df[redes.mascara_externa(df["source.ip"])]
 
     # Misma etiqueta que produce Elasticsearch para el intervalo horario: "AAAA-MM-DD HH". El panel
     # parte por el espacio para separar el día de la hora, así que el formato es parte del contrato.

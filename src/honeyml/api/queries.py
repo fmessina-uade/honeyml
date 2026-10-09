@@ -12,14 +12,16 @@ import os
 import urllib.request
 from typing import Any
 
+from .. import redes
+
 # En desarrollo Elasticsearch escucha en loopback. En el servidor, la API y el motor corren en
 # contenedores y lo alcanzan por el nombre del servicio dentro de la red de análisis.
 ES_URL = os.environ.get("ES_URL", "http://localhost:9200")
 INDEX = "honeypot-*"
-LOCAL_IP = "127.0.0.1"
 
-# todas las consultas dejan afuera los healthchecks del propio contenedor
-NOT_LOCAL: dict[str, Any] = {"bool": {"must_not": [{"term": {"source.ip": LOCAL_IP}}]}}
+# todas las consultas dejan afuera lo que no viene de terceros: los healthcheck de los contenedores
+# y las pruebas propias desde redes privadas
+NOT_LOCAL: dict[str, Any] = redes.EXTERNA
 
 
 def _search(body: dict[str, Any], es_url: str = ES_URL, index: str = INDEX) -> dict[str, Any]:
@@ -125,8 +127,8 @@ def _filtrado(
 ) -> dict[str, Any]:
     """La consulta base más los filtros que haya pasado quien llama.
 
-    Se arma acá y no en cada consulta para que todas las vistas filtradas dejen afuera los
-    healthchecks del contenedor de la misma forma. Sin filtros devuelve exactamente la consulta sin
+    Se arma acá y no en cada consulta para que todas las vistas filtradas dejen afuera los orígenes
+    internos de la misma forma. Sin filtros devuelve exactamente la consulta sin
     filtrar, así que sumarle filtros a una vista no puede cambiar lo que devuelve por defecto.
     """
     must: list[dict[str, Any]] = []
@@ -142,7 +144,7 @@ def _filtrado(
 
     if not must:
         return NOT_LOCAL
-    return {"bool": {"must": must, "must_not": [{"term": {"source.ip": LOCAL_IP}}]}}
+    return {"bool": {"must": must, "must_not": redes.TERMINOS}}
 
 
 # Intervalos aceptados. Se validan contra esta lista y no se pasan tal cual a Elasticsearch: el
@@ -215,7 +217,7 @@ def protocol_detail(es_url: str = ES_URL) -> list[dict[str, Any]]:
         "query": {
             "bool": {
                 "must": [{"term": {"honeypot": "dionaea"}}],
-                "must_not": [{"term": {"source.ip": LOCAL_IP}}],
+                "must_not": redes.TERMINOS,
             }
         },
         "aggs": {

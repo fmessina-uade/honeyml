@@ -21,9 +21,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from .. import redes
+
 PARQUET_IN = Path("data/processed/honeypot_events.parquet")
 PARQUET_OUT = Path("data/processed/features_por_ip.parquet")
-LOCAL_IP = "127.0.0.1"
 
 # herramientas típicas de post explotación; verlas es una señal de intención
 COMMAND_KEYWORDS = [
@@ -67,7 +68,7 @@ MIN_SPAN_H = 1 / 60  # piso de un minuto para la tasa de eventos por hora
 
 
 def _prepare(df: pd.DataFrame) -> pd.DataFrame:
-    df = df[df["source.ip"] != LOCAL_IP].dropna(subset=["source.ip"]).copy()
+    df = df[redes.mascara_externa(df["source.ip"])].dropna(subset=["source.ip"]).copy()
     df["@timestamp"] = pd.to_datetime(df["@timestamp"], utc=True)
     df["is_login"] = df["event.action"].eq("login")
     df["is_fail"] = df["is_login"] & df["event.outcome"].eq("failure")

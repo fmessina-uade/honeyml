@@ -16,9 +16,10 @@ import pandas as pd
 from scipy.sparse import csr_matrix
 from sklearn.feature_extraction.text import TfidfVectorizer
 
+from .. import redes
+
 PARQUET_IN = Path("data/processed/honeypot_events.parquet")
 MATRIX_OUT = Path("data/processed/command_tfidf.parquet")
-LOCAL_IP = "127.0.0.1"
 
 
 def _tokenizer(text: str) -> list[str]:
@@ -38,7 +39,8 @@ def commands_by_ip(df: pd.DataFrame) -> pd.Series:
     "Command not found: ..." que ensuciaría el vocabulario.
     """
     mask = df["event.action"].eq("command-input")
-    cmds = df.loc[mask & (df["source.ip"] != LOCAL_IP), ["source.ip", "process.command_line"]]
+    externa = redes.mascara_externa(df["source.ip"])
+    cmds = df.loc[mask & externa, ["source.ip", "process.command_line"]]
     cmds = cmds.dropna()
     return cmds.groupby("source.ip")["process.command_line"].apply(lambda s: " ".join(s))
 

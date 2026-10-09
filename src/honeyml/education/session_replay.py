@@ -20,11 +20,11 @@ import re
 from pathlib import Path
 from typing import Any
 
+from .. import redes
 from .annotations import annotate
 
 LOGS_DIR = Path("data/logs/cowrie")
 OUT_FILE = Path("data/processed/replay_sessions.json")
-LOCAL_IP = "127.0.0.1"
 
 # Comandos que no le aportan nada a quien lee (líneas vacías que manda el cliente al conectar).
 MIN_COMMAND_LEN = 2
@@ -72,7 +72,7 @@ def _collect(logs_dir: Path) -> dict[str, dict[str, Any]]:
                     continue
                 sid = event.get("session")
                 ip = event.get("src_ip", "")
-                if not sid or ip == LOCAL_IP:
+                if not sid or redes.es_interna(ip):
                     continue
 
                 s = sessions.setdefault(

@@ -114,25 +114,29 @@ def test_sin_respaldo_no_hay_nada_que_responder(
 
 
 # Construcción de la serie horaria
-def test_la_serie_horaria_excluye_el_trafico_local(
+def test_la_serie_horaria_excluye_los_origenes_internos(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """Sin este filtro la serie horaria y la diaria no cuadran, y el gráfico se contradice.
 
-    La tabla consolidada se carga con `match_all` y las consultas del panel excluyen el healthcheck
-    del contenedor. Sobre el corpus real la diferencia son 32.732 eventos.
+    La tabla consolidada se carga con `match_all` y las consultas del panel excluyen los healthcheck
+    de los contenedores y las pruebas propias desde redes privadas.
     """
     pd = pytest.importorskip("pandas")
-    from honeyml.api.queries import LOCAL_IP
 
     tabla = tmp_path / "eventos.parquet"
     pd.DataFrame(
         {
             "@timestamp": pd.to_datetime(
-                ["2026-08-25T14:10:00Z", "2026-08-25T14:40:00Z", "2026-08-25T14:50:00Z"]
+                [
+                    "2026-08-25T14:10:00Z",
+                    "2026-08-25T14:40:00Z",
+                    "2026-08-25T14:50:00Z",
+                    "2026-08-25T14:55:00Z",
+                ]
             ),
-            "honeypot": ["cowrie", "dionaea", "cowrie"],
-            "source.ip": ["203.0.113.7", "203.0.113.8", LOCAL_IP],
+            "honeypot": ["cowrie", "dionaea", "cowrie", "dionaea"],
+            "source.ip": ["203.0.113.7", "203.0.113.8", "127.0.0.1", "172.17.0.1"],
         }
     ).to_parquet(tabla)
     monkeypatch.setattr(offline, "TABLA_CONSOLIDADA", tabla)

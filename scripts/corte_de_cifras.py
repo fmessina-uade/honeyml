@@ -20,6 +20,7 @@ from typing import Any
 
 import redis
 
+from honeyml import redes
 from honeyml.api import decisiones, queries
 
 PROCESADOS = Path("data/processed")
@@ -122,7 +123,7 @@ def credenciales() -> dict[str, Any]:
             "query": {
                 "bool": {
                     "must": [{"exists": {"field": "cowrie.password"}}],
-                    "must_not": [{"term": {"source.ip": queries.LOCAL_IP}}],
+                    "must_not": redes.TERMINOS,
                 }
             }
         },
