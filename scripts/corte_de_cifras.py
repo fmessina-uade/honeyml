@@ -6,10 +6,16 @@ también los artefactos derivados de data/processed y el repertorio del bus. Esc
 salida estándar.
 
     python scripts/corte_de_cifras.py > corte.json
+    python scripts/corte_de_cifras.py --hasta 2026-10-03T22:00:59Z > corte_recontado.json
+
+Con `--hasta`, la telemetría se cuenta solo hasta ese instante, para recontar un corte ya publicado
+con el código actual. El motor queda afuera: sus decisiones y el bus no se pueden llevar a un
+momento pasado.
 """
 
 from __future__ import annotations
 
+import argparse
 import datetime
 import json
 import sys
@@ -28,6 +34,10 @@ PROCESADOS = Path("data/processed")
 # Un día cuenta como captura efectiva desde este volumen. Por debajo, el sensor estaba caído y solo
 # registró algún evento suelto al volver.
 CAPTURA_EFECTIVA = 10
+
+# El filtro del instante tope, vacío sin `--hasta`. Lo usan los conteos que este script arma por su
+# cuenta; las consultas del panel lo reciben con `queries.fijar_tope`.
+TOPE: list[dict[str, Any]] = []
 
 
 def _es(path: str, body: dict[str, Any] | None = None) -> Any:
@@ -55,7 +65,7 @@ def _artefacto(nombre: str) -> Any:
 
 def telemetria() -> dict[str, Any]:
     ov = queries.overview()
-    todos = _es("/honeypot-*/_count")["count"]
+    todos = _es("/honeypot-*/_count", {"query": {"bool": {"filter": TOPE}}})["count"]
     indices = _es("/_cat/indices/honeypot-*?format=json&bytes=b")
     diario = queries.timeline(interval="day")
     con_captura = [d for d in diario if d["count"] > 0]
@@ -124,6 +134,7 @@ def credenciales() -> dict[str, Any]:
                 "bool": {
                     "must": [{"exists": {"field": "cowrie.password"}}],
                     "must_not": redes.TERMINOS,
+                    "filter": TOPE,
                 }
             }
         },
@@ -297,10 +308,18 @@ def motor() -> dict[str, Any]:
 
 
 def main() -> int:
+    ap = argparse.ArgumentParser(description="Las cifras publicadas, tomadas en un solo momento.")
+    ap.add_argument("--hasta", help="cuenta la telemetría solo hasta este instante, en ISO 8601")
+    args = ap.parse_args()
+    if args.hasta:
+        TOPE.append({"range": {"@timestamp": {"lte": args.hasta}}})
+        queries.fijar_tope(args.hasta)
+
     inicio = datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds")
     t = telemetria()
     corte = {
         "inicio": inicio,
+        "hasta": args.hasta,
         "telemetria": {k: v for k, v in t.items() if k != "diario"},
         "continuidad": continuidad(t["diario"]),
         "protocolos": protocolos(),
@@ -311,7 +330,7 @@ def main() -> int:
         "ritmo": ritmo(),
         "etapas": etapas(t["resumen"]["events"]),
         "sesiones": sesiones(),
-        "motor": motor(),
+        "motor": None if args.hasta else motor(),
         "fin": datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds"),
     }
     json.dump(corte, sys.stdout, ensure_ascii=False, indent=2)

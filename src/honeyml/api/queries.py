@@ -23,6 +23,19 @@ INDEX = "honeypot-*"
 # y las pruebas propias desde redes privadas
 NOT_LOCAL: dict[str, Any] = redes.EXTERNA
 
+# Un instante tope opcional, para recontar un corte ya publicado con el mismo código que usa el
+# panel. La API nunca lo fija: lo usa `scripts/corte_de_cifras.py --hasta`.
+_TOPE: list[dict[str, Any]] = []
+
+
+def fijar_tope(instante: str | None) -> None:
+    """Desde acá, todas las consultas cuentan solo hasta `instante`; con None, sin tope."""
+    global NOT_LOCAL
+    _TOPE[:] = [{"range": {"@timestamp": {"lte": instante}}}] if instante else []
+    NOT_LOCAL = (
+        {"bool": {"must_not": redes.TERMINOS, "filter": list(_TOPE)}} if instante else redes.EXTERNA
+    )
+
 
 def _search(body: dict[str, Any], es_url: str = ES_URL, index: str = INDEX) -> dict[str, Any]:
     req = urllib.request.Request(
@@ -128,8 +141,8 @@ def _filtrado(
     """La consulta base más los filtros que haya pasado quien llama.
 
     Se arma acá y no en cada consulta para que todas las vistas filtradas dejen afuera los orígenes
-    internos de la misma forma. Sin filtros devuelve exactamente la consulta sin
-    filtrar, así que sumarle filtros a una vista no puede cambiar lo que devuelve por defecto.
+    internos de la misma forma. Sin filtros devuelve exactamente la consulta sin filtrar, así que
+    sumarle filtros a una vista no puede cambiar lo que devuelve por defecto.
     """
     must: list[dict[str, Any]] = []
     if sensor:
@@ -144,7 +157,7 @@ def _filtrado(
 
     if not must:
         return NOT_LOCAL
-    return {"bool": {"must": must, "must_not": redes.TERMINOS}}
+    return {"bool": {"must": must + _TOPE, "must_not": redes.TERMINOS}}
 
 
 # Intervalos aceptados. Se validan contra esta lista y no se pasan tal cual a Elasticsearch: el
@@ -216,7 +229,7 @@ def protocol_detail(es_url: str = ES_URL) -> list[dict[str, Any]]:
         "size": 0,
         "query": {
             "bool": {
-                "must": [{"term": {"honeypot": "dionaea"}}],
+                "must": [{"term": {"honeypot": "dionaea"}}, *_TOPE],
                 "must_not": redes.TERMINOS,
             }
         },

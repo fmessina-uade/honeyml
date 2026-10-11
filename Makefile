@@ -1,5 +1,5 @@
 .PHONY: help up down logs status ps clean deploy-vps dev-up dev-down dev-logs validate lint test \
-        test-integration consumer triaje retriaje grafo arquetipos uwf-verificar modelo evaluacion comparacion clasificar muestra procedencia \
+        test-integration consumer triaje retriaje grafo arquetipos uwf-verificar modelo evaluacion comparacion clasificar muestra tasa procedencia \
         api dash demo replays \
         elastic-up elastic-down elastic-logs elastic-dev-up elastic-dev-down elastic-dev-logs \
         es-bootstrap validate-indexing pull-logs \
@@ -60,6 +60,7 @@ help:
 	@echo "    make deploy-vps  Llevar el último commit al VPS (SECO=1 muestra qué cambiaría)"
 	@echo "    make analisis-up Levantar el motor de triaje y la API en contenedores"
 	@echo "    make muestra     Muestra para la revisión a ciegas (en el servidor)"
+	@echo "    make tasa        Falsos positivos y negativos, auditados a ciegas (en el servidor)"
 	@echo "    make procedencia De dónde viene cada evento del corpus (en el servidor)"
 	@echo "    make publicar-artefactos  Subir los artefactos derivados al VPS"
 	@echo "    make tunel     La API del VPS en esta máquina, por túnel SSH"
@@ -421,6 +422,15 @@ muestra:
 		--network host --memory 1g --user 0 -e ES_URL=http://127.0.0.1:9200 \
 		-v $(CURDIR)/data/processed:/app/data/processed honeyml-analisis \
 		python -m honeyml.medicion.muestra $(if $(SECO),--seco,) $(if $(REEMPLAZAR),--reemplazar,)
+
+# Las tasas de falsos positivos y negativos del motor, con la regla de referencia y con la revisión
+# a ciegas del analista, estrato por estrato. Solo lee la muestra y las revisiones.
+#   sudo make tasa
+tasa:
+	@docker run --rm --name honeyml-tasa-no-modificar --label honeyml.aviso="no modificar" \
+		--network host --memory 512m --user 0 -e ES_URL=http://127.0.0.1:9200 \
+		-v $(CURDIR)/data/processed:/app/data/processed:ro honeyml-analisis \
+		python -m honeyml.medicion.tasa
 
 # De dónde viene cada evento del corpus: direcciones públicas, loopback, redes privadas o ninguna,
 # con el conjunto de datos y los días de cada grupo. Solo lee y no imprime direcciones. Corre en el
