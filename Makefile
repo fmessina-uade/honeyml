@@ -1,5 +1,5 @@
 .PHONY: help up down logs status ps clean deploy-vps dev-up dev-down dev-logs validate lint test \
-        test-integration consumer triaje retriaje grafo arquetipos uwf-verificar modelo evaluacion comparacion clasificar muestra tasa procedencia \
+        test-integration consumer triaje retriaje grafo arquetipos uwf-verificar modelo evaluacion comparacion clasificar muestra tasa procedencia campana campana-seco campana-comparar \
         api dash demo replays \
         elastic-up elastic-down elastic-logs elastic-dev-up elastic-dev-down elastic-dev-logs \
         es-bootstrap validate-indexing pull-logs \
@@ -62,6 +62,7 @@ help:
 	@echo "    make muestra     Muestra para la revisión a ciegas (en el servidor)"
 	@echo "    make tasa        Falsos positivos y negativos, auditados a ciegas (en el servidor)"
 	@echo "    make procedencia De dónde viene cada evento del corpus (en el servidor)"
+	@echo "    make campana     Campaña de validación adversaria (en el servidor)"
 	@echo "    make publicar-artefactos  Subir los artefactos derivados al VPS"
 	@echo "    make tunel     La API del VPS en esta máquina, por túnel SSH"
 	@echo "    make respaldar-decisiones  Traer los volcados de decisiones del VPS"
@@ -440,6 +441,26 @@ procedencia:
 	@docker run --rm --name honeyml-procedencia-no-modificar --label honeyml.aviso="no modificar" \
 		--network host --memory 256m -e ES_URL=http://127.0.0.1:9200 honeyml-analisis \
 		python -m honeyml.medicion.procedencia
+
+# La campaña de validación adversaria: sesiones controladas contra los sensores, con la
+# clasificación esperada fijada en el código antes de correr. Escribe el registro de la corrida en
+# data/processed. Con --seco imprime los escenarios sin tocar la red. Corre en el servidor.
+#   make campana-seco          make campana          make campana-comparar
+campana-seco:
+	@docker run --rm --name honeyml-campana-no-modificar --label honeyml.aviso="no modificar" \
+		--memory 256m honeyml-analisis python -m honeyml.medicion.campana --seco
+
+campana:
+	@docker run --rm --name honeyml-campana-no-modificar --label honeyml.aviso="no modificar" \
+		--network host --memory 256m --user 0 \
+		-v $(CURDIR)/data/processed:/app/data/processed honeyml-analisis \
+		python -m honeyml.medicion.campana
+
+campana-comparar:
+	@docker run --rm --name honeyml-campana-no-modificar --label honeyml.aviso="no modificar" \
+		--network host --memory 256m -e ES_URL=http://127.0.0.1:9200 \
+		-v $(CURDIR)/data/processed:/app/data/processed:ro honeyml-analisis \
+		python -m honeyml.medicion.campana --comparar
 
 # La comparación de las cuatro familias de modelos, ordenada por F1 macro. Imprime la última
 # guardada; con REENTRENAR=1 vuelve a entrenarlas, que tarda unos seis minutos y la reescribe.
