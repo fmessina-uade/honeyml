@@ -56,6 +56,7 @@ def _decision() -> Decision:
     return Decision(
         severidad=Severidad.ALTO,
         confianza=0.8,
+        motivo_sin_tactica="sin_objetivo_tactico",
         justificacion="ejecutó comandos dentro del señuelo",
     )
 
@@ -71,6 +72,7 @@ def test_el_esquema_rechaza_un_nivel_que_no_existe() -> None:
             doc_id="abc123",
             severidad="media",  # type: ignore[arg-type]
             confianza=0.8,
+            motivo_sin_tactica=None,
             justificacion="x",
         )
 
@@ -207,6 +209,7 @@ def test_una_severidad_por_debajo_del_piso_no_llega_a_persistirse() -> None:
     imposible = Decision(
         severidad=Severidad.INFORMATIVO,
         confianza=0.9,
+        motivo_sin_tactica="sin_objetivo_tactico",
         justificacion="parece inofensivo",
     )
     visitados, final = _recorrer(

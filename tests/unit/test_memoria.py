@@ -50,6 +50,7 @@ def _decision(severidad: Severidad = Severidad.ALTO) -> Decision:
         severidad=severidad,
         confianza=0.8,
         tactica_mitre="Ejecución",
+        motivo_sin_tactica=None,
         justificacion="El atacante ejecutó un comando dentro del señuelo.",
         evidencia=["uname -a"],
     )
@@ -216,6 +217,19 @@ def test_una_entrada_que_ya_no_valida_se_descarta() -> None:
     repertorio = RepertorioFalso()
     marca = modulo_firma.de_evento(_evento())
     repertorio.datos[marca] = {"decision": {"severidad": "inventada"}, "doc_id": "viejo"}
+
+    salida = memoria.recordar(estado_inicial(_evento()), repertorio=repertorio)
+    assert "decision" not in salida
+
+
+def test_una_decision_de_antes_del_motivo_sin_tactica_se_razona_de_nuevo() -> None:
+    """El campo no tiene valor por defecto justamente para que esto pase: lo guardado con el
+    criterio de táctica anterior no se copia."""
+    repertorio = RepertorioFalso()
+    marca = modulo_firma.de_evento(_evento())
+    vieja = _decision().model_dump(mode="json")
+    del vieja["motivo_sin_tactica"]
+    repertorio.registrar(marca, vieja, "doc-viejo")
 
     salida = memoria.recordar(estado_inicial(_evento()), repertorio=repertorio)
     assert "decision" not in salida

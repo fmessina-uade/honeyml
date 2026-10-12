@@ -4,7 +4,13 @@ import type { DetalleDecision, Revision } from '../../lib/api';
 import { dec, duracion, fechaHora, n } from '../../lib/format';
 import { useI18n } from '../../lib/i18n';
 import { tacticColor } from '../sections/SessionReplay';
-import { ChipSeveridad, colorDeSeveridad, NotaMensajeOculto, sinMensajeRepetido } from './comunes';
+import {
+  ChipSeveridad,
+  colorDeSeveridad,
+  NotaMensajeOculto,
+  sinMensajeRepetido,
+  sinTacticaConMotivo,
+} from './comunes';
 
 function Seccion({ titulo, children }: { titulo: string; children: ReactNode }) {
   return (
@@ -116,7 +122,9 @@ export default function Detalle({
                 : 'rgb(var(--tinta) / 0.45)',
             }}
           >
-            {decision.tactica_mitre ? tacticName(decision.tactica_mitre) : t.triage.noTactic}
+            {decision.tactica_mitre
+              ? tacticName(decision.tactica_mitre)
+              : sinTacticaConMotivo(t, decision.motivo_sin_tactica)}
           </span>
           {decision.confianza !== undefined && (
             <span className="font-data text-[10.5px] text-white/40">

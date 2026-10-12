@@ -74,6 +74,12 @@ def _tacticas_admitidas() -> str:
     Las dos de acceso llevan su criterio escrito. Un ingreso exitoso admite las dos lecturas (entró,
     pero antes adivinó la clave), y sin una regla la táctica oscilaría entre firmas de la misma
     conducta. La regla sale del resultado, que el contexto ya trae.
+
+    Los comandos también. Sin regla, el modelo etiqueta el medio: todo comando corre en un
+    intérprete, que en ATT&CK es una técnica de Ejecución, y casi todo cae ahí. La táctica es
+    el objetivo, así que la regla pide el objetivo que la conducta muestra, sin suponer el paso
+    siguiente, y deja Ejecución para el código que trajo o escribió el atacante. Que un comando
+    falle no cambia su objetivo, por eso el resultado no vuelve nula la táctica.
     """
     admitidas = ", ".join(f"'{t}'" for t in TACTICAS_OBSERVABLES)
     return (
@@ -82,6 +88,24 @@ def _tacticas_admitidas() -> str:
         "En un evento de autenticación la táctica sale del resultado: con 'success' el atacante "
         "entró con una credencial que funciona y corresponde 'Acceso inicial'; con cualquier otro "
         "resultado estaba probando credenciales y corresponde 'Acceso a credenciales'.\n"
+        "En un comando la táctica es el objetivo que muestra la conducta, no el medio: que algo "
+        "se haya ejecutado en un intérprete no alcanza para 'Ejecución'. Consultar el sistema, "
+        "el hardware, la red o los permisos es 'Descubrimiento'. Agregar claves autorizadas, "
+        "crear usuarios, cambiar contraseñas o programar tareas es 'Persistencia'. Borrar o "
+        "desactivar el historial o los registros es 'Evasión de defensas'. Leer o buscar "
+        "credenciales es 'Acceso a credenciales'. 'Ejecución' corresponde cuando corre código "
+        "que el atacante trajo o escribió, como un binario descargado o un script armado en la "
+        "sesión. Si la conducta encadena varios comandos, va la táctica del objetivo al que "
+        "sirven los demás. Se clasifica lo que la conducta muestra, sin suponer pasos "
+        "posteriores: una descarga que no se ejecuta no es 'Ejecución'. Que el comando falle o "
+        "tenga un resultado desconocido no cambia la táctica.\n"
+        "Cuando la táctica es nula, 'motivo_sin_tactica' dice por qué: 'sin_objetivo_tactico' "
+        "para una acción mínima sin objetivo identificable, como imprimir un marcador o cambiar "
+        "de directorio; 'evidencia_insuficiente' cuando lo visible no alcanza para saber el "
+        "propósito, como un fragmento incompleto o malformado; "
+        "'fuera_del_catalogo' cuando la conducta se identifica pero ninguna táctica admitida la "
+        "describe, como una transferencia de archivos sin ejecución. Con una táctica asignada, "
+        "'motivo_sin_tactica' va nulo.\n"
         "La lista está en español y es cerrada porque el panel enciende su matriz con esos nombres "
         "exactos. Los nombres canónicos en inglés, como 'Execution' o 'Credential Access', no se "
         "admiten. Las que faltan son las que un señuelo de baja interacción no puede observar."

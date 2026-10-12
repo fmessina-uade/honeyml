@@ -558,6 +558,11 @@ const es = {
     bySeverity: 'Por severidad',
     byTactic: 'Por táctica',
     noTactic: 'sin táctica',
+    noTacticReason: {
+      sin_objetivo_tactico: 'sin objetivo táctico',
+      evidencia_insuficiente: 'evidencia insuficiente',
+      fuera_del_catalogo: 'fuera del catálogo',
+    } as Record<string, string>,
     filterHint: 'Tocá una barra para filtrar el listado.',
     state: { todas: 'Todas', pendientes: 'Pendientes', revisadas: 'Revisadas' },
     severity: 'Severidad',
@@ -1569,6 +1574,11 @@ const en: typeof es = {
     bySeverity: 'By severity',
     byTactic: 'By tactic',
     noTactic: 'no tactic',
+    noTacticReason: {
+      sin_objetivo_tactico: 'no tactical goal',
+      evidencia_insuficiente: 'insufficient evidence',
+      fuera_del_catalogo: 'outside the catalog',
+    } as Record<string, string>,
     filterHint: 'Click a bar to filter the list.',
     state: { todas: 'All', pendientes: 'Pending', revisadas: 'Reviewed' },
     severity: 'Severity',

@@ -21,7 +21,7 @@ termina sin decisión. Es la misma razón por la que "reproches" acumula en vez 
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, get_args
 
 from pydantic import ValidationError
 from pydantic_core import ErrorDetails
@@ -29,7 +29,7 @@ from pydantic_core import ErrorDetails
 from ...education.annotations import TACTICAS_OBSERVABLES
 from ..consumer import EventoDelBus
 from ..severidad import reproche as reproche_de_severidad
-from ..state import Decision, EstadoTriaje
+from ..state import Decision, EstadoTriaje, MotivoSinTactica
 
 # Cómo se traduce cada clase de error de Pydantic. La clave es el `type` que trae el error, y el
 # valor arma la oración con el campo adentro.
@@ -84,8 +84,9 @@ def _reproches_del_esquema(exc: ValidationError) -> list[str]:
 def _reproches_de_contenido(decision: Decision, evento: EventoDelBus) -> list[str]:
     """Lo que el esquema no puede exigir, pero el motor sí.
 
-    Son dos cosas que un JSON puede cumplir y aun así dejar la decisión inservible: que no se apoye
-    en nada, o que asigne una táctica que el señuelo no observa.
+    Son cosas que un JSON puede cumplir y aun así dejar la decisión inservible: que no se apoye en
+    nada, que asigne una táctica que el señuelo no observa, o que la táctica y su motivo de ausencia
+    no cierren entre sí.
     """
     problemas: list[str] = []
 
@@ -102,6 +103,20 @@ def _reproches_de_contenido(decision: Decision, evento: EventoDelBus) -> list[st
         problemas.append(
             f"La táctica '{decision.tactica_mitre}' no es una de las que este señuelo puede "
             f"observar. Las admitidas son {admitidas}, o nulo si ninguna aplica."
+        )
+
+    # El esquema pide los dos campos pero no puede atarlos entre sí. Una táctica con motivo de
+    # ausencia se contradice, y un nulo sin motivo deja a quien revisa sin saber si la conducta no
+    # tiene objetivo, no se entiende o no entra en el vocabulario.
+    if decision.tactica_mitre and decision.motivo_sin_tactica:
+        problemas.append(
+            "El campo 'motivo_sin_tactica' va nulo cuando hay una táctica asignada. Elegí una de "
+            "las dos cosas: la táctica, o nulo con su motivo."
+        )
+    if not decision.tactica_mitre and not decision.motivo_sin_tactica:
+        problemas.append(
+            "Sin táctica, el campo 'motivo_sin_tactica' tiene que decir por qué, con uno de "
+            f"{', '.join(repr(m) for m in get_args(MotivoSinTactica))}."
         )
 
     return problemas

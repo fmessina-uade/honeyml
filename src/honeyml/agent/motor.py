@@ -152,7 +152,8 @@ def _linea(evento: bus.EventoDelBus, final: EstadoTriaje) -> str:
     # Una marca distinta para lo copiado: en una corrida larga lo que importa ver de un vistazo es
     # cuántas decisiones se pagaron y cuántas salieron del repertorio.
     marca = "=" if final.get("reutilizada_de") else "+"
-    tactica = decision.tactica_mitre or "sin táctica"
+    # Sin táctica va el motivo entre paréntesis, que entra en la misma columna.
+    tactica = decision.tactica_mitre or f"({decision.motivo_sin_tactica or 'sin táctica'})"
     linea = f"  {marca} {decision.severidad.value:<10} {tactica:<22}{corregido} {evento.resumen()}"
 
     # El documento guarda qué consulta falló y no por qué. El porqué es para quien depura, y este

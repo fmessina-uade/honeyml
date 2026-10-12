@@ -12,12 +12,12 @@ del pedido que se rompen sin hacer ruido:
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, get_args
 
 from honeyml.agent.adapters.inferencia import Respuesta
 from honeyml.agent.nodes import inferencia as nodo
 from honeyml.agent.severidad import piso_de
-from honeyml.agent.state import Contexto
+from honeyml.agent.state import Contexto, MotivoSinTactica
 from honeyml.education.annotations import TACTICAS_OBSERVABLES
 
 
@@ -242,6 +242,18 @@ def test_el_pedido_dice_como_elegir_entre_las_dos_de_acceso() -> None:
     assert "'success'" in s.sistema
     assert "corresponde 'Acceso inicial'" in s.sistema
     assert "corresponde 'Acceso a credenciales'" in s.sistema
+
+
+def test_el_pedido_dice_que_en_un_comando_la_tactica_es_el_objetivo() -> None:
+    """Sin esta regla casi todo comando sale como Ejecución, que es el medio y no el objetivo."""
+    s = _ServicioFalso()
+    nodo.consultar(_estado(), servicio=s)
+
+    assert "objetivo que muestra la conducta, no el medio" in s.sistema
+    assert "una descarga que no se ejecuta no es 'Ejecución'" in s.sistema
+    assert "no cambia la táctica" in s.sistema
+    for motivo in get_args(MotivoSinTactica):
+        assert f"'{motivo}'" in s.sistema
 
 
 def test_lo_que_se_publica_es_lo_que_la_validacion_exige() -> None:

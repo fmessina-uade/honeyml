@@ -160,6 +160,10 @@ def test_el_esquema_de_la_decision_cumple_el_modo_estricto() -> None:
     # `tactica_mitre` es opcional en el dominio y por eso viaja como unión con null, no omitido.
     assert "tactica_mitre" in estricto["required"]
     assert {"type": "null"} in estricto["properties"]["tactica_mitre"]["anyOf"]
+    # El motivo viaja igual, y con su vocabulario cerrado en el esquema.
+    motivo = estricto["properties"]["motivo_sin_tactica"]["anyOf"]
+    assert {"type": "null"} in motivo
+    assert any(set(opcion.get("enum", [])) >= {"fuera_del_catalogo"} for opcion in motivo)
 
 
 def test_no_quedan_valores_por_defecto_en_el_esquema() -> None:

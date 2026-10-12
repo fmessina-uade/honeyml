@@ -67,6 +67,7 @@ def _decision(**kw: Any) -> Decision:
         "severidad": "alto",
         "confianza": 0.85,
         "tactica_mitre": "Descubrimiento",
+        "motivo_sin_tactica": None,
         "justificacion": "Ejecutó un comando de reconocimiento dentro del señuelo.",
         "evidencia": ["comando ejecutado: uname -a"],
     }
@@ -124,6 +125,14 @@ def test_guarda_la_justificacion_y_la_evidencia() -> None:
 
     assert doc["decision"]["justificacion"].startswith("Ejecutó")
     assert doc["decision"]["evidencia"] == ["comando ejecutado: uname -a"]
+
+
+def test_guarda_el_motivo_cuando_no_hay_tactica() -> None:
+    sin_tactica = _decision(tactica_mitre=None, motivo_sin_tactica="fuera_del_catalogo")
+    doc = nodo.documento(_estado(decision=sin_tactica))
+
+    assert doc["decision"]["tactica_mitre"] is None
+    assert doc["decision"]["motivo_sin_tactica"] == "fuera_del_catalogo"
 
 
 def test_guarda_los_limites_que_la_escala_calculo() -> None:

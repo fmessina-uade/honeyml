@@ -36,6 +36,7 @@ DECISION = {
     "severidad": "alto",
     "confianza": 0.9,
     "tactica_mitre": "Descubrimiento",
+    "motivo_sin_tactica": None,
     "justificacion": "Ejecutó un comando de reconocimiento dentro del señuelo.",
     "evidencia": ["comando ejecutado: uname -a"],
 }

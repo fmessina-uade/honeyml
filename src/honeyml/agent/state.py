@@ -30,6 +30,16 @@ MAX_INTENTOS = 3
 # revisión, así que los tres lo toman de acá.
 SUFIJO_DE_FALLA = "_falló"
 
+# Por qué una decisión no lleva táctica. Un nulo solo no distingue una acción sin propósito (un
+# `cd`, un `echo` de marcador) de un comando que no se entiende, ni de una conducta clara que el
+# vocabulario no cubre, como una transferencia de archivos sin ejecución. Son tres lecturas que
+# piden cosas distintas a quien revisa.
+MotivoSinTactica = Literal[
+    "sin_objetivo_tactico",
+    "evidencia_insuficiente",
+    "fuera_del_catalogo",
+]
+
 
 class Decision(BaseModel):
     """La respuesta del motor sobre un evento. Es el envoltorio, todavía no el vocabulario.
@@ -63,6 +73,12 @@ class Decision(BaseModel):
     severidad: Severidad = Field(description="nivel asignado; la escala vive en severidad.py")
     confianza: float = Field(ge=0.0, le=1.0)
     tactica_mitre: str | None = Field(default=None, description="táctica observada, si aplica")
+    # Sin valor por defecto a propósito: una decisión guardada en el repertorio antes de que el
+    # campo existiera no valida, y `memoria.recordar` la descarta. Así cada conducta se vuelve a
+    # razonar con el criterio de táctica vigente en vez de copiar uno que ya no rige.
+    motivo_sin_tactica: MotivoSinTactica | None = Field(
+        description="por qué no hay táctica; nulo cuando la hay"
+    )
     justificacion: str = Field(min_length=1, description="por qué, en una o dos oraciones")
     evidencia: list[str] = Field(
         default_factory=list,

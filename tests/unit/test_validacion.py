@@ -42,6 +42,7 @@ def _borrador(**kw: Any) -> dict[str, Any]:
         "severidad": "alto",
         "confianza": 0.8,
         "tactica_mitre": "Descubrimiento",
+        "motivo_sin_tactica": None,
         "justificacion": "Ejecutó un comando de reconocimiento dentro del señuelo.",
         "evidencia": ["comando ejecutado: uname -a"],
     }
@@ -66,9 +67,35 @@ def test_un_borrador_correcto_produce_una_decision() -> None:
 
 def test_la_tactica_puede_venir_nula() -> None:
     """Nulo es una respuesta válida: no todo evento corresponde a una táctica."""
+    borrador = _borrador(tactica_mitre=None, motivo_sin_tactica="evidencia_insuficiente")
+    salida = nodo.validar(_estado(borrador=borrador))
+
+    assert salida["decision"].motivo_sin_tactica == "evidencia_insuficiente"
+
+
+def test_una_tactica_nula_sin_motivo_se_rechaza() -> None:
     salida = nodo.validar(_estado(borrador=_borrador(tactica_mitre=None)))
 
-    assert "decision" in salida
+    assert "decision" not in salida
+    reproche = next(r for r in salida["reproches"] if "motivo_sin_tactica" in r)
+    for motivo in ("sin_objetivo_tactico", "evidencia_insuficiente", "fuera_del_catalogo"):
+        assert motivo in reproche
+
+
+def test_una_tactica_con_motivo_de_ausencia_se_rechaza() -> None:
+    borrador = _borrador(motivo_sin_tactica="fuera_del_catalogo")
+    salida = nodo.validar(_estado(borrador=borrador))
+
+    assert "decision" not in salida
+    assert any("va nulo cuando hay una táctica" in r for r in salida["reproches"])
+
+
+def test_un_motivo_inventado_lo_rechaza_el_esquema() -> None:
+    borrador = _borrador(tactica_mitre=None, motivo_sin_tactica="no sé")
+    salida = nodo.validar(_estado(borrador=borrador))
+
+    assert "decision" not in salida
+    assert any("motivo_sin_tactica" in r for r in salida["reproches"])
 
 
 # Lo que el esquema atrapa

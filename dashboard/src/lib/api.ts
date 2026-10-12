@@ -288,6 +288,7 @@ export interface DocumentoDecision {
     severidad?: string;
     confianza?: number;
     tactica_mitre?: string | null;
+    motivo_sin_tactica?: string | null;
     justificacion?: string;
     evidencia?: string[];
   };

@@ -5,7 +5,7 @@ import { dec, fechaHora } from '../../lib/format';
 import { useI18n } from '../../lib/i18n';
 import { Modal } from '../Superpuesto';
 import { tacticColor } from '../sections/SessionReplay';
-import { ChipSeveridad } from './comunes';
+import { ChipSeveridad, sinTacticaConMotivo } from './comunes';
 import { SelectorSeveridad, SelectorTactica } from './Selectores';
 
 type Eleccion = 'confirma' | 'corrige';
@@ -132,7 +132,9 @@ export default function ModalVeredicto({
                     : 'rgb(var(--tinta) / 0.45)',
                 }}
               >
-                {delMotor.tactica_mitre ? tacticName(delMotor.tactica_mitre) : t.triage.noTactic}
+                {delMotor.tactica_mitre
+                  ? tacticName(delMotor.tactica_mitre)
+                  : sinTacticaConMotivo(t, delMotor.motivo_sin_tactica)}
               </span>
               {delMotor.confianza !== undefined && (
                 <span className="font-data text-[10px] text-white/40">

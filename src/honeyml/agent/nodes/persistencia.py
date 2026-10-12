@@ -83,6 +83,7 @@ def _de_la_decision(estado: EstadoTriaje, concluyente: bool) -> dict[str, Any]:
         "severidad": decision.severidad.value,
         "confianza": decision.confianza,
         "tactica_mitre": decision.tactica_mitre,
+        "motivo_sin_tactica": decision.motivo_sin_tactica,
         "justificacion": decision.justificacion,
         "evidencia": decision.evidencia,
         "concluyente": concluyente,

@@ -43,6 +43,17 @@ export function sinMensajeRepetido<T>(atributos: Record<string, T>): {
   };
 }
 
+// Sin táctica, el motor dice por qué: no es lo mismo un `cd` que un comando ilegible o una
+// descarga que ninguna táctica del vocabulario describe. Las decisiones anteriores al motivo no lo
+// traen y quedan con el rótulo solo.
+export function sinTacticaConMotivo(
+  t: ReturnType<typeof useI18n>['t'],
+  motivo: string | null | undefined,
+): string {
+  const razon = motivo ? t.triage.noTacticReason[motivo] : undefined;
+  return razon ? `${t.triage.noTactic} (${razon})` : t.triage.noTactic;
+}
+
 export function NotaMensajeOculto() {
   const { t } = useI18n();
   return <p className="font-data text-[10px] text-white/40 mt-2">{t.triage.messageHidden}</p>;

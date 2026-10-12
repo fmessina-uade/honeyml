@@ -36,6 +36,7 @@
             "techo": { "type": "keyword" },
             "confianza": { "type": "float" },
             "tactica_mitre": { "type": "keyword" },
+            "motivo_sin_tactica": { "type": "keyword" },
             "justificacion": { "type": "text" },
             "evidencia": { "type": "text" },
             "concluyente": { "type": "boolean" }
