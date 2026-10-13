@@ -60,8 +60,12 @@ services:
     environment:
       - ES_URL=http://elasticsearch:9200
       # Para alcanzar el bus al corregir un veredicto: la API saca del repertorio la firma de la
-      # decisión corregida, así el error no se sigue copiando. La clave del bus entra por el .env.
+      # decisión corregida, así el error no se sigue copiando.
       - BUS_HOST=valkey
+      # La clave del bus va explícita y no por env_file: la API solo necesita la del bus, no la del
+      # proveedor de inferencia. Sin esta línea, con el bus autenticado el olvido de la firma fallaría
+      # callado y la decisión corregida se seguiría copiando. Vacía quiere decir sin autenticación.
+      - "BUS_PASSWORD=${BUS_PASSWORD:-}"
     volumes:
       - ../../data/processed:/app/data/processed:ro
       # Los registros que escriben los scripts del anfitrión, para la auditoría del superadmin. Va el
