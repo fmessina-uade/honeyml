@@ -52,7 +52,10 @@ def calcular(desde: str = "now-7d", es_url: str = queries.ES_URL) -> dict[str, A
         "runtime_mappings": DEMORA_MS,
         "query": _base(desde),
         "aggs": {
-            "total": _metricas(),
+            # Las tres van envueltas en un filtro: así `percentiles` y `media` quedan como
+            # sub-agregados con nombre. Sueltas en el mismo nivel serían dos tipos en un agregado,
+            # que no se permite. El total no filtra nada, pero mantiene la misma forma.
+            "total": {"filter": {"match_all": {}}, "aggs": _metricas()},
             "copiadas": {
                 "filter": {"exists": {"field": "ciclo.reutilizada_de"}},
                 "aggs": _metricas(),
