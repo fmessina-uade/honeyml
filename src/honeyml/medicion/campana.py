@@ -379,6 +379,32 @@ def _decisiones_internas(desde: str, hasta: str, es_url: str) -> list[dict[str, 
         return [h["_source"] for h in json.load(resp)["hits"]["hits"]]
 
 
+def _comandos_de_telemetria(doc_ids: list[str], es_url: str) -> dict[str, str]:
+    """El comando de cada evento, buscado por identificador en el índice de telemetría.
+
+    La decisión guarda un resumen recortado, no el comando entero, así que para emparejar con los
+    escenarios hace falta leer `process.command_line` del evento, bajo el mismo identificador.
+    """
+    if not doc_ids:
+        return {}
+    r = queries._search(
+        {
+            "size": len(doc_ids),
+            "query": {"ids": {"values": doc_ids}},
+            "_source": ["process.command_line"],
+        },
+        es_url,
+    )
+    comandos: dict[str, str] = {}
+    for h in r["hits"]["hits"]:
+        fuente = h["_source"]
+        proceso = fuente.get("process") or {}
+        comando = proceso.get("command_line") or fuente.get("process.command_line")
+        if comando:
+            comandos[h["_id"]] = comando
+    return comandos
+
+
 def _matriz(pares: list[tuple[str | None, str | None]]) -> dict[str, dict[str, int]]:
     """Cuenta los pares (esperado, obtenido) como una tabla anidada."""
     tabla: dict[str, dict[str, int]] = {}
@@ -388,11 +414,14 @@ def _matriz(pares: list[tuple[str | None, str | None]]) -> dict[str, dict[str, i
     return tabla
 
 
-def comparar(corrida: dict[str, Any], decisiones: list[dict[str, Any]]) -> dict[str, Any]:
+def comparar(
+    corrida: dict[str, Any], decisiones: list[dict[str, Any]], comandos: dict[str, str]
+) -> dict[str, Any]:
     """Enfrenta las decisiones de la corrida con lo esperado, por comando.
 
-    Los escenarios de acceso remoto se emparejan por el comando, que no se repite entre
-    escenarios. Los de autenticación se cuentan aparte: todos los intentos comparten la clase.
+    `comandos` mapea el identificador del evento a su comando, leído de la telemetría. Los
+    escenarios de acceso remoto se emparejan por ese comando, que no se repite entre escenarios.
+    Las autenticaciones se cuentan aparte: todos los intentos comparten la clase.
     """
     por_comando = esperado_por_comando()
     sev_escala: list[tuple[str | None, str | None]] = []
@@ -405,7 +434,7 @@ def comparar(corrida: dict[str, Any], decisiones: list[dict[str, Any]]) -> dict[
     for d in decisiones:
         evento = d.get("evento", {})
         decision = d.get("decision", {})
-        comando = evento.get("comando") or ""
+        comando = comandos.get(evento.get("doc_id") or "", "")
         escenario = por_comando.get(comando)
         if escenario is None:
             if evento.get("categoria") == "process":
@@ -495,7 +524,9 @@ def main() -> int:
     if args.comparar:
         corrida = json.loads(CORRIDA_FILE.read_text(encoding="utf-8"))
         decisiones = _decisiones_internas(corrida["desde"], corrida["hasta"], queries.ES_URL)
-        print("\n".join(informe_comparacion(comparar(corrida, decisiones))))
+        doc_ids = [d.get("evento", {}).get("doc_id", "") for d in decisiones]
+        comandos = _comandos_de_telemetria([i for i in doc_ids if i], queries.ES_URL)
+        print("\n".join(informe_comparacion(comparar(corrida, decisiones, comandos))))
         return 0
 
     corrida = correr(args.host, args.usuario, args.clave)
