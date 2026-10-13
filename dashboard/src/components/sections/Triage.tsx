@@ -218,15 +218,31 @@ export default function Triage() {
               )
             }
             sub={
-              resumen.conclusion.p90_s !== null
-                ? t.triage.conclusionP90(
-                    duracion(resumen.conclusion.p90_s),
-                    resumen.conclusion.ventana_dias,
-                    resumen.conclusion.media_s != null
-                      ? duracion(resumen.conclusion.media_s)
-                      : null,
-                  )
-                : t.triage.conclusionNote(resumen.conclusion.ventana_dias)
+              <span className="flex flex-col gap-0.5">
+                <span>
+                  {resumen.conclusion.p90_s !== null
+                    ? t.triage.conclusionP90(
+                        duracion(resumen.conclusion.p90_s),
+                        resumen.conclusion.ventana_dias,
+                        resumen.conclusion.media_s != null
+                          ? duracion(resumen.conclusion.media_s)
+                          : null,
+                      )
+                    : t.triage.conclusionNote(resumen.conclusion.ventana_dias)}
+                </span>
+                {resumen.conclusion.copiadas_s != null &&
+                  resumen.conclusion.razonadas_s != null && (
+                    <span className="text-white/35">
+                      {t.triage.conclusionSplit(
+                        duracion(resumen.conclusion.copiadas_s),
+                        duracion(resumen.conclusion.razonadas_s),
+                        resumen.conclusion.modelo_s != null
+                          ? duracion(resumen.conclusion.modelo_s)
+                          : t.triage.noData,
+                      )}
+                    </span>
+                  )}
+              </span>
             }
             color="var(--neural-teal)"
           />

@@ -487,6 +487,8 @@ const es = {
     conclusionNote: (d: number) => `del evento a la decisión guardada, últimos ${d} días`,
     conclusionP90: (p90: string, d: number, media: string | null) =>
       `${media ? `media de ${media}; ` : ''}nueve de cada diez, en menos de ${p90}. Últimos ${d} días`,
+    conclusionSplit: (copiadas: string, razonadas: string, modelo: string) =>
+      `copiadas ${copiadas}, razonadas ${razonadas} (la llamada al modelo, ${modelo})`,
     pendingNone: (r: string) => `el motor cerró todo solo; ${r} con veredicto`,
     inbox: 'Decisiones',
     live: 'en vivo',
@@ -1504,6 +1506,8 @@ const en: typeof es = {
     conclusionNote: (d: number) => `from the event to the stored decision, last ${d} days`,
     conclusionP90: (p90: string, d: number, media: string | null) =>
       `${media ? `mean of ${media}; ` : ''}nine out of ten in under ${p90}. Last ${d} days`,
+    conclusionSplit: (copiadas: string, razonadas: string, modelo: string) =>
+      `copied ${copiadas}, reasoned ${razonadas} (model call, ${modelo})`,
     pendingNone: (r: string) => `the engine settled everything on its own; ${r} with a verdict`,
     inbox: 'Decisions',
     live: 'live',

@@ -194,6 +194,12 @@ def test_el_resumen_descuenta_de_pendientes_lo_ya_revisado(
                     "doc_count": 5,
                     "percentiles": {"values": {"50.0": 4000.0, "90.0": 12000.0}},
                     "media": {"value": 5500.0},
+                    "copiadas": {"doc_count": 4, "media": {"value": 3000.0}},
+                    "razonadas": {
+                        "doc_count": 1,
+                        "media": {"value": 15000.0},
+                        "modelo_s": {"value": 2.8},
+                    },
                 },
             },
         }
@@ -211,6 +217,9 @@ def test_el_resumen_descuenta_de_pendientes_lo_ya_revisado(
     assert [c["key"] for c in r["por_severidad"]] == ["bajo", "alto"]  # en el orden de la escala
     assert r["conclusion"]["mediana_s"] == 4.0
     assert r["conclusion"]["media_s"] == 5.5
+    assert r["conclusion"]["copiadas_s"] == 3.0
+    assert r["conclusion"]["razonadas_s"] == 15.0
+    assert r["conclusion"]["modelo_s"] == 2.8
     assert r["actividad"] == {
         "ultima": "2026-09-24T12:00:05.000Z",
         "ultima_hora": 7,

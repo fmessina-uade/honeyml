@@ -205,6 +205,13 @@ export interface ResumenTriaje {
     p90_s: number | null;
     /** La media, que es como se define la métrica; la mediana dice lo típico. */
     media_s?: number | null;
+    /** El desglose: las copiadas marcan el piso del pipeline, las razonadas esperan al modelo. */
+    copiadas_n?: number;
+    copiadas_s?: number | null;
+    razonadas_n?: number;
+    razonadas_s?: number | null;
+    /** Cuánto de la demora de las razonadas fue la llamada al modelo. */
+    modelo_s?: number | null;
   };
 }
 

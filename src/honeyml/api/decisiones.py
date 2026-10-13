@@ -277,6 +277,22 @@ def resumen(es_url: str = queries.ES_URL) -> dict[str, Any]:
                 "aggs": {
                     "percentiles": {"percentiles": {"field": "demora_ms", "percents": [50, 90]}},
                     "media": {"avg": {"field": "demora_ms"}},
+                    # El desglose entre los dos caminos: las copiadas solo leen el repertorio y
+                    # marcan el piso del pipeline; las razonadas esperan al modelo. De estas, cuánto
+                    # fue la llamada, que ya viene en segundos y no se divide.
+                    "copiadas": {
+                        "filter": {"exists": {"field": "ciclo.reutilizada_de"}},
+                        "aggs": {"media": {"avg": {"field": "demora_ms"}}},
+                    },
+                    "razonadas": {
+                        "filter": {
+                            "bool": {"must_not": [{"exists": {"field": "ciclo.reutilizada_de"}}]}
+                        },
+                        "aggs": {
+                            "media": {"avg": {"field": "demora_ms"}},
+                            "modelo_s": {"avg": {"field": "modelo.segundos"}},
+                        },
+                    },
                 },
             },
         },
@@ -335,12 +351,22 @@ def resumen(es_url: str = queries.ES_URL) -> dict[str, Any]:
             "mediana_s": _segundos(pct.get("50.0")),
             "p90_s": _segundos(pct.get("90.0")),
             "media_s": _segundos(a["conclusion"].get("media", {}).get("value")),
+            "copiadas_n": a["conclusion"]["copiadas"]["doc_count"],
+            "copiadas_s": _segundos(a["conclusion"]["copiadas"].get("media", {}).get("value")),
+            "razonadas_n": a["conclusion"]["razonadas"]["doc_count"],
+            "razonadas_s": _segundos(a["conclusion"]["razonadas"].get("media", {}).get("value")),
+            "modelo_s": _redondea(a["conclusion"]["razonadas"].get("modelo_s", {}).get("value")),
         },
     }
 
 
 def _segundos(ms: float | None) -> float | None:
     return round(ms / 1000, 1) if ms is not None else None
+
+
+def _redondea(s: float | None) -> float | None:
+    """El tiempo de la llamada al modelo ya viene en segundos, así que no se divide."""
+    return round(s, 1) if s is not None else None
 
 
 def _filtros(
