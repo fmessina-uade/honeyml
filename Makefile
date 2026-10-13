@@ -1,5 +1,5 @@
 .PHONY: help up down logs status ps clean deploy-vps dev-up dev-down dev-logs validate lint test \
-        test-integration consumer triaje retriaje grafo arquetipos uwf-verificar modelo evaluacion comparacion clasificar muestra tasa procedencia campana campana-seco campana-comparar \
+        test-integration consumer triaje retriaje grafo arquetipos uwf-verificar modelo evaluacion comparacion clasificar muestra tasa procedencia conclusion campana campana-seco campana-comparar \
         api dash demo replays \
         elastic-up elastic-down elastic-logs elastic-dev-up elastic-dev-down elastic-dev-logs \
         es-bootstrap validate-indexing pull-logs \
@@ -62,6 +62,7 @@ help:
 	@echo "    make muestra     Muestra para la revisión a ciegas (en el servidor)"
 	@echo "    make tasa        Falsos positivos y negativos, auditados a ciegas (en el servidor)"
 	@echo "    make procedencia De dónde viene cada evento del corpus (en el servidor)"
+	@echo "    make conclusion  Tiempo de conclusión del motor (en el servidor)"
 	@echo "    make campana     Campaña de validación adversaria (en el servidor)"
 	@echo "    make publicar-artefactos  Subir los artefactos derivados al VPS"
 	@echo "    make tunel     La API del VPS en esta máquina, por túnel SSH"
@@ -441,6 +442,14 @@ procedencia:
 	@docker run --rm --name honeyml-procedencia-no-modificar --label honeyml.aviso="no modificar" \
 		--network host --memory 256m -e ES_URL=http://127.0.0.1:9200 honeyml-analisis \
 		python -m honeyml.medicion.procedencia
+
+# El tiempo de conclusión del motor, del evento capturado a la decisión guardada, partido entre las
+# copiadas del repertorio y las razonadas con el modelo. Solo lee. Con DESDE se cambia la ventana.
+#   sudo make conclusion            sudo make conclusion DESDE=now-30d
+conclusion:
+	@docker run --rm --name honeyml-conclusion-no-modificar --label honeyml.aviso="no modificar" \
+		--network host --memory 256m -e ES_URL=http://127.0.0.1:9200 honeyml-analisis \
+		python -m honeyml.medicion.conclusion $(if $(DESDE),--desde $(DESDE),)
 
 # La campaña de validación adversaria: sesiones controladas contra los sensores, con la
 # clasificación esperada fijada en el código antes de correr. Escribe el registro de la corrida en
