@@ -1,5 +1,5 @@
 .PHONY: help up down logs status ps clean deploy-vps dev-up dev-down dev-logs validate lint test \
-        test-integration consumer triaje retriaje grafo arquetipos uwf-verificar modelo evaluacion comparacion clasificar muestra tasa procedencia conclusion campana campana-seco campana-comparar \
+        test-integration consumer triaje retriaje grafo arquetipos uwf-verificar modelo evaluacion comparacion clasificar muestra tasa procedencia conclusion campana campana-seco campana-comparar verificacion \
         api dash demo replays \
         elastic-up elastic-down elastic-logs elastic-dev-up elastic-dev-down elastic-dev-logs \
         es-bootstrap validate-indexing pull-logs \
@@ -64,6 +64,7 @@ help:
 	@echo "    make procedencia De dónde viene cada evento del corpus (en el servidor)"
 	@echo "    make conclusion  Tiempo de conclusión del motor (en el servidor)"
 	@echo "    make campana     Campaña de validación adversaria (en el servidor)"
+	@echo "    make verificacion Reutilización por firma, segunda clasificación (en el servidor)"
 	@echo "    make publicar-artefactos  Subir los artefactos derivados al VPS"
 	@echo "    make tunel     La API del VPS en esta máquina, por túnel SSH"
 	@echo "    make respaldar-decisiones  Traer los volcados de decisiones del VPS"
@@ -470,6 +471,16 @@ campana-comparar:
 		--network host --memory 256m -e ES_URL=http://127.0.0.1:9200 \
 		-v $(CURDIR)/data/processed:/app/data/processed:ro honeyml-analisis \
 		python -m honeyml.medicion.campana --comparar
+
+# La verificación de la reutilización por firma: razona de nuevo una muestra de conductas ya
+# copiadas y las enfrenta con lo que el repertorio les había copiado. Lee el índice y le paga al
+# proveedor una vez por firma de la muestra, así que necesita la clave del .env. No escribe nada.
+# Con SECO=1 muestra la población y el gasto sin razonar; CUANTAS cambia el tamaño de la muestra.
+#   sudo make verificacion SECO=1          sudo make verificacion          sudo make verificacion CUANTAS=100
+verificacion:
+	@docker run --rm --name honeyml-verificacion-no-modificar --label honeyml.aviso="no modificar" \
+		--network host --memory 512m --env-file .env -e ES_URL=http://127.0.0.1:9200 honeyml-analisis \
+		python -m honeyml.medicion.verificacion $(if $(CUANTAS),--cuantas $(CUANTAS),) $(if $(SECO),--seco,)
 
 # La comparación de las cuatro familias de modelos, ordenada por F1 macro. Imprime la última
 # guardada; con REENTRENAR=1 vuelve a entrenarlas, que tarda unos seis minutos y la reescribe.
