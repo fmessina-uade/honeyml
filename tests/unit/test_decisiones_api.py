@@ -89,6 +89,44 @@ def test_el_veredicto_va_a_su_indice_y_guarda_lo_que_dijo_el_motor(
     assert guardado == cuerpo
 
 
+def test_corregir_olvida_la_firma_para_que_no_se_siga_copiando(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _con_decision(monkeypatch, DECISION)
+    olvidadas: list[dict[str, Any]] = []
+    monkeypatch.setattr(decisiones, "_olvidar_firma", olvidadas.append)
+
+    v = decisiones.Veredicto(veredicto="corrige", severidad="alto", tactica_mitre="Acceso inicial")
+    decisiones.revisar("d1", v)
+    assert olvidadas == [DECISION]
+
+
+def test_confirmar_no_olvida_la_firma(monkeypatch: pytest.MonkeyPatch) -> None:
+    _con_decision(monkeypatch, DECISION)
+    olvidadas: list[dict[str, Any]] = []
+    monkeypatch.setattr(decisiones, "_olvidar_firma", olvidadas.append)
+
+    decisiones.revisar("d1", decisiones.Veredicto(veredicto="confirma"))
+    assert olvidadas == []
+
+
+def test_olvidar_firma_borra_la_del_documento(monkeypatch: pytest.MonkeyPatch) -> None:
+    borradas: list[str] = []
+
+    class RepertorioFalso:
+        def olvidar(self, firma: str) -> None:
+            borradas.append(firma)
+
+    monkeypatch.setattr(decisiones, "RepertorioEnElBus", RepertorioFalso)
+    monkeypatch.setattr(decisiones, "_repertorio", None)
+    decisiones._olvidar_firma({"ciclo": {"firma": "abc123"}})
+    assert borradas == ["abc123"]
+
+    # sin firma no intenta nada
+    decisiones._olvidar_firma({"ciclo": {}})
+    assert borradas == ["abc123"]
+
+
 def test_no_se_confirma_lo_que_el_motor_no_clasifico(monkeypatch: pytest.MonkeyPatch) -> None:
     sin_clasificar = {**DECISION, "decision": {"concluyente": False}}
     pedidos = _con_decision(monkeypatch, sin_clasificar)

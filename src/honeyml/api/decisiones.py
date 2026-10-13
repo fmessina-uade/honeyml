@@ -23,6 +23,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from ..agent.adapters.repertorio import RepertorioEnElBus
 from ..agent.graph import CONTEXTO, HISTORIAL, INFERENCIA, MEMORIA, PERSISTENCIA, VALIDACION
 from ..agent.severidad import ORDEN, Severidad
 from ..education.annotations import TACTICAS_OBSERVABLES
@@ -35,6 +36,30 @@ NO_EXISTE = 404
 # La muestra estratificada por conducta que se revisa a ciegas. La arma `make muestra` y la API
 # solo la lee.
 MUESTRA_FILE = Path("data/processed/muestra_de_revision.json")
+
+# El repertorio del bus, para olvidar una firma cuando el analista corrige. Se arma una vez y se
+# reusa; si el bus no está, `olvidar` no hace nada y el veredicto se guarda igual.
+_repertorio: RepertorioEnElBus | None = None
+
+
+def _olvidar_firma(decision: dict[str, Any]) -> None:
+    """Saca del repertorio la firma de una decisión que el analista acaba de corregir.
+
+    Sin esto, la decisión equivocada se sigue copiando a cada repetición de la conducta hasta que
+    la clave vence sola. Se lee la firma del propio documento, que ya la guarda. Best-effort: un
+    fallo del bus no tiene que voltear el veredicto, que ya quedó escrito.
+    """
+    global _repertorio
+    firma = (decision.get("ciclo") or {}).get("firma")
+    if not firma:
+        return
+    try:
+        if _repertorio is None:
+            _repertorio = RepertorioEnElBus()
+        _repertorio.olvidar(firma)
+    except Exception:
+        return
+
 
 # Cómo se nombra en los filtros una decisión sin táctica. Un valor que ninguna táctica real puede
 # tener, así el panel filtra por "sin táctica" con el mismo parámetro que por cualquier otra.
@@ -632,6 +657,8 @@ def revisar(
     if usuario:
         documento["usuario"] = usuario
     _guardar_revision(doc_id, documento, es_url)
+    if veredicto.veredicto == "corrige":
+        _olvidar_firma(decision)
     return documento
 
 
@@ -720,4 +747,6 @@ def revisar_a_ciegas(
     if usuario:
         documento["usuario"] = usuario
     _guardar_revision(doc_id, documento, es_url)
+    if not coincide:
+        _olvidar_firma(decision)
     return documento

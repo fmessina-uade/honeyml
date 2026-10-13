@@ -76,7 +76,32 @@ def test_los_rankings_piden_un_recorte_amplio(monkeypatch: pytest.MonkeyPatch) -
     for body in pedidos:
         terms = body["aggs"]["t"]["terms"]
         assert terms["shard_size"] >= 2_000
-        assert terms["size"] == 12
+        # Se piden seis de más: después se descartan las que parecen una dirección.
+        assert terms["size"] == 18
+
+
+def test_las_credenciales_con_forma_de_direccion_no_salen(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Una de las más probadas es un fragmento de la dirección del servidor: no tiene que aparecer
+    en el ranking que devuelve la API."""
+
+    def falso(body: dict[str, Any], es_url: str = "") -> dict[str, Any]:
+        return {
+            "aggregations": {
+                "t": {
+                    "buckets": [
+                        {"key": "root", "doc_count": 9},
+                        {"key": "203.0.113", "doc_count": 7},
+                        {"key": "admin", "doc_count": 5},
+                    ]
+                }
+            }
+        }
+
+    monkeypatch.setattr(queries, "_search", falso)
+    usuarios = queries.top_credentials(size=2)["users"]
+    claves = [c["key"] for c in usuarios]
+    assert claves == ["root", "admin"]
+    assert "203.0.113" not in claves
 
 
 def test_las_direcciones_por_grupo_usan_el_umbral_maximo() -> None:

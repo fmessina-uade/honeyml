@@ -19,11 +19,9 @@ from typing import Any
 
 from . import queries
 from .decisiones import DECISIONES, DEMORA_MS, REVISIONES, SIN_TACTICA, _buscar
-from .privacidad import sin_direcciones
+from .privacidad import parece_direccion, sin_direcciones
 
 FECHA = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-# Tres grupos alcanzan para descartar una credencial: así se va también una dirección cortada.
-PARECE_DIRECCION = re.compile(r"\d{1,3}\.\d{1,3}\.\d{1,3}")
 VIGENCIA_S = 300.0
 TOPE = 10
 
@@ -56,7 +54,7 @@ def _cubos(agg: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _sin_direcciones(cubos: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return [c for c in cubos if not PARECE_DIRECCION.search(str(c["key"]))][:TOPE]
+    return [c for c in cubos if not parece_direccion(c["key"])][:TOPE]
 
 
 def _con_direcciones_distintas(agg: dict[str, Any], clave: str) -> list[dict[str, Any]]:

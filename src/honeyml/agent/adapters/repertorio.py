@@ -43,6 +43,8 @@ class Repertorio(Protocol):
 
     def registrar(self, firma: str, decision: dict[str, Any], doc_id: str) -> None: ...
 
+    def olvidar(self, firma: str) -> None: ...
+
 
 class RepertorioEnElBus:
     """El repertorio real, en el mismo servidor que lleva el bus."""
@@ -90,6 +92,18 @@ class RepertorioEnElBus:
         except redis.RedisError:
             # No registrar solo cuesta plata: la próxima repetición vuelve a preguntar. Frenar el
             # ciclo por esto costaría el evento, que es peor.
+            return
+
+    def olvidar(self, firma: str) -> None:
+        """Saca una firma del repertorio, para que su próxima repetición se razone de nuevo.
+
+        La usa el analista cuando corrige un veredicto: la decisión que se copiaba estaba mal, y
+        dejarla llevaría el mismo error a los eventos que vengan con esa conducta hasta que la clave
+        venza sola. Si el bus no responde, no pasa nada grave: la firma vence igual por su tiempo.
+        """
+        try:
+            self.r.delete(f"{PREFIJO}{firma}")
+        except redis.RedisError:
             return
 
     def resumen(self) -> str:

@@ -13,6 +13,7 @@ import urllib.request
 from typing import Any
 
 from .. import redes
+from . import privacidad
 
 # En desarrollo Elasticsearch escucha en loopback. En el servidor, la API y el motor corren en
 # contenedores y lo alcanzan por el nombre del servicio dentro de la red de análisis.
@@ -197,10 +198,19 @@ def timeline(
 
 
 def top_credentials(es_url: str = ES_URL, size: int = 10) -> dict[str, list[dict[str, Any]]]:
-    """Lo que los atacantes prueban de verdad: la evidencia detrás de "usá contraseñas fuertes"."""
+    """Lo que los atacantes prueban de verdad: la evidencia detrás de "usá contraseñas fuertes".
+
+    Las credenciales con forma de dirección se descartan antes de devolver el ranking: una de ellas
+    es un fragmento de la dirección del propio servidor, y no tiene por qué salir de la API. Se
+    piden unas cuantas de más para que el recorte no deje la lista corta.
+    """
     return {
-        "users": _terms("user.name", size, es_url),
-        "passwords": _terms("cowrie.password", size, es_url),
+        "users": privacidad.sin_credenciales_con_direccion(
+            _terms("user.name", size + 6, es_url), size
+        ),
+        "passwords": privacidad.sin_credenciales_con_direccion(
+            _terms("cowrie.password", size + 6, es_url), size
+        ),
     }
 
 
