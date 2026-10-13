@@ -57,15 +57,16 @@ services:
     container_name: api
     hostname: api
     command: ["uvicorn", "honeyml.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    # La clave del bus entra por el mismo archivo que la del motor, resuelto contra la ubicación del
+    # compose y no contra el directorio desde donde se lo corre: así un recreado manual de la API la
+    # recibe igual, cosa que una interpolación del entorno no garantiza. Hace falta para que, al
+    # corregir un veredicto, la API saque del repertorio la firma de la decisión corregida; sin la
+    # clave, con el bus autenticado ese olvido fallaría callado y el error se seguiría copiando.
+    env_file:
+      - ../../.env
     environment:
       - ES_URL=http://elasticsearch:9200
-      # Para alcanzar el bus al corregir un veredicto: la API saca del repertorio la firma de la
-      # decisión corregida, así el error no se sigue copiando.
       - BUS_HOST=valkey
-      # La clave del bus va explícita y no por env_file: la API solo necesita la del bus, no la del
-      # proveedor de inferencia. Sin esta línea, con el bus autenticado el olvido de la firma fallaría
-      # callado y la decisión corregida se seguiría copiando. Vacía quiere decir sin autenticación.
-      - "BUS_PASSWORD=${BUS_PASSWORD:-}"
     volumes:
       - ../../data/processed:/app/data/processed:ro
       # Los registros que escriben los scripts del anfitrión, para la auditoría del superadmin. Va el
