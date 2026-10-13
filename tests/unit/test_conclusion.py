@@ -28,7 +28,7 @@ def _respuesta() -> dict[str, Any]:
                 "doc_count": 10,
                 "percentiles": {"values": {"50.0": 9000.0, "90.0": 13000.0}},
                 "media": {"value": 9500.0},
-                "modelo_s": {"value": 1200.0},
+                "modelo_s": {"value": 2.3},
             },
         },
     }
@@ -42,7 +42,7 @@ def test_el_desglose_separa_copiadas_de_razonadas(monkeypatch: pytest.MonkeyPatc
     assert r["total"]["media_s"] == 8.6
     assert r["copiadas_detalle"]["media_s"] == 0.6
     assert r["razonadas_detalle"]["media_s"] == 9.5
-    assert r["razonadas_detalle"]["modelo_s"] == 1.2
+    assert r["razonadas_detalle"]["modelo_s"] == 2.3
 
 
 def test_la_consulta_excluye_retriaje_y_origen_interno(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -58,6 +58,7 @@ def test_la_consulta_excluye_retriaje_y_origen_interno(monkeypatch: pytest.Monke
     must_not = capturado["cuerpo"]["query"]["bool"]["must_not"]
     assert {"term": {"ciclo.retriaje": True}} in must_not
     assert {"term": {"evento.origen": redes.INTERNAS[0]}} in must_not
+    assert capturado["cuerpo"]["track_total_hits"] is True
     assert capturado["cuerpo"]["query"]["bool"]["filter"][0]["range"]["@timestamp"]["gte"] == (
         "now-30d"
     )

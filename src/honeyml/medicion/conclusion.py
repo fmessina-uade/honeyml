@@ -49,6 +49,8 @@ def calcular(desde: str = "now-7d", es_url: str = queries.ES_URL) -> dict[str, A
     """El tiempo de conclusión en la ventana, en total y partido entre copiadas y razonadas."""
     cuerpo = {
         "size": 0,
+        # Sin esto el total queda topado en 10.000 y la resta de las copiadas daría negativo.
+        "track_total_hits": True,
         "runtime_mappings": DEMORA_MS,
         "query": _base(desde),
         "aggs": {
@@ -79,7 +81,9 @@ def calcular(desde: str = "now-7d", es_url: str = queries.ES_URL) -> dict[str, A
         "copiadas_detalle": _tramo(a["copiadas"], copiadas),
         "razonadas_detalle": {
             **_tramo(a["razonadas"], total - copiadas),
-            "modelo_s": _seg(a["razonadas"].get("modelo_s", {}).get("value")),
+            # `modelo.segundos` ya viene en segundos, a diferencia de la demora, que está en
+            # milisegundos: no se divide.
+            "modelo_s": _redondear(a["razonadas"].get("modelo_s", {}).get("value")),
         },
     }
 
@@ -96,6 +100,10 @@ def _tramo(agg: dict[str, Any], n: int) -> dict[str, Any]:
 
 def _seg(ms: float | None) -> float | None:
     return round(ms / 1000, 1) if ms is not None else None
+
+
+def _redondear(s: float | None) -> float | None:
+    return round(s, 1) if s is not None else None
 
 
 def _num(v: float | None) -> str:
