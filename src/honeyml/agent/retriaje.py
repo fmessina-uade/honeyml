@@ -74,10 +74,17 @@ def main() -> int:
     ap.add_argument("--seco", action="store_true", help="contar y estimar, sin escribir nada")
     ap.add_argument("--host", default=bus.HOST)
     ap.add_argument("--puerto", type=int, default=bus.PORT)
+    ap.add_argument("--contrasena", default=bus.PASSWORD)
     ap.add_argument("--stream", default=bus.STREAM)
     args = ap.parse_args()
 
-    r = redis.Redis(host=args.host, port=args.puerto, decode_responses=True, socket_timeout=10)
+    r = redis.Redis(
+        host=args.host,
+        port=args.puerto,
+        password=args.contrasena,
+        decode_responses=True,
+        socket_timeout=10,
+    )
     eventos = eventos_de(r, args.stream, args.categoria)
     firmas = {firma.de_evento(e) for e in eventos}
     print(f"  eventos de '{args.categoria}' en el bus: {len(eventos)}")

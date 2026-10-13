@@ -21,6 +21,7 @@ algo salga mal; el piso acota la consecuencia si sale. Si te interesa esa parte,
 
 from __future__ import annotations
 
+import hashlib
 import json
 from typing import Any
 
@@ -117,6 +118,19 @@ def _bloque(titulo: str, cuerpo: str) -> str:
     return f"{titulo}\n{CERCA}\n{cuerpo.replace(CERCA, CERCA_NEUTRALIZADA)}\n{CERCA}"
 
 
+def seudonimo(ip: str) -> str:
+    """Un apodo estable para una dirección, para no mandarle la real al proveedor de inferencia.
+
+    La misma dirección da siempre el mismo apodo, así el modelo todavía puede ver que dos eventos
+    vienen del mismo origen, que es lo único que la dirección le aporta a la clasificación. El resto
+    del contexto sobre esa dirección ya viaja en conteos, no en la dirección misma. El apodo no se
+    puede volver dirección: es el principio de un SHA-256, que no se invierte.
+    """
+    if not ip:
+        return ""
+    return "origen-" + hashlib.sha256(ip.encode()).hexdigest()[:8]
+
+
 def _pedido(estado: EstadoTriaje) -> str:
     """Arma el mensaje que lee el proveedor, a partir de la estructura del contexto.
 
@@ -138,6 +152,10 @@ def _pedido(estado: EstadoTriaje) -> str:
         "momento": ctx.momento,
     }
     evento = "\n".join(f"{k}: {v}" for k, v in campos.items() if v)
+    # La dirección de origen se reemplaza por su apodo en todo el texto del evento, no solo en su
+    # campo: el resumen la trae embebida, y la real no tiene que llegar al proveedor.
+    if ctx.origen:
+        evento = evento.replace(ctx.origen, seudonimo(ctx.origen))
 
     partes = [_bloque("EVENTO", evento)]
     if ctx.hallazgos:

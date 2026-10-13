@@ -49,6 +49,9 @@ import redis
 # loopback y no se alcanza desde afuera de la zona de análisis.
 HOST = os.getenv("BUS_HOST", "127.0.0.1")
 PORT = int(os.getenv("BUS_PORT", "6379"))
+# La contraseña del bus. Vacía o sin definir quiere decir sin autenticación, que es como corre en
+# una prueba local; en el servidor la fija el entorno y el bus la exige.
+PASSWORD = os.getenv("BUS_PASSWORD") or None
 STREAM = os.getenv("BUS_STREAM", "honeyml:events")
 GROUP = os.getenv("BUS_GROUP", "triaje")
 
@@ -210,6 +213,7 @@ class ConsumidorDelBus:
         *,
         host: str = HOST,
         puerto: int = PORT,
+        contrasena: str | None = PASSWORD,
         stream: str = STREAM,
         grupo: str = GROUP,
         nombre: str | None = None,
@@ -240,7 +244,11 @@ class ConsumidorDelBus:
         self.motivo_de_parada = ""
 
         self.r = redis.Redis(
-            host=host, port=puerto, decode_responses=True, socket_timeout=bloqueo_ms / 1000 + 10
+            host=host,
+            port=puerto,
+            password=contrasena,
+            decode_responses=True,
+            socket_timeout=bloqueo_ms / 1000 + 10,
         )
 
     # Ciclo de vida

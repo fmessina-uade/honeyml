@@ -63,6 +63,9 @@ services:
       # lectura. pipeline.workers queda en su valor por defecto (la cantidad de CPU); LS_JAVA_OPTS
       # no es un ajuste, se aplica directo.
       - "LS_JAVA_OPTS=-Xmx${LS_HEAP:-512m} -Xms${LS_HEAP:-512m}"
+      # La clave del bus, para que el filtro que publica en Valkey pueda autenticarse. Vacía quiere
+      # decir sin autenticación, como en una prueba local.
+      - "BUS_PASSWORD=${BUS_PASSWORD:-}"
     volumes:
       - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
       - ./logstash/pipeline:/usr/share/logstash/pipeline:ro

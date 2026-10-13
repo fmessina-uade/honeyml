@@ -51,7 +51,11 @@ class RepertorioEnElBus:
 
     def __init__(self, cliente: redis.Redis | None = None, ttl: int = TTL) -> None:
         self.r = cliente or redis.Redis(
-            host=bus.HOST, port=bus.PORT, decode_responses=True, socket_timeout=3
+            host=bus.HOST,
+            port=bus.PORT,
+            password=bus.PASSWORD,
+            decode_responses=True,
+            socket_timeout=3,
         )
         self.ttl = ttl
         self.aciertos = 0

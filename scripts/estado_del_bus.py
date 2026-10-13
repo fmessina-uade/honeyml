@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from collections.abc import Iterator
@@ -37,8 +38,10 @@ PREFIJOS = (PREFIJO_FIRMA, PREFIJO_VISTO)
 LOTE = 500
 
 
-def _conectar(host: str, puerto: int) -> redis.Redis:
-    r = redis.Redis(host=host, port=puerto, decode_responses=True, socket_timeout=10)
+def _conectar(host: str, puerto: int, contrasena: str | None) -> redis.Redis:
+    r = redis.Redis(
+        host=host, port=puerto, password=contrasena, decode_responses=True, socket_timeout=10
+    )
     r.ping()
     return r
 
@@ -161,6 +164,7 @@ def main() -> int:
     ap.add_argument("accion", choices=["contar", "exportar", "importar"])
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--puerto", type=int, default=6379)
+    ap.add_argument("--contrasena", default=os.getenv("BUS_PASSWORD") or None)
     ap.add_argument(
         "--forzar",
         action="store_true",
@@ -169,7 +173,7 @@ def main() -> int:
     args = ap.parse_args()
 
     try:
-        r = _conectar(args.host, args.puerto)
+        r = _conectar(args.host, args.puerto, args.contrasena)
     except redis.RedisError as exc:
         print(f"  no se pudo conectar a {args.host}:{args.puerto}: {exc}", file=sys.stderr)
         return 1

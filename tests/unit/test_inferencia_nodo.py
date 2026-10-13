@@ -192,6 +192,18 @@ def test_el_pedido_se_arma_desde_la_estructura_y_es_reproducible() -> None:
     assert s1.usuario == s2.usuario and s1.sistema == s2.sistema
 
 
+def test_la_direccion_de_origen_viaja_seudonimizada() -> None:
+    """La dirección real no se le manda al proveedor: va un apodo estable, que alcanza para que el
+    modelo vea que dos eventos comparten origen."""
+    s = _ServicioFalso()
+    nodo.consultar(_estado(), servicio=s)
+
+    assert "203.0.113.7" not in s.usuario
+    assert nodo.seudonimo("203.0.113.7") in s.usuario
+    assert nodo.seudonimo("203.0.113.7") == nodo.seudonimo("203.0.113.7")
+    assert nodo.seudonimo("203.0.113.7") != nodo.seudonimo("203.0.113.8")
+
+
 def test_el_esquema_pedido_es_el_estricto_de_la_decision() -> None:
     s = _ServicioFalso()
     nodo.consultar(_estado(), servicio=s)

@@ -14,13 +14,19 @@ services:
     container_name: valkey
     hostname: valkey
     restart: unless-stopped
+    # `--requirepass` con la clave del entorno. Vacía quiere decir sin autenticación, como en una
+    # prueba local; en el servidor la fija el `.env` y el bus la exige. La misma clave entra al
+    # contenedor como variable, para que el chequeo de salud pueda autenticarse cuando está puesta.
     command: >-
       valkey-server
       --appendonly yes
       --appendfsync everysec
       --maxmemory ${BUS_MAXMEMORY:-512mb}
       --maxmemory-policy noeviction
+      --requirepass "${BUS_PASSWORD:-}"
       --save ""
+    environment:
+      - BUS_PASSWORD=${BUS_PASSWORD:-}
     volumes:
       - valkey_data:/data
     # atado a loopback, nunca expuesto en la interfaz pública del VPS
@@ -29,7 +35,12 @@ services:
     networks:
       - elastic_net
     healthcheck:
-      test: ["CMD", "valkey-cli", "ping"]
+      # Se autentica solo si hay clave: `$${BUS_PASSWORD:+...}` agrega `-a` nada más cuando está
+      # puesta, así el mismo chequeo sirve con y sin autenticación. El `$$` deja que lo expanda el
+      # shell del contenedor y no Compose.
+      test:
+        - CMD-SHELL
+        - valkey-cli $${BUS_PASSWORD:+-a "$$BUS_PASSWORD"} --no-auth-warning ping | grep -q PONG
       interval: 15s
       timeout: 5s
       retries: 5

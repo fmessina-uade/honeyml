@@ -59,6 +59,9 @@ services:
     command: ["uvicorn", "honeyml.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
     environment:
       - ES_URL=http://elasticsearch:9200
+      # Para alcanzar el bus al corregir un veredicto: la API saca del repertorio la firma de la
+      # decisión corregida, así el error no se sigue copiando. La clave del bus entra por el .env.
+      - BUS_HOST=valkey
     volumes:
       - ../../data/processed:/app/data/processed:ro
       # Los registros que escriben los scripts del anfitrión, para la auditoría del superadmin. Va el
