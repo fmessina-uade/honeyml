@@ -98,6 +98,28 @@ def test_el_impacto_separa_la_descarga_de_la_escala() -> None:
     assert campana._aciertos(r["severidad_impacto"]) == (0, 1)  # esperaba alto
 
 
+def test_los_eventos_de_archivo_se_cuentan_aparte() -> None:
+    """La descarga que no se concreta llega como evento de archivo, no como comando: su severidad
+    se mide por separado, porque el piso del archivo ya es crítico."""
+    decisiones = [
+        {
+            "evento": {"categoria": "file", "doc_id": "f1", "origen": "10.0.0.5"},
+            "decision": {"severidad": "critico", "tactica_mitre": None},
+            "ciclo": {},
+        },
+        {
+            "evento": {"categoria": "file", "doc_id": "f2", "origen": "10.0.0.5"},
+            "decision": {"severidad": "alto", "tactica_mitre": None},
+            "ciclo": {},
+        },
+    ]
+    r = campana.comparar(_corrida(), decisiones, {})
+
+    assert r["por_categoria"] == {"file": 2}
+    assert r["archivos_por_severidad"] == {"critico": 1, "alto": 1}
+    assert r["emparejadas"] == 0
+
+
 def test_el_informe_en_seco_se_lee() -> None:
     texto = "\n".join(campana.informe_corrida())
     assert "escenarios" in texto

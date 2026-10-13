@@ -448,12 +448,22 @@ def comparar(
         sev_impacto.append((escenario.severidad_impacto, obtenida))
         tactica.append((escenario.tactica, decision.get("tactica_mitre")))
 
+    # Las descargas no llegan como comando sino como evento de archivo: el sensor registra el
+    # intento aunque no se concrete. Para la escala del proyecto, un archivo tiene piso crítico, así
+    # que acá se mide si el motor sostiene ese nivel en el camino que de verdad lo produce.
+    archivos = [d for d in decisiones if d.get("evento", {}).get("categoria") == "file"]
+    por_categoria: dict[str, int] = {}
+    for d in decisiones:
+        cat = d.get("evento", {}).get("categoria") or "sin categoría"
+        por_categoria[cat] = por_categoria.get(cat, 0) + 1
+
     autenticaciones = [
         d for d in decisiones if d.get("evento", {}).get("categoria") == "authentication"
     ]
     return {
         "ventana": {"desde": corrida["desde"], "hasta": corrida["hasta"]},
         "decisiones": len(decisiones),
+        "por_categoria": por_categoria,
         "emparejadas": emparejadas,
         "sin_emparejar": sin_emparejar,
         "copiadas": copiadas,
@@ -461,7 +471,17 @@ def comparar(
         "severidad_escala": _matriz(sev_escala),
         "severidad_impacto": _matriz(sev_impacto),
         "tactica": _matriz(tactica),
+        "archivos_por_severidad": _conteo(
+            [d.get("decision", {}).get("severidad") for d in archivos]
+        ),
     }
+
+
+def _conteo(valores: list[str | None]) -> dict[str, int]:
+    conteo: dict[str, int] = {}
+    for v in valores:
+        conteo[str(v)] = conteo.get(str(v), 0) + 1
+    return conteo
 
 
 def _aciertos(matriz: dict[str, dict[str, int]]) -> tuple[int, int]:
@@ -487,8 +507,10 @@ def informe_corrida() -> list[str]:
 
 def informe_comparacion(r: dict[str, Any]) -> list[str]:
     v = r["ventana"]
+    categorias = ", ".join(f"{c} {n}" for c, n in sorted(r["por_categoria"].items()))
     lineas = [
         f"Corrida {v['desde']} a {v['hasta']}: {r['decisiones']} decisiones de origen interno.",
+        f"Por categoría: {categorias}.",
         f"Comandos emparejados {r['emparejadas']}, sin emparejar {r['sin_emparejar']}, "
         f"copiadas {r['copiadas']}; autenticaciones {r['autenticaciones']}.",
     ]
@@ -503,6 +525,15 @@ def informe_comparacion(r: dict[str, Any]) -> list[str]:
             for obtenido, n in sorted(fila.items()):
                 marca = " " if esperado == obtenido else "x"
                 lineas.append(f"  {marca} esperado {esperado:<24} obtenido {obtenido:<24} {n}")
+    archivos = r["archivos_por_severidad"]
+    if archivos:
+        total = sum(archivos.values())
+        criticos = archivos.get("critico", 0)
+        lineas.append(f"\nEventos de archivo (la descarga que no se concreta): {total}")
+        lineas.append(f"  en crítico {criticos} de {total} (piso del evento de archivo)")
+        for sev, n in sorted(archivos.items()):
+            if sev != "critico":
+                lineas.append(f"  x en {sev} {n}")
     return lineas
 
 
