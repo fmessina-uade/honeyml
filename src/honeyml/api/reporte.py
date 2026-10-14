@@ -19,7 +19,7 @@ from typing import Any
 
 from . import queries
 from .decisiones import DECISIONES, DEMORA_MS, REVISIONES, SIN_TACTICA, _buscar
-from .privacidad import parece_direccion, sin_direcciones
+from .privacidad import credenciales_frecuentes, sin_direcciones
 
 FECHA = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 VIGENCIA_S = 300.0
@@ -53,8 +53,8 @@ def _cubos(agg: dict[str, Any]) -> list[dict[str, Any]]:
     return [{"key": b["key"], "count": b["doc_count"]} for b in agg["buckets"]]
 
 
-def _sin_direcciones(cubos: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return [c for c in cubos if not parece_direccion(c["key"])][:TOPE]
+def _credenciales(agg: dict[str, Any]) -> list[dict[str, Any]]:
+    return credenciales_frecuentes(queries.cubos_de_credenciales(agg["buckets"]), TOPE)
 
 
 def _con_direcciones_distintas(agg: dict[str, Any], clave: str) -> list[dict[str, Any]]:
@@ -97,9 +97,9 @@ def _captura(consulta: dict[str, Any], es_url: str) -> dict[str, Any]:
             "con_geo": {"filter": {"exists": {"field": "source.geo.country_name"}}},
             "sistemas": queries._ranking("source.as.organization.name", 10)
             | {"aggs": {"ips": queries._distintas("source.ip")}},
-            # Se piden de más: después se descartan las que parecen direcciones.
-            "usuarios": queries._ranking("user.name", TOPE + 6),
-            "contrasenas": queries._ranking("cowrie.password", TOPE + 6),
+            # Se piden de más: después se descartan las poco probadas y las que parecen direcciones.
+            "usuarios": queries._ranking_de_credenciales("user.name", TOPE * 3 + 10),
+            "contrasenas": queries._ranking_de_credenciales("cowrie.password", TOPE * 3 + 10),
             "comandos_top": queries._ranking("process.command_line", 8),
         },
     }
@@ -148,8 +148,8 @@ def _captura(consulta: dict[str, Any], es_url: str) -> dict[str, Any]:
         "paises": paises,
         "con_geo": a["con_geo"]["doc_count"],
         "sistemas": _con_direcciones_distintas(a["sistemas"], "organization"),
-        "usuarios": _sin_direcciones(_cubos(a["usuarios"])),
-        "contrasenas": _sin_direcciones(_cubos(a["contrasenas"])),
+        "usuarios": _credenciales(a["usuarios"]),
+        "contrasenas": _credenciales(a["contrasenas"]),
         "comandos": sin_direcciones(_cubos(a["comandos_top"])),
     }
 

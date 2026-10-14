@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Annotated, Any, Literal
 from urllib.error import HTTPError, URLError
 
-from fastapi import Depends, FastAPI, HTTPException, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -42,7 +42,7 @@ from . import (
     telemetria,
 )
 from .acceso import Sesion
-from .privacidad import sin_direcciones
+from .privacidad import credenciales_de_sesiones, sin_contrasenas, sin_direcciones
 
 REPLAY_FILE = Path("data/processed/replay_sessions.json")
 
@@ -116,10 +116,10 @@ def _en_vivo[T](fetch: Callable[[], T]) -> T:
 
 
 def _tapar_si_invitado[T](sesion: Sesion, datos: T) -> T:
-    """El invitado ve las decisiones sin ninguna dirección: está para mirar el panel en una
-    demostración, y no necesita la del atacante para eso. Desde el analista para arriba se ven,
-    porque revisar una clasificación pide el evento como llegó."""
-    tapados: T = sin_direcciones(datos) if not sesion.puede("analista") else datos
+    """El invitado ve las decisiones sin ninguna dirección y sin las contraseñas de los eventos:
+    está para mirar el panel en una demostración, y no necesita ni lo uno ni lo otro. Desde el
+    analista para arriba se ven, porque revisar una clasificación pide el evento como llegó."""
+    tapados: T = sin_contrasenas(sin_direcciones(datos)) if not sesion.puede("analista") else datos
     return tapados
 
 
@@ -180,14 +180,22 @@ def get_timeline(
         ) from exc
 
 
+# El ranking más largo que se entrega. Cualquier sesión puede pedirlo, invitados incluidos, y cada
+# puesto pedido le cuesta a Elasticsearch cubos en todos los índices diarios: sin tope, un solo
+# pedido grande alcanza para cargarlo. El panel pide pocos.
+RANKING_MAXIMO = 50
+
+
 @app.get("/api/credentials")
-def get_credentials(size: int = 10) -> dict[str, list[dict[str, Any]]]:
+def get_credentials(
+    size: int = Query(10, ge=1, le=RANKING_MAXIMO),
+) -> dict[str, list[dict[str, Any]]]:
     """Los usuarios y contraseñas más intentados."""
     return _live_or_frozen(lambda: queries.top_credentials(size=size), "credentials")
 
 
 @app.get("/api/commands")
-def get_commands(size: int = 12) -> list[dict[str, Any]]:
+def get_commands(size: int = Query(12, ge=1, le=RANKING_MAXIMO)) -> list[dict[str, Any]]:
     """Los comandos más ejecutados."""
     return _live_or_frozen(lambda: queries.top_commands(size=size), "commands")
 
@@ -338,7 +346,15 @@ def get_replays() -> list[dict[str, Any]]:
             detail="Faltan las sesiones. Generalas con: python -m honeyml.education.session_replay",
         )
     data: list[dict[str, Any]] = json.loads(REPLAY_FILE.read_text(encoding="utf-8"))
-    return data
+    credenciales = [s["credentials"] for s in data if s.get("credentials")]
+    usuarios = sorted({c["user"] for c in credenciales if c.get("user")})
+    contrasenas = sorted({c["password"] for c in credenciales if c.get("password")})
+    try:
+        aceptados, aceptadas = queries.credenciales_probadas(usuarios, contrasenas)
+    except (URLError, ConnectionError, TimeoutError):
+        # Sin el índice no se puede saber cuántos probaron cada una, y ante la duda se tapan todas.
+        aceptados, aceptadas = set(), set()
+    return credenciales_de_sesiones(data, aceptados, aceptadas)
 
 
 @app.get("/api/decisiones/resumen")

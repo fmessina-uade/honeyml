@@ -51,3 +51,44 @@ def test_descarta_credenciales_con_forma_de_direccion() -> None:
         {"key": "root", "count": 9},
         {"key": "admin", "count": 5},
     ]
+
+
+def test_una_credencial_entra_desde_cinco_direcciones() -> None:
+    cubos = [
+        {"key": "root", "count": 900, "origenes": 300},
+        {"key": "justo", "count": 60, "origenes": 5},
+        {"key": "casi", "count": 50, "origenes": 4},
+        {"key": "198.51.100", "count": 40, "origenes": 30},
+    ]
+    assert privacidad.credenciales_frecuentes(cubos) == [
+        {"key": "root", "count": 900},
+        {"key": "justo", "count": 60},
+    ]
+
+
+def test_una_sesion_tapa_la_credencial_que_no_pasa_la_regla() -> None:
+    sesiones = [
+        {"attacker": "attacker-1", "credentials": {"user": "root", "password": "123456"}},
+        {"attacker": "attacker-2", "credentials": {"user": "root", "password": "unica"}},
+    ]
+    tapadas = privacidad.credenciales_de_sesiones(sesiones, {"root"}, {"123456"})
+    assert tapadas[0]["credentials"] == {"user": "root", "password": "123456"}
+    assert tapadas[1]["credentials"] == {
+        "user": "root",
+        "password": privacidad.CREDENCIAL_TAPADA,
+    }
+    # el resto de la sesión no se toca
+    assert tapadas[1]["attacker"] == "attacker-2"
+
+
+def test_las_contrasenas_de_un_evento_se_ocultan_a_cualquier_profundidad() -> None:
+    datos = {
+        "evento": {"user.name": "root", "cowrie.password": "123456", "dionaea.password": None},
+        "items": [{"evento": {"cowrie.password": "otra"}}],
+    }
+    oculto = privacidad.sin_contrasenas(datos)
+    assert oculto["evento"]["cowrie.password"] == privacidad.CONTRASENA_OCULTA
+    # un campo vacío sigue vacío: no se inventa una contraseña que no estaba
+    assert oculto["evento"]["dionaea.password"] is None
+    assert oculto["evento"]["user.name"] == "root"
+    assert oculto["items"][0]["evento"]["cowrie.password"] == privacidad.CONTRASENA_OCULTA

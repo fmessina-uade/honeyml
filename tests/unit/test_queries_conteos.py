@@ -68,7 +68,8 @@ def test_los_rankings_piden_un_recorte_amplio(monkeypatch: pytest.MonkeyPatch) -
 
     def falso(body: dict[str, Any], es_url: str = "") -> dict[str, Any]:
         pedidos.append(body)
-        return {"aggregations": {"t": {"buckets": [{"key": "root", "doc_count": 5}]}}}
+        cubo = {"key": "root", "doc_count": 5, "origenes": {"value": 300}}
+        return {"aggregations": {"t": {"buckets": [cubo]}}}
 
     monkeypatch.setattr(queries, "_search", falso)
 
@@ -76,8 +77,10 @@ def test_los_rankings_piden_un_recorte_amplio(monkeypatch: pytest.MonkeyPatch) -
     for body in pedidos:
         terms = body["aggs"]["t"]["terms"]
         assert terms["shard_size"] >= 2_000
-        # Se piden seis de más: después se descartan las que parecen una dirección.
-        assert terms["size"] == 18
+        # Se piden de más: después se descartan las poco probadas y las que parecen una dirección.
+        assert terms["size"] == 46
+        origenes = body["aggs"]["t"]["aggs"]["origenes"]["cardinality"]
+        assert origenes["field"] == "source.ip"
 
 
 def test_las_credenciales_con_forma_de_direccion_no_salen(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -89,9 +92,9 @@ def test_las_credenciales_con_forma_de_direccion_no_salen(monkeypatch: pytest.Mo
             "aggregations": {
                 "t": {
                     "buckets": [
-                        {"key": "root", "doc_count": 9},
-                        {"key": "203.0.113", "doc_count": 7},
-                        {"key": "admin", "doc_count": 5},
+                        {"key": "root", "doc_count": 9, "origenes": {"value": 300}},
+                        {"key": "203.0.113", "doc_count": 7, "origenes": {"value": 80}},
+                        {"key": "admin", "doc_count": 5, "origenes": {"value": 40}},
                     ]
                 }
             }
@@ -108,3 +111,26 @@ def test_las_direcciones_por_grupo_usan_el_umbral_maximo() -> None:
     assert queries._distintas("source.ip") == {
         "cardinality": {"field": "source.ip", "precision_threshold": 40_000}
     }
+
+
+def test_las_credenciales_poco_probadas_no_salen(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Una credencial que probó una sola dirección apunta a una cuenta puntual: puede ser real y
+    filtrada de otro servicio, así que no sale aunque esté entre las más intentadas."""
+
+    def falso(body: dict[str, Any], es_url: str = "") -> dict[str, Any]:
+        return {
+            "aggregations": {
+                "t": {
+                    "buckets": [
+                        {"key": "root", "doc_count": 900, "origenes": {"value": 300}},
+                        {"key": "cuenta.puntual", "doc_count": 400, "origenes": {"value": 1}},
+                        {"key": "admin", "doc_count": 50, "origenes": {"value": 5}},
+                        {"key": "casi", "doc_count": 40, "origenes": {"value": 4}},
+                    ]
+                }
+            }
+        }
+
+    monkeypatch.setattr(queries, "_search", falso)
+    claves = [c["key"] for c in queries.top_credentials(size=10)["passwords"]]
+    assert claves == ["root", "admin"]

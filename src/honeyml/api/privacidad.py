@@ -35,6 +35,15 @@ def parece_direccion(texto: object) -> bool:
     return bool(PARECE_DIRECCION.search(str(texto)))
 
 
+# Una credencial se muestra solo si la probaron al menos estas direcciones distintas. Las de
+# diccionario las prueban cientos; una credencial real filtrada de otro servicio apunta a una cuenta
+# puntual, y la prueban una o muy pocas. El corte deja las primeras y descarta las segundas.
+MINIMO_DE_ORIGENES = 5
+
+# Lo que se muestra en lugar de una credencial que no llega al mínimo, cuando hay que mostrar algo.
+CREDENCIAL_TAPADA = "(poco probada)"
+
+
 def sin_credenciales_con_direccion(
     cubos: list[dict[str, Any]], tope: int | None = None
 ) -> list[dict[str, Any]]:
@@ -45,6 +54,66 @@ def sin_credenciales_con_direccion(
     """
     limpios = [c for c in cubos if not parece_direccion(c.get("key"))]
     return limpios[:tope] if tope is not None else limpios
+
+
+def credenciales_frecuentes(
+    cubos: list[dict[str, Any]], tope: int | None = None
+) -> list[dict[str, Any]]:
+    """El ranking con las credenciales que probaron al menos `MINIMO_DE_ORIGENES` direcciones.
+
+    Cada cubo trae en `origenes` cuántas direcciones distintas probaron esa credencial, y sale sin
+    ese campo, con la misma forma de siempre. Las que tienen forma de dirección se descartan igual.
+    """
+    frecuentes = [
+        {"key": c["key"], "count": c["count"]}
+        for c in sin_credenciales_con_direccion(cubos)
+        if c.get("origenes", 0) >= MINIMO_DE_ORIGENES
+    ]
+    return frecuentes[:tope] if tope is not None else frecuentes
+
+
+def credenciales_de_sesiones(
+    sesiones: list[dict[str, Any]], usuarios: set[str], contrasenas: set[str]
+) -> list[dict[str, Any]]:
+    """Las sesiones con la credencial de entrada tapada cuando no pasa la regla de arriba.
+
+    `usuarios` y `contrasenas` son las que la pasan. Una sesión es un solo atacante, así que su
+    credencial no dice nada de cuántos la probaron: eso se mide sobre todo el corpus.
+    """
+    salida = []
+    for sesion in sesiones:
+        credencial = sesion.get("credentials") or {}
+        usuario, contrasena = credencial.get("user"), credencial.get("password")
+        salida.append(
+            sesion
+            | {
+                "credentials": {
+                    "user": usuario if usuario in usuarios else CREDENCIAL_TAPADA,
+                    "password": contrasena if contrasena in contrasenas else CREDENCIAL_TAPADA,
+                }
+            }
+        )
+    return salida
+
+
+# Las contraseñas de un evento, tal como las guarda el índice. Para revisar una clasificación hacen
+# falta; para mirar el panel en una demostración, no.
+CAMPOS_DE_CONTRASENA = ("cowrie.password", "dionaea.password")
+CONTRASENA_OCULTA = "(oculta)"
+
+
+def sin_contrasenas(valor: Any) -> Any:
+    """El mismo valor, con las contraseñas de los eventos ocultas, a cualquier profundidad."""
+    if isinstance(valor, dict):
+        return {
+            clave: CONTRASENA_OCULTA
+            if clave in CAMPOS_DE_CONTRASENA and v is not None
+            else sin_contrasenas(v)
+            for clave, v in valor.items()
+        }
+    if isinstance(valor, list):
+        return [sin_contrasenas(v) for v in valor]
+    return valor
 
 
 def _tapar_texto(texto: str) -> str:

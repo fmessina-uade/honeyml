@@ -238,6 +238,8 @@ const es = {
     ofTop: 'del top 10',
     timesLess: (n: string, k: string) => `${n} veces menos que ${k}`,
     noteTop: (k: string, p: string) => `${k} solo se lleva el ${p}% del ranking`,
+    filterNote:
+      'Solo aparecen las credenciales que probaron al menos cinco direcciones distintas, que son las de diccionario. Una credencial que probó una sola dirección puede ser real, filtrada de otro servicio y dirigida a una cuenta puntual, así que no se muestra.',
   },
   mitre: {
     coverageTitle: 'Cobertura del marco',
@@ -1265,6 +1267,8 @@ const en: typeof es = {
     ofTop: 'of the top 10',
     timesLess: (n: string, k: string) => `${n} times fewer than ${k}`,
     noteTop: (k: string, p: string) => `${k} alone takes ${p}% of the ranking`,
+    filterNote:
+      'Only credentials tried by at least five different addresses appear, which are the dictionary ones. A credential tried by a single address may be real, leaked from another service and aimed at a specific account, so it is not shown.',
   },
   mitre: {
     coverageTitle: 'Framework coverage',

@@ -265,6 +265,9 @@ export default function Dictionary({ users, passwords }: { users: Bucket[]; pass
           />
         </Reveal>
       </div>
+      <p className="text-[13px] text-white/50 mt-8 leading-relaxed max-w-[48rem]">
+        {t.dictionary.filterNote}
+      </p>
     </section>
   );
 }

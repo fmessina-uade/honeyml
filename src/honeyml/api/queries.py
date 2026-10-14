@@ -197,20 +197,79 @@ def timeline(
     return out
 
 
+# Un ranking de credenciales que además cuenta cuántas direcciones distintas probaron cada una. Para
+# saber si llegan al mínimo de `privacidad` alcanza un umbral chico del estimador, que por debajo de
+# él cuenta exacto y por cubo pesa poco: con el umbral máximo, dos mil cubos por índice diario se
+# volverían una carga seria para Elasticsearch.
+_ORIGENES: dict[str, Any] = {"cardinality": {"field": "source.ip", "precision_threshold": 100}}
+
+
+def _ranking_de_credenciales(field: str, size: int) -> dict[str, Any]:
+    return _ranking(field, size) | {"aggs": {"origenes": _ORIGENES}}
+
+
+def cubos_de_credenciales(buckets: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        {"key": b["key"], "count": b["doc_count"], "origenes": b["origenes"]["value"]}
+        for b in buckets
+    ]
+
+
+def _credenciales(field: str, size: int, es_url: str = ES_URL) -> list[dict[str, Any]]:
+    # Se piden de más: después del corte por direcciones el ranking no puede quedar corto.
+    body = {
+        "size": 0,
+        "query": NOT_LOCAL,
+        "aggs": {"t": _ranking_de_credenciales(field, size * 3 + 10)},
+    }
+    buckets = _search(body, es_url)["aggregations"]["t"]["buckets"]
+    return privacidad.credenciales_frecuentes(cubos_de_credenciales(buckets), size)
+
+
+def credenciales_probadas(
+    usuarios: list[str], contrasenas: list[str], es_url: str = ES_URL
+) -> tuple[set[str], set[str]]:
+    """De estas credenciales, las que pasan la regla de `privacidad` sobre todo el corpus.
+
+    Se pregunta solo por los valores dados (`include`), así la consulta no depende de que estén
+    entre las más probadas de cada índice diario.
+    """
+
+    def contar(campo: str, valores: list[str]) -> dict[str, Any]:
+        return {
+            "terms": {"field": campo, "include": valores, "size": len(valores)},
+            "aggs": {"origenes": _ORIGENES},
+        }
+
+    aggs = {}
+    if usuarios:
+        aggs["u"] = contar("user.name", usuarios)
+    if contrasenas:
+        aggs["p"] = contar("cowrie.password", contrasenas)
+    if not aggs:
+        return set(), set()
+    a = _search({"size": 0, "query": NOT_LOCAL, "aggs": aggs}, es_url)["aggregations"]
+
+    def pasan(clave: str) -> set[str]:
+        if clave not in a:
+            return set()
+        cubos = cubos_de_credenciales(a[clave]["buckets"])
+        return {c["key"] for c in privacidad.credenciales_frecuentes(cubos)}
+
+    return pasan("u"), pasan("p")
+
+
 def top_credentials(es_url: str = ES_URL, size: int = 10) -> dict[str, list[dict[str, Any]]]:
     """Lo que los atacantes prueban de verdad: la evidencia detrás de "usá contraseñas fuertes".
 
-    Las credenciales con forma de dirección se descartan antes de devolver el ranking: una de ellas
-    es un fragmento de la dirección del propio servidor, y no tiene por qué salir de la API. Se
-    piden unas cuantas de más para que el recorte no deje la lista corta.
+    Solo entran las credenciales que probaron al menos cinco direcciones distintas, que son las de
+    diccionario: una credencial real filtrada de otro servicio apunta a una cuenta puntual y no
+    llega. Las que tienen forma de dirección se descartan igual, porque una de ellas es un fragmento
+    de la dirección del propio servidor.
     """
     return {
-        "users": privacidad.sin_credenciales_con_direccion(
-            _terms("user.name", size + 6, es_url), size
-        ),
-        "passwords": privacidad.sin_credenciales_con_direccion(
-            _terms("cowrie.password", size + 6, es_url), size
-        ),
+        "users": _credenciales("user.name", size, es_url),
+        "passwords": _credenciales("cowrie.password", size, es_url),
     }
 
 
