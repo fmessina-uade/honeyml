@@ -16,13 +16,15 @@ El contrato con el consumidor es corto. Si el ciclo levanta, sea porque el índi
 porque no se alcanzó al proveedor o porque el almacén rechazó la decisión, la excepción sale, el
 evento no se confirma y otro consumidor lo reclama. Si retorna, la decisión ya está guardada. Lo
 único que se traduce es la cuota del proveedor: sale como `DetenerConsumo`, porque afecta a todos
-los eventos que siguen y no solo al que la encontró.
+los eventos que siguen y no solo al que la encontró. En modo continuo ese corte no termina el
+proceso: el motor deja una marca en el bus para que el panel avise, y queda en pausa reintentando.
 """
 
 from __future__ import annotations
 
 import argparse
 import sys
+import time
 from collections.abc import Callable
 from typing import Any, cast
 
@@ -34,6 +36,7 @@ from .adapters.almacen import Almacen, AlmacenConsultable, AlmacenElastic
 from .adapters.config import MODELO_POR_DEFECTO, CredencialAusenteError
 from .adapters.inferencia import PRECIOS, CuotaAgotadaError
 from .adapters.repertorio import PREFIJO, Repertorio, RepertorioEnElBus
+from .adapters.saldo import MarcaSinSaldo
 from .adapters.servicio import AdaptadorDeInferencia, ServicioDeInferencia
 from .graph import INFERENCIA, MEMORIA, PERSISTENCIA, construir_grafo, ejecutar
 from .nodes import inferencia as nodo_inferencia
@@ -55,6 +58,11 @@ TOPE_SIN_CONFIRMAR = 2000
 # Salen de corridas contra datos reales y no de una cuenta a ojo. Una estimación que se queda corta
 # es el peor error para una guardia pensada justamente para avisar antes de gastar.
 TOKENS_TIPICOS = (2545, 980)
+
+# Cada cuánto reintenta el motor cuando el proveedor se quedó sin saldo. Cinco minutos alcanzan para
+# retomar enseguida cuando se carga crédito, y son pocos pedidos rechazados por hora. Mientras tanto
+# no se lee el bus: lo que llega espera ahí, sin perderse.
+PAUSA_SIN_SALDO_S = 300
 
 
 def compilar(
@@ -174,6 +182,7 @@ def manejador(
     repertorio: Repertorio | None = None,
     *,
     saltear_decididos: bool = True,
+    marca: MarcaSinSaldo | None = None,
 ) -> Callable[[bus.EventoDelBus], bool]:
     """El manejador que reemplaza a `manejador_de_registro`: corre un evento por el grafo.
 
@@ -185,11 +194,20 @@ def manejador(
     sin la pregunta, cada uno recorre el grafo entero y el que no acierta el repertorio paga una
     llamada que después choca contra la decisión guardada. Con `saltear_decididos` en falso se
     vuelve a decidir, que es lo que pide una corrida que reescribe a propósito.
+
+    Con `marca`, la cuota agotada queda anotada en el bus para el panel, y la anotación se saca en
+    cuanto el proveedor vuelve a contestar.
     """
     destino = almacen or AlmacenElastic()
     compilado = compilar(servicio=servicio, almacen=destino, repertorio=repertorio)
 
+    # Arranca como puesta porque al levantar no se sabe si quedó una marca de una corrida anterior:
+    # la primera respuesta del proveedor la saca, y después solo se vuelve a sacar si se volvió a
+    # poner. Así no se escribe en el bus por cada evento.
+    marca_puesta = marca is not None
+
     def triar(evento: bus.EventoDelBus) -> bool:
+        nonlocal marca_puesta
         if saltear_decididos and destino.existe(evento.doc_id):
             print(f"  ~ ya estaba decidido: {evento.resumen()}")
             return True
@@ -199,12 +217,33 @@ def manejador(
             # El problema no es el evento sino el proveedor, y va a afectar igual a todos los que
             # siguen. Tomado como una falla común, cada evento fallaría, se reclamaría y a la
             # tercera entrega terminaría en la cola de muertos.
+            if marca is not None:
+                marca.poner(str(exc))
+                marca_puesta = True
             raise bus.DetenerConsumo(str(exc)) from exc
+        # `intentos` solo sube cuando el proveedor contestó. Una copia del repertorio o un evento
+        # cortado antes de razonar no prueban que haya saldo, así que no sacan la marca.
+        if marca is not None and marca_puesta and int(final.get("intentos") or 0) > 0:
+            marca.quitar()
+            marca_puesta = False
         print(_linea(evento, final))
         # Le avisa al consumidor si la decisión ya existía, para que lo cuente como repetido.
         return bool(final.get("ya_existia"))
 
     return triar
+
+
+def esperar(consumidor: bus.ConsumidorDelBus, segundos: int) -> bool:
+    """Espera de a un segundo y devuelve falso si en el medio llegó una señal.
+
+    De a uno para que un `docker stop` durante la pausa corte en el acto y no espere los minutos
+    que falten: Docker manda SIGKILL a los diez segundos.
+    """
+    for _ in range(segundos):
+        if consumidor.parado:
+            return False
+        time.sleep(1)
+    return not consumidor.parado
 
 
 def main() -> int:
@@ -266,6 +305,7 @@ def main() -> int:
             almacen=almacen,
             repertorio=repertorio,
             saltear_decididos=not args.reescribir,
+            marca=MarcaSinSaldo(),
         ),
         host=args.host,
         puerto=args.puerto,
@@ -304,6 +344,16 @@ def main() -> int:
         return 1
 
     c = consumidor.correr(limite=args.limite, desde_ahora=args.desde_ahora)
+    # En modo continuo una cuota agotada no termina el proceso. Si saliera, el contenedor lo
+    # volvería a levantar, chocaría otra vez y quedaría en un bucle de reinicios que no avisa nada.
+    # En cambio queda en pausa con la marca puesta y reintenta. Una corrida acotada sí termina.
+    while args.limite is None and consumidor.motivo_de_parada and not consumidor.senal:
+        print(f"\n  Sin saldo de inferencia: {consumidor.motivo_de_parada}")
+        print(f"  En pausa, se reintenta en {PAUSA_SIN_SALDO_S // 60} minutos.")
+        consumidor.reanudar()
+        if not esperar(consumidor, PAUSA_SIN_SALDO_S):
+            break
+        c = consumidor.correr(limite=None, desde_ahora=args.desde_ahora)
 
     if consumidor.motivo_de_parada:
         print(f"\n  La corrida se detuvo: {consumidor.motivo_de_parada}")

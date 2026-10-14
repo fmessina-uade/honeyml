@@ -340,6 +340,12 @@ export default function EngineLive({
   const ultima = recientes[0]?.decidida ?? resumen.actividad.ultima;
   const hace = ultima ? Math.max(0, (ahora - new Date(ultima).getTime()) / 1000) : null;
   const activo = hace !== null && hace < MINUTOS_ACTIVO * 60;
+  // Sin saldo de inferencia el motor queda en pausa, y eso manda sobre "activo": entre reintentos
+  // puede seguir copiando del repertorio, pero no puede razonar nada nuevo.
+  const sinSaldo = resumen.sin_saldo ?? null;
+  const enPausa = sinSaldo
+    ? Math.max(0, (ahora - new Date(sinSaldo.desde).getTime()) / 1000)
+    : null;
   const enPantalla = actual ?? mostrada;
   const fila = enPantalla?.fila;
   const hechos = fila ? hechosDe(fila) : [];
@@ -395,16 +401,22 @@ export default function EngineLive({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className="relative flex w-2.5 h-2.5">
-              {activo && (
+              {activo && !sinSaldo && (
                 <span className="absolute inline-flex h-full w-full rounded-full bg-[#ff6b35] opacity-60 animate-ping" />
               )}
               <span
                 className="relative inline-flex w-2.5 h-2.5 rounded-full"
-                style={{ background: activo ? 'var(--agent-coral)' : 'var(--motor-apagado)' }}
+                style={{
+                  background: sinSaldo
+                    ? 'var(--honey-amber)'
+                    : activo
+                      ? 'var(--agent-coral)'
+                      : 'var(--motor-apagado)',
+                }}
               />
             </span>
             <span className="geist text-[15px] font-medium tracking-tight text-white">
-              {activo ? e.active : e.idle}
+              {sinSaldo ? e.noCredit : activo ? e.active : e.idle}
             </span>
             {hace !== null && (
               <span className="font-data text-[11px] text-white/45">
@@ -416,6 +428,12 @@ export default function EngineLive({
             <span className="text-[11px] text-white/45">{e.replaying}</span>
           )}
         </div>
+
+        {enPausa !== null && (
+          <p role="status" className="aviso-saldo mt-3 text-[12.5px] leading-snug text-white/75">
+            {e.noCreditDetail(duracion(enPausa))}
+          </p>
+        )}
 
         {/* Lo que pasa ahora, lo que razonó el modelo y la vía. En una columna la vía va antes del
             panel, pegada a la frase que la explica. */}

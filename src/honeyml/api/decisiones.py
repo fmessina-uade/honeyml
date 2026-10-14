@@ -24,6 +24,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ..agent.adapters.repertorio import RepertorioEnElBus
+from ..agent.adapters.saldo import MarcaSinSaldo
 from ..agent.graph import CONTEXTO, HISTORIAL, INFERENCIA, MEMORIA, PERSISTENCIA, VALIDACION
 from ..agent.severidad import ORDEN, Severidad
 from ..education.annotations import TACTICAS_OBSERVABLES
@@ -59,6 +60,22 @@ def _olvidar_firma(decision: dict[str, Any]) -> None:
         _repertorio.olvidar(firma)
     except Exception:
         return
+
+
+# La marca que el motor deja en el bus cuando el proveedor se queda sin saldo. Se arma una vez y se
+# reusa, igual que el repertorio.
+_marca: MarcaSinSaldo | None = None
+
+
+def _sin_saldo() -> dict[str, Any] | None:
+    """Desde cuándo el motor está en pausa por falta de saldo de inferencia, o None si no está."""
+    global _marca
+    try:
+        if _marca is None:
+            _marca = MarcaSinSaldo()
+        return _marca.leer()
+    except Exception:
+        return None
 
 
 # Cómo se nombra en los filtros una decisión sin táctica. Un valor que ninguna táctica real puede
@@ -382,6 +399,7 @@ def resumen(es_url: str = queries.ES_URL) -> dict[str, Any]:
             "razonadas_s": _segundos(a["conclusion"]["razonadas"].get("media", {}).get("value")),
             "modelo_s": _redondea(a["conclusion"]["razonadas"].get("modelo_s", {}).get("value")),
         },
+        "sin_saldo": _sin_saldo(),
     }
 
 

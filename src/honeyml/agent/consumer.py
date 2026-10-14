@@ -242,6 +242,9 @@ class ConsumidorDelBus:
         self._parar = False
         # Por qué se cortó la corrida, cuando la cortó el manejador. Vacío si terminó normalmente.
         self.motivo_de_parada = ""
+        # La señal que pidió cortar, si llegó alguna. Va aparte de `_parar` porque un corte del
+        # manejador se puede reanudar y un SIGTERM no.
+        self.senal = ""
 
         self.r = redis.Redis(
             host=host,
@@ -279,10 +282,25 @@ class ConsumidorDelBus:
         def parar(signum: int, _frame: Any) -> None:
             nombre = signal.Signals(signum).name
             print(f"\n  {nombre} recibido: se termina el lote en curso y se corta.")
+            self.senal = nombre
             self._parar = True
 
         signal.signal(signal.SIGINT, parar)
         signal.signal(signal.SIGTERM, parar)
+
+    def reanudar(self) -> None:
+        """Deja al consumidor listo para otra corrida después de un corte del manejador.
+
+        Una señal recibida no se borra: si llegó SIGTERM en el medio, quien llama tiene que cortar,
+        y `parado` se lo sigue diciendo.
+        """
+        self._parar = bool(self.senal)
+        self.motivo_de_parada = ""
+
+    @property
+    def parado(self) -> bool:
+        """Si el ciclo tiene que cortar, por una señal o por el manejador."""
+        return self._parar
 
     # Procesamiento
 

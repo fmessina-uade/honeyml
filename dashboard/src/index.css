@@ -1040,6 +1040,15 @@ body {
   box-shadow: inset 2px 0 0 var(--agent-coral);
 }
 
+/* El aviso de sin saldo: ámbar de atención y no coral de alarma, porque el motor se recupera solo en
+   cuanto vuelve el saldo. */
+.aviso-saldo {
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--honey-amber) 12%, transparent);
+  box-shadow: inset 2px 0 0 var(--honey-amber);
+}
+
 /* El escenario del motor: negro de instrumento, sin grilla, con una luz cálida que sube cuando el
    modelo está decidiendo. */
 .escenario {

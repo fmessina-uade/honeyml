@@ -213,6 +213,9 @@ export interface ResumenTriaje {
     /** Cuánto de la demora de las razonadas fue la llamada al modelo. */
     modelo_s?: number | null;
   };
+  /** Presente cuando el motor está en pausa porque el proveedor de inferencia se quedó sin saldo.
+   *  Opcional porque una API anterior no lo trae. */
+  sin_saldo?: { desde: string; ultimo_intento?: string; motivo?: string } | null;
 }
 
 export type Veredicto = 'confirma' | 'corrige';

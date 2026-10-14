@@ -258,6 +258,7 @@ def test_el_resumen_descuenta_de_pendientes_lo_ya_revisado(
     assert r["conclusion"]["copiadas_s"] == 3.0
     assert r["conclusion"]["razonadas_s"] == 15.0
     assert r["conclusion"]["modelo_s"] == 2.8
+    assert r["sin_saldo"] is None
     assert r["actividad"] == {
         "ultima": "2026-09-24T12:00:05.000Z",
         "ultima_hora": 7,
@@ -333,6 +334,26 @@ def test_el_tiempo_de_conclusion_deja_afuera_lo_vuelto_a_triar(
 
     filtro = capturado["aggs"]["conclusion"]["filter"]["bool"]
     assert {"term": {"ciclo.retriaje": True}} in filtro["must_not"]
+
+
+def test_el_resumen_avisa_cuando_el_motor_esta_sin_saldo(monkeypatch: pytest.MonkeyPatch) -> None:
+    marca = {"desde": "2026-10-13T10:00:00+00:00", "ultimo_intento": "2026-10-13T10:05:00+00:00"}
+
+    class _Puesta:
+        def leer(self) -> dict[str, Any]:
+            return marca
+
+    monkeypatch.setattr(decisiones, "_marca", _Puesta())
+    assert decisiones._sin_saldo() == marca
+
+
+def test_si_el_bus_falla_el_resumen_no_inventa_el_aviso(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _Rota:
+        def leer(self) -> None:
+            raise RuntimeError("bus caído")
+
+    monkeypatch.setattr(decisiones, "_marca", _Rota())
+    assert decisiones._sin_saldo() is None
 
 
 # El camino por el grafo

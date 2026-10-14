@@ -302,6 +302,94 @@ def test_la_cuota_agotada_corta_la_corrida_y_no_persiste(sin_indice: None) -> No
     assert almacen.escrituras == []
 
 
+# El aviso de sin saldo y la pausa
+
+
+class _Marca:
+    """Anota qué se le pidió a la marca, sin bus."""
+
+    def __init__(self) -> None:
+        self.puestas: list[str] = []
+        self.quitadas = 0
+
+    def poner(self, motivo: str, vigencia_s: int = 0) -> None:
+        self.puestas.append(motivo)
+
+    def quitar(self) -> None:
+        self.quitadas += 1
+
+
+def test_la_cuota_agotada_deja_la_marca_para_el_panel(sin_indice: None) -> None:
+    from honeyml.agent.adapters.inferencia import CuotaAgotadaError
+    from honeyml.agent.consumer import DetenerConsumo
+
+    marca = _Marca()
+    servicio = _Servicio(falla=CuotaAgotadaError("sin crédito"))
+    triar = motor.manejador(servicio=servicio, almacen=_Almacen(), marca=marca)  # type: ignore[arg-type]
+
+    with pytest.raises(DetenerConsumo):
+        triar(_evento())
+    assert marca.puestas == ["sin crédito"]
+
+
+def test_la_respuesta_del_proveedor_saca_la_marca_una_sola_vez(sin_indice: None) -> None:
+    """Tras una cuota, la primera respuesta saca la marca y las siguientes no tocan el bus."""
+    from honeyml.agent.adapters.inferencia import CuotaAgotadaError
+    from honeyml.agent.consumer import DetenerConsumo
+
+    marca = _Marca()
+    servicio = _Servicio(falla=CuotaAgotadaError("sin crédito"))
+    triar = motor.manejador(servicio=servicio, almacen=_Almacen(), marca=marca)  # type: ignore[arg-type]
+    with pytest.raises(DetenerConsumo):
+        triar(_evento())
+
+    servicio.falla = None  # se cargó crédito
+    triar(_evento())
+    triar(_evento())
+
+    assert marca.quitadas == 1
+
+
+def test_un_evento_que_no_llega_al_proveedor_no_saca_la_marca() -> None:
+    """Sin dirección el evento se corta antes de razonar: eso no prueba que haya saldo."""
+    marca = _Marca()
+    servicio = _Servicio()
+    triar = motor.manejador(servicio=servicio, almacen=_Almacen(), marca=marca)  # type: ignore[arg-type]
+
+    triar(_evento(source_ip=""))
+
+    assert servicio.llamadas == 0
+    assert marca.quitadas == 0
+
+
+class _ConsumidorParado:
+    def __init__(self, parado: bool) -> None:
+        self.parado = parado
+
+
+def test_la_pausa_corta_si_llega_una_senal() -> None:
+    assert motor.esperar(_ConsumidorParado(True), 300) is False  # type: ignore[arg-type]
+    assert motor.esperar(_ConsumidorParado(False), 0) is True  # type: ignore[arg-type]
+
+
+def test_reanudar_no_borra_una_senal_recibida() -> None:
+    """Un corte por cuota se reanuda; un SIGTERM que llegó en el medio no se pierde al reanudar."""
+    from honeyml.agent.consumer import ConsumidorDelBus
+
+    consumidor = ConsumidorDelBus(lambda evento: False)
+    consumidor.motivo_de_parada = "sin crédito"
+    consumidor._parar = True
+
+    consumidor.reanudar()
+    assert consumidor.parado is False
+    assert consumidor.motivo_de_parada == ""
+
+    consumidor.senal = "SIGTERM"
+    consumidor._parar = True
+    consumidor.reanudar()
+    assert consumidor.parado is True
+
+
 class _BusFalso:
     """Lo mínimo del bus que usa la estimación: el grupo, los mensajes y el repertorio."""
 

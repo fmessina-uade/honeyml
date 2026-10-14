@@ -587,6 +587,9 @@ const es = {
     engine: {
       active: 'Agente activo',
       idle: 'Agente en espera',
+      noCredit: 'Agente en pausa: sin saldo de inferencia',
+      noCreditDetail: (hace: string) =>
+        `El proveedor dejó de aceptar pedidos hace ${hace}. Lo que llega espera en el bus, y el motor retoma solo en cuanto se cargue saldo.`,
       lastAgo: (hace: string) => `última decisión hace ${hace}`,
       lastHour: 'decisiones en la última hora',
       byMemory: 'resueltas por memoria',
@@ -1605,6 +1608,9 @@ const en: typeof es = {
     engine: {
       active: 'Agent active',
       idle: 'Agent idle',
+      noCredit: 'Agent paused: out of inference credit',
+      noCreditDetail: (hace: string) =>
+        `The provider stopped accepting requests ${hace} ago. Incoming events wait in the bus, and the engine resumes on its own once credit is added.`,
       lastAgo: (hace: string) => `last decision ${hace} ago`,
       lastHour: 'decisions in the last hour',
       byMemory: 'settled from memory',

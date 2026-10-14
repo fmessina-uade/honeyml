@@ -12,8 +12,19 @@ from typing import Any
 
 import pytest
 
-from honeyml.api import acceso, auditoria
+from honeyml.api import acceso, auditoria, decisiones
 from honeyml.api.main import app
+
+
+class _MarcaVacia:
+    def leer(self) -> None:
+        return None
+
+
+@pytest.fixture(autouse=True)
+def sin_bus_para_la_marca(monkeypatch: pytest.MonkeyPatch) -> None:
+    """El resumen del motor lee del bus la marca de sin saldo, y en estas pruebas no hay bus."""
+    monkeypatch.setattr(decisiones, "_marca", _MarcaVacia())
 
 
 def _sesion_de(rol: str, monkeypatch: pytest.MonkeyPatch) -> Iterator[list[dict[str, Any]]]:
