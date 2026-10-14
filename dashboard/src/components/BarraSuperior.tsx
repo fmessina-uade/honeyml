@@ -3,6 +3,7 @@ import { ChevronDown, Menu, SlidersHorizontal, X } from 'lucide-react';
 import type { ArchetypeData, FingerprintData, Snapshot } from '../lib/api';
 import { useI18n } from '../lib/i18n';
 import Miniatura from './Miniatura';
+import Marca from './Marca';
 import {
   MENUS,
   SECCIONES,
@@ -203,9 +204,7 @@ export default function BarraSuperior({
           aria-label={t.brand.name}
         >
           <img src="/favicon.png" alt="" aria-hidden className="w-7 h-7 rounded-lg shrink-0" />
-          <span className="geist text-[16px] font-semibold text-white tracking-tight leading-none">
-            {t.brand.name}
-          </span>
+          <Marca className="geist text-[16px] font-semibold text-white tracking-tight leading-none" />
         </button>
 
         <nav

@@ -37,6 +37,7 @@ import Reportes from './components/sections/Reportes';
 import Auditoria from './components/sections/Auditoria';
 import EnVivo from './components/sections/EnVivo';
 import { fechaHora } from './lib/format';
+import Marca from './components/Marca';
 import TransicionColmena, {
   APERTURA_MS,
   CIERRE_MS,
@@ -429,7 +430,7 @@ export default function App() {
               <footer className="mt-12 pt-5 border-t border-white/5 flex flex-wrap items-center justify-between gap-3 text-[11px] text-white/35">
                 <span className="flex items-center gap-2">
                   <img src="/favicon.png" alt="" aria-hidden className="w-4 h-4 rounded" />
-                  <span className="font-mono-display">{t.brand.name}</span>
+                  <Marca className="font-mono-display" />
                   <span className="geist text-[12px] text-white/40">{t.brand.subtitle}</span>
                 </span>
                 <span className="font-data">{t.footer.range(desde, hasta)}</span>

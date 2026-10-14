@@ -3,6 +3,7 @@ import type { Bucket, ReporteGeneral } from '../../lib/api';
 import { compacto, duracion, localeActual, n, nombreDePais, pct } from '../../lib/format';
 import { useI18n } from '../../lib/i18n';
 import { WORLD } from '../../lib/world';
+import Marca from '../Marca';
 
 /**
  * Las hojas A4 del reporte general. Se usan dos veces: achicadas en la vista previa de la sección y
@@ -156,7 +157,7 @@ function Cabeza({
       <header className="hoja-cabeza">
         <span className="hoja-marca">
           <img src="/logo.png" alt="" width={20} height={20} />
-          HoneyML
+          <Marca />
         </span>
         <span>
           {t.hoja.titulo}, {t.hoja.del(fechaCorta(desde), fechaCorta(hasta)).toLowerCase()}
@@ -325,7 +326,7 @@ function Portada({
     <Hoja numero={1} total={total} generado={generado} portada>
       <header className="portada-marca">
         <img src="/logo.png" alt="" width={44} height={44} />
-        <span>HoneyML</span>
+        <Marca />
       </header>
       <div className="portada-titulos">
         <p className="portada-ceja">{t.acceso.insignia}</p>

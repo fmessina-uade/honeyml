@@ -1,5 +1,5 @@
 .PHONY: help up down logs status ps clean deploy-vps dev-up dev-down dev-logs validate lint test \
-        test-integration consumer triaje retriaje grafo arquetipos uwf-verificar modelo evaluacion comparacion clasificar muestra tasa procedencia conclusion campana campana-seco campana-comparar verificacion \
+        test-integration consumer triaje retriaje grafo arquetipos uwf-verificar modelo evaluacion comparacion clasificar muestra tasa procedencia conclusion campana campana-seco campana-comparar verificacion corpus-publico \
         api dash demo replays \
         elastic-up elastic-down elastic-logs elastic-dev-up elastic-dev-down elastic-dev-logs \
         es-bootstrap validate-indexing pull-logs \
@@ -65,6 +65,7 @@ help:
 	@echo "    make conclusion  Tiempo de conclusión del motor (en el servidor)"
 	@echo "    make campana     Campaña de validación adversaria (en el servidor)"
 	@echo "    make verificacion Reutilización por firma, segunda clasificación (en el servidor)"
+	@echo "    make corpus-publico Edición seudonimizada del corpus, para entregar afuera (en el servidor)"
 	@echo "    make publicar-artefactos  Subir los artefactos derivados al VPS"
 	@echo "    make tunel     La API del VPS en esta máquina, por túnel SSH"
 	@echo "    make respaldar-decisiones  Traer los volcados de decisiones del VPS"
@@ -482,6 +483,17 @@ verificacion:
 	@docker run --rm --name honeyml-verificacion-no-modificar --label honeyml.aviso="no modificar" \
 		--network host --memory 512m --env-file .env -e ES_URL=http://127.0.0.1:9200 honeyml-analisis \
 		python -m honeyml.medicion.verificacion $(if $(CUANTAS),--cuantas $(CUANTAS),) $(if $(DESDE),--desde $(DESDE),) $(if $(SECO),--seco,)
+
+# La edición del corpus para entregar afuera: seudónimo con clave en lugar de la dirección, solo las
+# credenciales que probaron al menos cinco direcciones, y los textos con las direcciones tapadas.
+# Necesita CORPUS_CLAVE en el .env (se genera con `openssl rand -hex 32` y no se publica nunca).
+# Escribe en data/processed/corpus_publico. HASTA fija el final de la ventana, por ejemplo el del corte.
+#   sudo make corpus-publico SECO=1          sudo make corpus-publico HASTA=AAAA-MM-DDTHH:MM:SSZ
+corpus-publico:
+	@docker run --rm --name honeyml-corpus-publico-no-modificar --label honeyml.aviso="no modificar" \
+		--network host --memory 512m --user 0 --env-file .env -e ES_URL=http://127.0.0.1:9200 \
+		-v $(CURDIR)/data/processed:/app/data/processed honeyml-analisis \
+		python -m honeyml.publicacion $(if $(DESDE),--desde $(DESDE),) $(if $(HASTA),--hasta $(HASTA),) $(if $(SECO),--seco,)
 
 # La comparación de las cuatro familias de modelos, ordenada por F1 macro. Imprime la última
 # guardada; con REENTRENAR=1 vuelve a entrenarlas, que tarda unos seis minutos y la reescribe.

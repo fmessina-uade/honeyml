@@ -4,6 +4,7 @@ import { api, type SesionAbierta } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
 import Preferencias from '../Preferencias';
 import EscenaPanal from './EscenaPanal';
+import Marca from '../Marca';
 
 const EXPO = 'cubic-bezier(.16,1,.3,1)';
 const SUAVE = 'cubic-bezier(.22,1,.36,1)';
@@ -218,7 +219,7 @@ export default function Ingreso({
         <form className="ingreso-form" onSubmit={enviar} noValidate>
           <div className="ingreso-marca">
             <img src="/logo.png" alt="" aria-hidden width={60} height={60} />
-            <span>{t.brand.name}</span>
+            <Marca />
           </div>
           <h1 className="ingreso-h1">{a.titulo}</h1>
 

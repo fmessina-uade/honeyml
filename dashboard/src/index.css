@@ -1040,6 +1040,12 @@ body {
   box-shadow: inset 2px 0 0 var(--agent-coral);
 }
 
+/* La parte de la marca que va en miel, como en el logo. Con dos clases, para ganarle a las reglas
+   que tiñen todo el texto de un contenedor, como `.ingreso-marca span`. */
+.marca .marca-ml {
+  color: var(--honey-amber);
+}
+
 /* El aviso de sin saldo: ámbar de atención y no coral de alarma, porque el motor se recupera solo en
    cuanto vuelve el saldo. */
 .aviso-saldo {
