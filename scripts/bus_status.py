@@ -9,19 +9,23 @@ Lo que importa en operación es la cuenta de pendientes. Un grupo de consumidore
 tomadas y nunca confirmadas significa que el motor de triaje levantó eventos y se murió antes de
 persistir una decisión. Esos eventos se recuperan, pero solo si alguien se da cuenta.
 
-Uso:
-    python scripts/bus_status.py
+Se corre con `make bus-status`. Si el bus exige clave, la toma de `BUS_PASSWORD`, igual que el
+motor.
 """
 
 from __future__ import annotations
 
 import argparse
+import os
 import socket
 from typing import Any
 
 HOST = "127.0.0.1"
 PORT = 6379
 STREAM = "honeyml:events"
+# Vacía o sin definir quiere decir sin autenticación, como en el bus de desarrollo. Es la misma
+# convención que siguen el motor y los demás clientes del bus.
+PASSWORD = os.getenv("BUS_PASSWORD") or None
 
 
 class BusError(RuntimeError):
@@ -68,6 +72,15 @@ def command(sock_file: Any, sock: socket.socket, *args: str) -> Any:
     return _read_reply(sock_file)
 
 
+def autenticar(sock_file: Any, sock: socket.socket, contrasena: str | None) -> None:
+    """Se presenta con la clave, si hay, antes de cualquier otro pedido.
+
+    Sin clave no manda nada: un bus sin autenticación contesta con error a un AUTH de más.
+    """
+    if contrasena:
+        command(sock_file, sock, "AUTH", contrasena)
+
+
 def as_dict(pairs: list[Any] | None) -> dict[str, Any]:
     """El protocolo devuelve los mapas como listas planas, clave y valor alternados."""
     if not pairs:
@@ -80,6 +93,9 @@ def main() -> int:
     ap.add_argument("--host", default=HOST)
     ap.add_argument("--port", type=int, default=PORT)
     ap.add_argument("--stream", default=STREAM)
+    ap.add_argument(
+        "--contrasena", default=PASSWORD, help="clave del bus; por defecto, BUS_PASSWORD"
+    )
     args = ap.parse_args()
 
     try:
@@ -90,7 +106,14 @@ def main() -> int:
         return 1
 
     with sock, sock.makefile("rb") as f:
-        print(f"  ping: {command(f, sock, 'PING')}")
+        try:
+            autenticar(f, sock, args.contrasena)
+            print(f"  ping: {command(f, sock, 'PING')}")
+        except BusError as exc:
+            print(f"  El bus rechazó la conexión: {exc}")
+            if "NOAUTH" in str(exc):
+                print("  Pide clave: definí BUS_PASSWORD o pasala con --contrasena.")
+            return 1
 
         info = command(f, sock, "INFO", "memory")
         used = next(
@@ -137,7 +160,7 @@ def main() -> int:
         for g in groups:
             gd = as_dict(g)
             pending = gd.get("pending", 0)
-            marca = "  <- hay eventos sin confirmar" if pending else ""
+            marca = "  (hay eventos sin confirmar)" if pending else ""
             print(f"    {gd.get('name')}")
             print(f"      consumidores: {gd.get('consumers')}   pendientes: {pending}{marca}")
             print(f"      último entregado: {gd.get('last-delivered-id')}")
