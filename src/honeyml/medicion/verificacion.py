@@ -9,11 +9,13 @@ límites ni la táctica, que la propia firma declara como su límite conocido.
 
 Esta medición le pone un número a ese límite. Toma una muestra de firmas que efectivamente se
 reutilizaron, razona de nuevo un evento ya copiado de cada una sin consultar el repertorio, y
-enfrenta la clasificación nueva con la que se había copiado. El evento se reconstruye solo con los
-campos de la firma (sin la dirección de origen ni el momento), que es justo sobre lo que el
-repertorio reutiliza. De la severidad informa dos cosas: cuántas veces cae en el mismo nivel
-(estabilidad) y cuántas, aun difiriendo, siguen dentro de los límites del evento (la invariante que
-vuelve defendible copiar). De la táctica informa la coincidencia y en qué se fue cuando difiere.
+enfrenta la clasificación nueva con la que se había copiado. El evento se arma con la conducta (lo
+que define la firma) más la dirección, el momento y la sesión que guardó la decisión: el primer
+nodo corta por falta de contexto un evento sin dirección, antes de razonarlo, así que reconstruir
+esos campos es lo que deja que el grafo corra. De la severidad informa dos cosas: cuántas veces cae
+en el mismo nivel (estabilidad) y cuántas, aun difiriendo, siguen dentro de los límites del evento
+(la invariante que vuelve defendible copiar). De la táctica informa la coincidencia y en qué se fue
+cuando difiere.
 
 Cuesta una llamada de inferencia por firma de la muestra, así que la muestra es chica y fija por
 semilla. Razona con un almacén que no escribe y sin repertorio, de modo que no toca ni el corpus ni
@@ -37,12 +39,13 @@ from ..agent import firma, severidad
 from ..agent.adapters.config import CredencialAusenteError
 from ..agent.adapters.inferencia import CuotaAgotadaError
 from ..agent.adapters.servicio import AdaptadorDeInferencia
+from ..agent.consumer import EventoDelBus
 from ..agent.graph import ejecutar
 from ..agent.motor import compilar, costo_estimado
 from ..agent.state import estado_inicial
 from ..api import queries
 from ..api.decisiones import DECISIONES
-from .muestra import evento_del_bus, leer_telemetria
+from .muestra import leer_telemetria
 
 # Cuántas firmas entran en la muestra. Cada una cuesta una llamada de inferencia, así que el valor
 # por defecto es un número que alcanza para una proporción creíble sin un gasto que pese.
@@ -174,15 +177,48 @@ def elegir(conductas: Iterable[Conducta], cuantas: int, semilla: int) -> list[Co
     return generador.sample(poblado, min(cuantas, len(poblado)))
 
 
+def _primero(valor: Any) -> str:
+    if isinstance(valor, list):
+        return str(valor[0]) if valor else ""
+    return "" if valor is None else str(valor)
+
+
+def _evento(conducta: Conducta, telemetria: dict[str, Any] | None) -> EventoDelBus:
+    """El evento reconstruido para volver a razonarlo.
+
+    La conducta viene de la decisión guardada y el usuario con el comando, de la telemetría, igual
+    que para la firma. Además se reponen la dirección, el momento y la sesión, que la firma no mira
+    pero el primer nodo sí: sin la dirección no hay contexto que armar y el evento se corta antes de
+    razonarlo. Reponerlos con lo que guardó la decisión es razonar el mismo evento, no uno parecido.
+    """
+    e = conducta.evento
+    telemetria = telemetria or {}
+    campos = {
+        "doc_id": e.get("doc_id", ""),
+        "timestamp": e.get("momento", ""),
+        "honeypot": e.get("sensor") or "",
+        "category": e.get("categoria") or "",
+        "action": e.get("accion") or "",
+        "outcome": e.get("resultado") or "",
+        "protocol": e.get("protocolo") or "",
+        "source_ip": e.get("origen") or "",
+        "session": e.get("sesion") or "",
+        "user": _primero(telemetria.get("user", {}).get("name")),
+        "command": _primero(telemetria.get("process", {}).get("command_line")),
+    }
+    return EventoDelBus.desde_mensaje("", campos)
+
+
 def contrastar(
     conducta: Conducta, telemetria: dict[str, Any] | None, compilado: Any
 ) -> Contraste | None:
     """Vuelve a razonar el evento representante y lo enfrenta con lo copiado.
 
-    Devuelve None si la telemetría no deja reconstruir la misma firma: sin el usuario y el comando
-    el evento no se puede volver a armar, y uno que firma distinto no corresponde a esta decisión.
+    Devuelve None si la telemetría no deja reconstruir la misma firma (sin el usuario y el comando
+    el evento no se puede volver a armar, y uno que firma distinto no es esta decisión), o si el
+    grafo vuelve sin decisión.
     """
-    evento = evento_del_bus({"evento": conducta.evento}, telemetria)
+    evento = _evento(conducta, telemetria)
     if firma.de_evento(evento) != conducta.firma:
         return None
     estado = estado_inicial(evento)
@@ -281,7 +317,7 @@ def main() -> int:
     telemetria = leer_telemetria([c.representante for c in muestra])
     compilado = compilar(servicio=inferencia, almacen=_NoEscribe(), repertorio=None)
     contrastes: list[Contraste] = []
-    sin_telemetria = 0
+    descartadas = 0
     for i, conducta in enumerate(muestra, start=1):
         try:
             contraste = contrastar(conducta, telemetria.get(conducta.representante), compilado)
@@ -290,14 +326,14 @@ def main() -> int:
             print("  Se informa lo verificado hasta acá.")
             break
         if contraste is None:
-            sin_telemetria += 1
+            descartadas += 1
             continue
         contrastes.append(contraste)
         if i % 10 == 0:
             print(f"  {i}/{len(muestra)}")
 
-    if sin_telemetria:
-        print(f"  {sin_telemetria} firmas sin telemetría para reconstruir, fuera de la cuenta")
+    if descartadas:
+        print(f"  {descartadas} firmas descartadas (firma distinta o sin decisión)")
     print()
     print(informe(comparar(contrastes), len(poblada), inferencia.resumen()))
     return 0
