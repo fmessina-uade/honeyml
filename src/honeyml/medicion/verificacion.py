@@ -20,7 +20,8 @@ cuando difiere.
 Cuesta una llamada de inferencia por firma de la muestra, así que la muestra es chica y fija por
 semilla. Razona con un almacén que no escribe y sin repertorio, de modo que no toca ni el corpus ni
 las firmas guardadas. Se corre en el servidor con `make verificacion`; con `--seco` muestra la
-población sin gastar.
+población sin gastar, y con `--desde` se limita a las firmas nacidas de una fecha en adelante, para
+que la clasificación guardada y la nueva salgan del mismo criterio.
 """
 
 from __future__ import annotations
@@ -77,6 +78,10 @@ class Conducta:
     severidad: str = ""
     tactica: str | None = None
     momento: str = ""
+    # El momento de la primera decisión de la firma, que es siempre la razonada original: ninguna
+    # copia existe antes que el original del que copia. Sirve para quedarse con las firmas nacidas
+    # bajo un criterio dado, sin arrastrar las que se decidieron con uno anterior.
+    primera: str = ""
     decisiones: int = 0
     reutilizadas: int = 0
 
@@ -151,10 +156,12 @@ def agrupar(decisiones: Iterable[tuple[str, dict[str, Any]]]) -> dict[str, Condu
         if c is None:
             c = conductas[clave] = Conducta(firma=clave)
         c.decisiones += 1
+        momento = str(d.get("@timestamp", ""))
+        if momento and (not c.primera or momento < c.primera):
+            c.primera = momento
         if not d.get("ciclo", {}).get("reutilizada_de"):
             continue
         c.reutilizadas += 1
-        momento = str(d.get("@timestamp", ""))
         if momento >= c.momento:
             clasificacion = d.get("decision", {})
             c.momento = momento
@@ -165,14 +172,25 @@ def agrupar(decisiones: Iterable[tuple[str, dict[str, Any]]]) -> dict[str, Condu
     return conductas
 
 
-def poblacion(conductas: Iterable[Conducta]) -> list[Conducta]:
-    """Las conductas que sirven para verificar: reutilizadas y con representante."""
-    return [c for c in conductas if c.reutilizadas and c.representante]
+def poblacion(conductas: Iterable[Conducta], desde: str | None = None) -> list[Conducta]:
+    """Las conductas que sirven para verificar: reutilizadas y con representante.
+
+    Con `desde` se queda solo con las firmas cuya primera decisión es de esa fecha en adelante, que
+    es como se aísla un criterio: enfrentar la clasificación guardada bajo un criterio con una
+    nueva hecha con otro mediría el cambio de criterio, no la estabilidad de la reutilización.
+    """
+    return [
+        c
+        for c in conductas
+        if c.reutilizadas and c.representante and (not desde or c.primera >= desde)
+    ]
 
 
-def elegir(conductas: Iterable[Conducta], cuantas: int, semilla: int) -> list[Conducta]:
+def elegir(
+    conductas: Iterable[Conducta], cuantas: int, semilla: int, desde: str | None = None
+) -> list[Conducta]:
     """Muestra fija por semilla, ordenada antes de mezclar para no atarla al orden de ES."""
-    poblado = sorted(poblacion(conductas), key=lambda c: c.firma)
+    poblado = sorted(poblacion(conductas, desde), key=lambda c: c.firma)
     generador = random.Random(semilla)
     return generador.sample(poblado, min(cuantas, len(poblado)))
 
@@ -297,13 +315,19 @@ def main() -> int:
     ap.add_argument("--cuantas", type=int, default=CUANTAS, help="firmas en la muestra")
     ap.add_argument("--semilla", type=int, default=SEMILLA)
     ap.add_argument("--seco", action="store_true", help="muestra la población sin razonar")
+    ap.add_argument(
+        "--desde",
+        default=None,
+        help="solo firmas nacidas en esta fecha o después, ISO con forma AAAA-MM-DD",
+    )
     args = ap.parse_args()
 
     conductas = agrupar(leer_decisiones())
-    poblada = poblacion(conductas.values())
-    muestra = elegir(conductas.values(), args.cuantas, args.semilla)
+    poblada = poblacion(conductas.values(), args.desde)
+    muestra = elegir(conductas.values(), args.cuantas, args.semilla, args.desde)
     gasto = costo_estimado(len(muestra))
-    print(f"  {len(conductas)} firmas en el corpus, {len(poblada)} reutilizadas")
+    desde_txt = f" nacidas desde {args.desde}" if args.desde else ""
+    print(f"  {len(conductas)} firmas en el corpus, {len(poblada)} reutilizadas{desde_txt}")
     print(f"  muestra de {len(muestra)} firmas, gasto estimado USD {gasto:.2f}")
     if args.seco or not muestra:
         return 0

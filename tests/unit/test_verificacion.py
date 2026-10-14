@@ -48,6 +48,8 @@ def test_agrupar_toma_la_copia_mas_reciente_como_representante() -> None:
     assert c.representante == "copia_nueva"
     assert c.severidad == "alto"
     assert c.tactica == "ejecucion"
+    # La primera decisión de la firma es la razonada original, la más vieja de las tres.
+    assert c.primera == "2026-10-01T00:00:00Z"
 
 
 def test_poblacion_deja_afuera_las_firmas_sin_copias() -> None:
@@ -59,6 +61,23 @@ def test_poblacion_deja_afuera_las_firmas_sin_copias() -> None:
     conductas = verificacion.agrupar(decisiones)
     poblada = verificacion.poblacion(conductas.values())
     assert [c.firma for c in poblada] == ["con_copia"]
+
+
+def test_poblacion_con_desde_deja_solo_las_firmas_nacidas_despues() -> None:
+    decisiones = [
+        # Firma vieja: nació antes del corte, aunque se siga copiando después.
+        _decision("vieja_razonada", "vieja", "alto", None, "2026-10-10T00:00:00Z", None),
+        _decision("vieja_copia", "vieja", "alto", None, "2026-10-13T00:00:00Z", "vieja_razonada"),
+        # Firma nueva: su primera decisión es posterior al corte.
+        _decision("nueva_razonada", "nueva", "alto", None, "2026-10-12T00:00:00Z", None),
+        _decision("nueva_copia", "nueva", "alto", None, "2026-10-13T00:00:00Z", "nueva_razonada"),
+    ]
+    conductas = verificacion.agrupar(decisiones)
+    sin_corte = {c.firma for c in verificacion.poblacion(conductas.values())}
+    con_corte = {c.firma for c in verificacion.poblacion(conductas.values(), desde="2026-10-12")}
+    assert sin_corte == {"vieja", "nueva"}
+    # La vieja queda afuera aunque su copia sea del día del corte: pesa la primera decisión.
+    assert con_corte == {"nueva"}
 
 
 def test_elegir_es_fijo_por_semilla_y_se_acota() -> None:

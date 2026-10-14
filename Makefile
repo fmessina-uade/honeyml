@@ -475,12 +475,13 @@ campana-comparar:
 # La verificación de la reutilización por firma: razona de nuevo una muestra de conductas ya
 # copiadas y las enfrenta con lo que el repertorio les había copiado. Lee el índice y le paga al
 # proveedor una vez por firma de la muestra, así que necesita la clave del .env. No escribe nada.
-# Con SECO=1 muestra la población y el gasto sin razonar; CUANTAS cambia el tamaño de la muestra.
-#   sudo make verificacion SECO=1          sudo make verificacion          sudo make verificacion CUANTAS=100
+# Con SECO=1 muestra la población y el gasto sin razonar; CUANTAS cambia el tamaño de la muestra;
+# DESDE limita a las firmas nacidas de esa fecha en adelante (para medir sobre un solo criterio).
+#   sudo make verificacion SECO=1          sudo make verificacion CUANTAS=100          sudo make verificacion DESDE=AAAA-MM-DD
 verificacion:
 	@docker run --rm --name honeyml-verificacion-no-modificar --label honeyml.aviso="no modificar" \
 		--network host --memory 512m --env-file .env -e ES_URL=http://127.0.0.1:9200 honeyml-analisis \
-		python -m honeyml.medicion.verificacion $(if $(CUANTAS),--cuantas $(CUANTAS),) $(if $(SECO),--seco,)
+		python -m honeyml.medicion.verificacion $(if $(CUANTAS),--cuantas $(CUANTAS),) $(if $(DESDE),--desde $(DESDE),) $(if $(SECO),--seco,)
 
 # La comparación de las cuatro familias de modelos, ordenada por F1 macro. Imprime la última
 # guardada; con REENTRENAR=1 vuelve a entrenarlas, que tarda unos seis minutos y la reescribe.
