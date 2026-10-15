@@ -117,3 +117,13 @@ def test_la_ventana_excluye_los_origenes_internos() -> None:
     assert cuerpo["bool"]["filter"] == [
         {"range": {"@timestamp": {"gte": "2026-05-30", "lte": "2026-10-03T22:00:59Z"}}}
     ]
+
+
+def test_los_campos_de_geolite_llevan_su_licencia() -> None:
+    """Mientras la lista blanca tenga datos de GeoLite2, la edición es CC BY-SA y atribuye a
+    MaxMind; sacarlos es la única forma de cambiar de licencia."""
+    geo = [c for c in publicacion.CAMPOS if c.startswith(("source.geo.", "source.as."))]
+
+    assert geo
+    assert publicacion.LICENCIA["nombre"] == "CC BY-SA 4.0"
+    assert "MaxMind" in publicacion.LICENCIA["atribucion"]

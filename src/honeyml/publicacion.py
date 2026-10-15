@@ -12,7 +12,7 @@ otros, la dirección del propio servidor, el mensaje crudo (trae la contraseña 
 coordenadas y la ciudad.
 
 Se corre en el servidor con `make corpus-publico`. Escribe un NDJSON comprimido y un manifiesto con
-las reglas aplicadas y la huella del archivo; con `--seco` solo cuenta.
+las reglas aplicadas, la licencia y la huella del archivo; con `--seco` solo cuenta.
 """
 
 from __future__ import annotations
@@ -67,6 +67,17 @@ CAMPOS = (
     "file.hash.sha256",
 )
 SEUDONIMO = "source.seudonimo"
+
+# Continente, país y sistema autónomo salen de las bases GeoLite2 de MaxMind, que tienen licencia
+# CC BY-SA 4.0: la edición que los lleva hereda la licencia y la obligación de atribuir. El
+# manifiesto viaja con el archivo, así que las dos van ahí.
+LICENCIA = {
+    "nombre": "CC BY-SA 4.0",
+    "texto": "https://creativecommons.org/licenses/by-sa/4.0/",
+    "atribucion": (
+        "Incluye datos de GeoLite2 creados por MaxMind, disponibles en https://www.maxmind.com"
+    ),
+}
 
 VARIABLE_DE_CLAVE = "CORPUS_CLAVE"
 # Una clave corta se adivina tan fácil como un hash sin clave.
@@ -247,6 +258,7 @@ def main() -> int:
         "archivo": archivo.name,
         "sha256": _huella(archivo),
         "campos": [SEUDONIMO if c == "source.ip" else c for c in CAMPOS],
+        "licencia": LICENCIA,
         "reglas": {
             "seudonimo": (
                 "HMAC-SHA256 de la dirección de origen con una clave privada del proyecto, "
