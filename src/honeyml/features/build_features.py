@@ -159,7 +159,8 @@ def build_features(df: pd.DataFrame, prune: bool = True) -> pd.DataFrame:
         feats[col] = np.log1p(feats[col])
     feats = feats.rename(columns={col: f"log1p_{col}" for col in SKEWED})
 
-    # banderas de comandos: binarias, no se transforman ni se podan
+    # banderas de comandos: binarias, así que no se transforman; la poda las alcanza igual que al
+    # resto, porque dos herramientas que siempre aparecen juntas dicen lo mismo
     feats = feats.join(_command_flags(df, feats.index))
 
     if prune:

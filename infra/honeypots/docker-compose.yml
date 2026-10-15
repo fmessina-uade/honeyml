@@ -18,6 +18,8 @@ services:
       # el CWD del proceso es /cowrie/cowrie-git (no /cowrie), y todas las rutas cuelgan de ahí
       - ./cowrie/cowrie.cfg:/cowrie/cowrie-git/etc/cowrie.cfg:ro
       - ./cowrie/userdb.txt:/cowrie/cowrie-git/etc/userdb.txt:ro
+      # find corregido: el original baja por los enlaces y un `find /` congela el sensor entero
+      - ./cowrie/find.py:/cowrie/cowrie-git/src/cowrie/commands/find.py:ro
       - cowrie_logs:/cowrie/cowrie-git/var/log/cowrie
       - cowrie_downloads:/cowrie/cowrie-git/var/lib/cowrie/downloads
       - cowrie_tty:/cowrie/cowrie-git/var/lib/cowrie/tty

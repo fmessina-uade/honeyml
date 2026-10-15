@@ -32,6 +32,7 @@ from __future__ import annotations
 import argparse
 import ftplib
 import json
+import re
 import sys
 import urllib.request
 from dataclasses import dataclass
@@ -49,6 +50,14 @@ DESTINO = "198.51.100.20"
 
 # Dónde queda el registro de una corrida, para que la comparación sepa qué se envió y cuándo.
 CORRIDA_FILE = Path("data/processed/campana.json")
+
+# El indicador del intérprete del sensor: `#` para root y `$` para el resto. Esperar solo uno hace
+# que cada comando de root agote el plazo entero antes de mandar el siguiente.
+INDICADOR = [re.compile(rb"[#$] $")]
+
+# Cómo cierra el ejecutor cada sesión. El sensor lo registra como un comando más, pero lo escribe la
+# campaña y no el escenario, así que la comparación lo cuenta aparte.
+CIERRE = "exit"
 
 # Los dos sensores, por el nombre con el que el pipeline los etiqueta.
 COWRIE = "cowrie"
@@ -272,24 +281,30 @@ def esperado_por_comando() -> dict[str, Escenario]:
 
 def _sesion_cowrie(
     host: str, puerto: int, usuario: str, clave: str, comandos: tuple[str, ...], espera: float
-) -> None:
+) -> bool:
     """Abre una sesión por telnet, ingresa y escribe cada comando. No lee el resultado: lo que
-    importa es lo que el sensor registra, que el motor va a leer del índice."""
+    importa es lo que el sensor registra, que el motor va a leer del índice.
+
+    Devuelve si el sensor contestó. Uno trabado acepta la conexión (la toma el proxy de Docker) pero
+    nunca muestra el ingreso, y sin esta respuesta la corrida seguiría como si nada.
+    """
     # Importado acá y no arriba: queda fuera de la corrida en seco y de la comparación, que no
     # tocan la red, así que su aviso de obsolescencia no aparece cuando no se usa.
     import telnetlib
 
     tn = telnetlib.Telnet(host, puerto, timeout=espera)
     try:
-        tn.read_until(b"login:", timeout=espera)
+        if b"login:" not in tn.read_until(b"login:", timeout=espera):
+            return False
         tn.write(usuario.encode() + b"\n")
         tn.read_until(b"assword:", timeout=espera)
         tn.write(clave.encode() + b"\n")
-        tn.read_until(b"$", timeout=espera)
+        tn.expect(INDICADOR, timeout=espera)
         for comando in comandos:
             tn.write(comando.encode() + b"\n")
-            tn.read_until(b"$", timeout=espera)
-        tn.write(b"exit\n")
+            tn.expect(INDICADOR, timeout=espera)
+        tn.write(CIERRE.encode() + b"\n")
+        return True
     finally:
         tn.close()
 
@@ -323,9 +338,11 @@ def correr(host: str, usuario: str, clave: str, espera: float = 10.0) -> dict[st
     necesita para acotar la ventana y emparejar cada comando con su escenario.
     """
     desde = datetime.now(UTC).isoformat(timespec="seconds")
+    sin_respuesta: list[str] = []
     for e in ESCENARIOS:
         if e.sensor == COWRIE:
-            _sesion_cowrie(host, 23, usuario, clave, e.comandos, espera)
+            if not _sesion_cowrie(host, 23, usuario, clave, e.comandos, espera):
+                sin_respuesta.append(e.nombre)
         else:
             _fuerza_bruta_ftp(host, 21, e.credenciales, espera)
     hasta = datetime.now(UTC).isoformat(timespec="seconds")
@@ -333,6 +350,7 @@ def correr(host: str, usuario: str, clave: str, espera: float = 10.0) -> dict[st
         "desde": desde,
         "hasta": hasta,
         "host": host,
+        "sin_respuesta": sin_respuesta,
         "escenarios": [
             {
                 "nombre": e.nombre,
@@ -428,6 +446,7 @@ def comparar(
     sev_impacto: list[tuple[str | None, str | None]] = []
     tactica: list[tuple[str | None, str | None]] = []
     sin_emparejar = 0
+    cierres = 0
     emparejadas = 0
     copiadas = 0
 
@@ -437,7 +456,9 @@ def comparar(
         comando = comandos.get(evento.get("doc_id") or "", "")
         escenario = por_comando.get(comando)
         if escenario is None:
-            if evento.get("categoria") == "process":
+            if comando == CIERRE:
+                cierres += 1
+            elif evento.get("categoria") == "process":
                 sin_emparejar += 1
             continue
         emparejadas += 1
@@ -466,6 +487,7 @@ def comparar(
         "por_categoria": por_categoria,
         "emparejadas": emparejadas,
         "sin_emparejar": sin_emparejar,
+        "cierres": cierres,
         "copiadas": copiadas,
         "autenticaciones": len(autenticaciones),
         "severidad_escala": _matriz(sev_escala),
@@ -512,7 +534,8 @@ def informe_comparacion(r: dict[str, Any]) -> list[str]:
         f"Corrida {v['desde']} a {v['hasta']}: {r['decisiones']} decisiones de origen interno.",
         f"Por categoría: {categorias}.",
         f"Comandos emparejados {r['emparejadas']}, sin emparejar {r['sin_emparejar']}, "
-        f"copiadas {r['copiadas']}; autenticaciones {r['autenticaciones']}.",
+        f"cierres de sesión {r.get('cierres', 0)}, copiadas {r['copiadas']}; "
+        f"autenticaciones {r['autenticaciones']}.",
     ]
     for titulo, clave in (
         ("Severidad, escala del proyecto", "severidad_escala"),
@@ -529,7 +552,7 @@ def informe_comparacion(r: dict[str, Any]) -> list[str]:
     if archivos:
         total = sum(archivos.values())
         criticos = archivos.get("critico", 0)
-        lineas.append(f"\nEventos de archivo (la descarga que no se concreta): {total}")
+        lineas.append(f"\nEventos de archivo (descargados o escritos en la sesión): {total}")
         lineas.append(f"  en crítico {criticos} de {total} (piso del evento de archivo)")
         for sev, n in sorted(archivos.items()):
             if sev != "critico":
@@ -563,6 +586,11 @@ def main() -> int:
     corrida = correr(args.host, args.usuario, args.clave)
     CORRIDA_FILE.write_text(json.dumps(corrida, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Corrida guardada en {CORRIDA_FILE}: {corrida['desde']} a {corrida['hasta']}.")
+    if corrida["sin_respuesta"]:
+        print(f"El sensor no contestó en {len(corrida['sin_respuesta'])} escenarios:")
+        for nombre in corrida["sin_respuesta"]:
+            print(f"  {nombre}")
+        return 1
     print("Esperá a que el motor consuma el bus y después corré con --comparar.")
     return 0
 

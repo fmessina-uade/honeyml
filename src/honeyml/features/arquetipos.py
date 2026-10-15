@@ -5,9 +5,10 @@ criterio estricto, así que no agrupa nada por casualidad y cada familia que enc
 también significa que un carácter distinto parte una familia en dos, y no dice absolutamente nada de
 las direcciones que nunca ejecutaron un comando.
 
-Esto trabaja al revés: toma las 35 características de comportamiento calculadas por dirección y deja
-que los datos decidan dónde caen los límites. Generaliza más allá de la coincidencia literal y cubre
-todas las direcciones observadas, no solo las que llegaron a una consola.
+Esto trabaja al revés: toma las características de comportamiento calculadas por dirección, las que
+quedan después de la poda por correlación, y deja que los datos decidan dónde caen los límites.
+Generaliza más allá de la coincidencia literal y cubre todas las direcciones observadas, no solo las
+que llegaron a una consola.
 
 Además llena un hueco que el conjunto de referencia no puede. UWF-ZeekData24 aporta etiquetas MITRE
 pero es telemetría de flujos de red: bytes, paquetes, estado de conexión. Las nuestras son de
@@ -45,7 +46,7 @@ KS = range(3, 9)
 # calcula sobre una muestra, que es lo habitual y suficiente para comparar k entre sí.
 MUESTRA_SILUETA = 5000
 
-# Cuántas características definen a cada grupo en su perfil. Con 35 disponibles, mostrarlas todas
+# Cuántas características definen a cada grupo en su perfil. Con más de treinta, mostrarlas todas
 # no describe: esconde.
 RASGOS_POR_GRUPO = 5
 

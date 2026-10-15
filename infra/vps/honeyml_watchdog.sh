@@ -8,8 +8,10 @@
 #
 # Hay dos umbrales. Con la CPU clavada, diez minutos sin escribir ya son un cuelgue: el proceso
 # trabaja al máximo y no produce nada. Con la CPU tranquila se espera media hora, porque puede ser
-# una pausa del tráfico. La cuenta arranca, como mucho, cuando arrancó el contenedor: un reinicio
-# reciente no hereda la antigüedad del registro y no se encadenan reinicios.
+# una pausa del tráfico. Clavada se mide contra el tope del contenedor y no contra un núcleo entero:
+# Cowrie tiene medio núcleo, así que trabado marca 50 % y nunca llegaría al 90 %. La cuenta arranca,
+# como mucho, cuando arrancó el contenedor: un reinicio reciente no hereda la antigüedad del
+# registro y no se encadenan reinicios.
 #
 # Antes de reiniciar se guarda la pila del proceso y el uso de CPU por hilo, porque el reinicio borra
 # esa evidencia y sin ella no hay forma de saber dónde quedó trabado. La pila la lee py-spy desde un
@@ -26,7 +28,8 @@ LOG="/var/log/honeyml_watchdog.log"
 DIAGNOSTICOS="/var/log/honeyml_diagnosticos"
 IMAGEN_PYSPY="honeyml-pyspy"
 
-# segundos sin escribir que alcanzan cuando la CPU supera LIMITE_CPU (en porcentaje)
+# segundos sin escribir que alcanzan cuando la CPU supera LIMITE_CPU (en porcentaje del tope del
+# contenedor)
 UMBRAL_CON_CPU=600
 LIMITE_CPU=90
 # segundos sin escribir que alcanzan con cualquier CPU
@@ -50,6 +53,18 @@ desde_arranque() {
 cpu_de() {
     # la parte entera del porcentaje, o vacío si Docker no contesta
     docker stats "$1" --no-stream --format '{{.CPUPerc}}' 2>/dev/null | tr -d '%' | cut -d. -f1 || true
+}
+
+tope_cpu_de() {
+    # lo que marca docker stats con el contenedor al máximo: 100 por núcleo asignado, y 100 si no
+    # tiene tope, que es lo que ocupa un proceso de un solo hilo trabado
+    local nano
+    nano=$(docker inspect -f '{{.HostConfig.NanoCpus}}' "$1" 2>/dev/null || echo 0)
+    if [[ "${nano:-0}" -gt 0 ]]; then
+        echo $(( nano / 10000000 ))
+    else
+        echo 100
+    fi
 }
 
 diagnosticar() {
@@ -91,7 +106,7 @@ diagnosticar() {
 
 revisar() {
     local nombre="$1" archivo="$2"
-    local edad arranque cpu pids
+    local edad arranque cpu clavada pids
     edad=$(edad_registro "$archivo")
     if [[ "$edad" -lt 0 ]]; then
         log "AVISO: no existe el registro de ${nombre} (${archivo})"
@@ -106,7 +121,8 @@ revisar() {
     fi
 
     cpu=$(cpu_de "$nombre")
-    if [[ "$edad" -le "$UMBRAL_SIN_CPU" && "${cpu:-0}" -lt "$LIMITE_CPU" ]]; then
+    clavada=$(( $(tope_cpu_de "$nombre") * LIMITE_CPU / 100 ))
+    if [[ "$edad" -le "$UMBRAL_SIN_CPU" && "${cpu:-0}" -lt "$clavada" ]]; then
         return
     fi
 

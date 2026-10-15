@@ -402,7 +402,8 @@ uwf-verificar:
 	@./.venv/bin/python -m honeyml.eda.uwf_loader --verificar
 
 # Entrena el clasificador final, lo persiste y calcula el ranking por permutación.
-# Tarda unos dos minutos: la parte lenta son las probabilidades fuera de muestra del umbral.
+# Tarda unos seis minutos en una laptop de cuatro núcleos. El ajuste es medio minuto; lo lento es el
+# umbral: las probabilidades fuera de muestra y el barrido de nueve puntos sobre 1,4 millones de filas.
 modelo:
 	@./.venv/bin/python -m honeyml.features.uwf_export
 

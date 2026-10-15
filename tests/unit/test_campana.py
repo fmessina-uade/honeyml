@@ -124,3 +124,62 @@ def test_el_informe_en_seco_se_lee() -> None:
     texto = "\n".join(campana.informe_corrida())
     assert "escenarios" in texto
     assert campana.DESTINO in texto
+
+
+def test_el_cierre_de_sesion_no_cuenta_como_sin_emparejar() -> None:
+    """El `exit` lo escribe el ejecutor al terminar cada sesión, no el escenario: contarlo como un
+    comando sin emparejar haría parecer que el sensor descompuso lo que se envió."""
+    decisiones = [_decision("a", "alto", "Descubrimiento"), _decision("z", "alto", None)]
+    comandos = {"a": "uname -a", "z": campana.CIERRE}
+    r = campana.comparar(_corrida(), decisiones, comandos)
+
+    assert r["emparejadas"] == 1
+    assert r["sin_emparejar"] == 0
+    assert r["cierres"] == 1
+
+
+def test_el_indicador_reconoce_root_y_usuario() -> None:
+    """Root ve `#` y un usuario común `$`: esperar solo uno hace que cada comando agote el plazo."""
+    for indicador in (b"root@svr04:~# ", b"phil@svr04:~$ "):
+        assert any(p.search(indicador) for p in campana.INDICADOR)
+
+
+class _TelnetMudo:
+    """Un sensor trabado: el proxy acepta la conexión, pero nunca llega el ingreso."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        self.escrito: list[bytes] = []
+
+    def read_until(self, esperado: bytes, timeout: float | None = None) -> bytes:
+        return b""
+
+    def write(self, datos: bytes) -> None:
+        self.escrito.append(datos)
+
+    def close(self) -> None:
+        pass
+
+
+def test_una_sesion_sin_ingreso_se_informa(monkeypatch: Any) -> None:
+    import telnetlib
+
+    monkeypatch.setattr(telnetlib, "Telnet", _TelnetMudo)
+    assert campana._sesion_cowrie("127.0.0.1", 23, "root", "x", ("uname -a",), 0.1) is False
+
+
+def test_la_corrida_lista_los_escenarios_sin_respuesta(monkeypatch: Any) -> None:
+    """Si el sensor deja de contestar a mitad de la corrida, los escenarios que faltan quedan
+    nombrados en el registro en vez de perderse sin aviso."""
+    cowrie = [e.nombre for e in campana.ESCENARIOS if e.sensor == campana.COWRIE]
+    contestadas = set(cowrie[:3])
+    monkeypatch.setattr(
+        campana,
+        "_sesion_cowrie",
+        lambda host, puerto, u, c, comandos, espera: next(
+            e.nombre in contestadas for e in campana.ESCENARIOS if e.comandos == comandos
+        ),
+    )
+    monkeypatch.setattr(campana, "_fuerza_bruta_ftp", lambda *a: None)
+    corrida = campana.correr("127.0.0.1", "root", "x")
+
+    assert corrida["sin_respuesta"] == cowrie[3:]
