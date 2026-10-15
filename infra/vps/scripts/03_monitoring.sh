@@ -19,12 +19,14 @@ THRESHOLD_DISK=80
 # Eventos de atraso a partir de los cuales el motor dejó de consumir. En régimen el atraso vuelve a
 # cero en minutos; este número solo se alcanza con el motor detenido durante horas.
 THRESHOLD_ATRASO=5000
-# el watchdog, el respaldo y la imagen de diagnóstico viven en el repositorio, un nivel arriba
+# los guiones del anfitrión y la imagen de diagnóstico viven en el repositorio, un nivel arriba
 REPO_VPS="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WATCHDOG_SCRIPT="/usr/local/bin/honeyml_watchdog.sh"
 WATCHDOG_LOG="/var/log/honeyml_watchdog.log"
 BACKUP_SCRIPT="/usr/local/bin/honeyml_backup.sh"
 BACKUP_LOG="/var/log/honeyml_backup.log"
+PURGA_SCRIPT="/usr/local/bin/honeyml_purga_muestras.sh"
+PURGA_LOG="/var/log/honeyml_purga.log"
 # Los flujos que graba Dionaea son evidencia, pero crecen sin techo y comparten disco con el índice.
 BISTREAMS="/var/lib/docker/volumes/honeypots_dionaea_var/_data/lib/dionaea/bistreams"
 RETENCION_BISTREAMS_DIAS=30
@@ -186,11 +188,12 @@ DAILY_SCRIPT
 
 chmod +x "$DAILY_REPORT_SCRIPT"
 
-# 3. los scripts del anfitrión: watchdog de los sensores, respaldo, y la imagen con la que se lee la
-#    pila de un proceso colgado
-log "[3/4] Instalando el watchdog y el respaldo..."
+# 3. los scripts del anfitrión: watchdog de los sensores, respaldo, purga de muestras, y la imagen
+#    con la que se lee la pila de un proceso colgado
+log "[3/4] Instalando el watchdog, el respaldo y la purga..."
 install -m 755 "$REPO_VPS/honeyml_watchdog.sh" "$WATCHDOG_SCRIPT"
 install -m 755 "$REPO_VPS/honeyml_backup.sh" "$BACKUP_SCRIPT"
+install -m 755 "$REPO_VPS/honeyml_purga_muestras.sh" "$PURGA_SCRIPT"
 if command -v docker >/dev/null 2>&1; then
     docker build -q -t honeyml-pyspy "$REPO_VPS/pyspy" >/dev/null
     log "  Imagen honeyml-pyspy construida."
@@ -219,8 +222,12 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 # respaldo diario de la telemetría y de las decisiones, a las 03:00 UTC
 0 3 * * * root $BACKUP_SCRIPT >> $BACKUP_LOG 2>&1
 
-# rotación semanal del registro de actividad de los honeypots
-0 3 * * 0 root find /var/log -name "honeyml_*.log" -mtime +30 -delete 2>/dev/null || true
+# purga diaria de las muestras de malware de más de siete días, a las 05:00 UTC
+0 5 * * * root $PURGA_SCRIPT >> $PURGA_LOG 2>&1
+
+# rotación semanal de los registros del monitoreo. El de las muestras borradas queda afuera: en
+# Dionaea es la única copia del hash de cada muestra
+0 3 * * 0 root find /var/log -name "honeyml_*.log" ! -name "honeyml_muestras_borradas.log" -mtime +30 -delete 2>/dev/null || true
 
 # retención semanal de los flujos grabados por Dionaea, que si no llenan el disco
 0 4 * * 0 root find $BISTREAMS -type f -mtime +$RETENCION_BISTREAMS_DIAS -delete 2>/dev/null; find $BISTREAMS -mindepth 1 -type d -empty -delete 2>/dev/null || true
@@ -237,6 +244,7 @@ log "  Health check (c/5 min) : $HEALTHCHECK_SCRIPT"
 log "  Reporte diario (07:00) : $DAILY_REPORT_SCRIPT"
 log "  Watchdog (c/5 min)     : $WATCHDOG_SCRIPT"
 log "  Respaldo (03:00)       : $BACKUP_SCRIPT"
+log "  Purga (05:00)          : $PURGA_SCRIPT"
 log "  Log de monitoreo       : $HEALTHCHECK_LOG"
 log ""
 log "Para probar manualmente: bash $HEALTHCHECK_SCRIPT"
