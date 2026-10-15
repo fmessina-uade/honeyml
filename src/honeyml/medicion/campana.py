@@ -371,22 +371,30 @@ def correr(host: str, usuario: str, clave: str, espera: float = 10.0) -> dict[st
 # La comparación entre lo obtenido y lo esperado
 
 
-def _decisiones_internas(desde: str, hasta: str, es_url: str) -> list[dict[str, Any]]:
-    """Las decisiones de origen interno dentro de la ventana de la corrida.
+def _consulta_de_la_corrida(desde: str, hasta: str) -> dict[str, Any]:
+    """Las decisiones de origen interno sobre eventos ocurridos dentro de la ventana de la corrida.
+
+    La ventana se aplica a `evento.momento` y no a `@timestamp`, que es cuándo se decidió: el motor
+    tría después de que el evento cruza el pipeline, así que una decisión puede llegar minutos más
+    tarde que el fin de la corrida y con `@timestamp` quedaría afuera.
 
     El origen interno es el que `redes` ya excluye de las cifras educativas: la campaña corre desde
     el servidor, así que su tráfico entra por una red privada y no se mezcla con los atacantes.
     """
-    consulta = {
+    return {
         "size": 1000,
         "query": {
             "bool": {
-                "filter": [{"range": {"@timestamp": {"gte": desde, "lte": hasta}}}],
+                "filter": [{"range": {"evento.momento": {"gte": desde, "lte": hasta}}}],
                 "should": [{"term": {"evento.origen": r}} for r in redes.INTERNAS],
                 "minimum_should_match": 1,
             }
         },
     }
+
+
+def _decisiones_internas(desde: str, hasta: str, es_url: str) -> list[dict[str, Any]]:
+    consulta = _consulta_de_la_corrida(desde, hasta)
     pedido = urllib.request.Request(
         f"{es_url}/{DECISIONES}/_search",
         data=json.dumps(consulta).encode(),

@@ -183,3 +183,13 @@ def test_la_corrida_lista_los_escenarios_sin_respuesta(monkeypatch: Any) -> None
     corrida = campana.correr("127.0.0.1", "root", "x")
 
     assert corrida["sin_respuesta"] == cowrie[3:]
+
+
+def test_la_ventana_se_aplica_al_momento_del_evento() -> None:
+    """Una decisión que llega después del fin de la corrida también es sobre un evento de ella."""
+    consulta = campana._consulta_de_la_corrida(
+        "2026-01-01T00:00:00+00:00", "2026-01-01T00:01:00+00:00"
+    )
+    rangos = [f["range"] for f in consulta["query"]["bool"]["filter"]]
+
+    assert [list(r) for r in rangos] == [["evento.momento"]]
