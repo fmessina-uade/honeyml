@@ -3148,7 +3148,11 @@ button.ranking-fila:hover {
     right: auto;
     bottom: auto;
     margin: auto 22px 24px;
-    padding-top: calc(14vh + env(safe-area-inset-top));
+    /* Arriba del titular entra una fila de honeypots de la escena, entre los controles y el texto.
+       El mínimo sale de las medidas de EscenaPanal.tsx: los controles, el aire, la celda (1,94 veces
+       su radio, que es la catorceava parte del lado menor) y lo que va debajo de ella, más unos
+       píxeles de margen para que un control un poco más alto no deje la fila afuera. */
+    padding-top: calc(max(14vh, 98px + 13.9vmin, 153px) + env(safe-area-inset-top));
     gap: 14px;
   }
   .ingreso-titular {

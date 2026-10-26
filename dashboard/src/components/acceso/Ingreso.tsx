@@ -123,6 +123,8 @@ export default function Ingreso({
   const { t } = useI18n();
   const a = t.acceso;
   const raiz = useRef<HTMLDivElement>(null);
+  const controles = useRef<HTMLDivElement>(null);
+  const heroe = useRef<HTMLElement>(null);
   const campoUsuario = useRef<HTMLInputElement>(null);
   const [pendiente, setPendiente] = useState(true);
   const [usuario, setUsuario] = useState('');
@@ -197,13 +199,13 @@ export default function Ingreso({
 
   return (
     <div ref={raiz} className="ingreso" data-entrada={pendiente ? 'pendiente' : undefined}>
-      <EscenaPanal etiqueta={a.escena} />
+      <EscenaPanal etiqueta={a.escena} controles={controles} texto={heroe} />
       <div className="ingreso-velo" aria-hidden />
-      <div className="ingreso-preferencias">
+      <div ref={controles} className="ingreso-preferencias">
         <Preferencias enLinea />
       </div>
 
-      <section className="ingreso-heroe">
+      <section ref={heroe} className="ingreso-heroe">
         <span className="insignia ingreso-insignia">{a.insignia}</span>
         <h2 className="ingreso-titular">
           <span className="ln">

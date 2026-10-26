@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import { useQuieto } from '../../lib/useQuieto';
 
 /**
@@ -57,6 +57,11 @@ const SERVICIOS: { servicio: string; peso: number }[] = [
 
 const VIDA_CAPTURA_MS = 1800;
 const DEMORA_CLASIFICACION_MS = 520;
+// Lo que ocupa cada honeypot por debajo de su celda: el servicio, la cuenta y un respiro antes del
+// texto que tenga abajo. El relleno superior del titular en el teléfono (index.css) cuenta con
+// estas medidas.
+const PIE_DEL_HONEYPOT = 44;
+const AIRE_BAJO_LOS_CONTROLES = 4;
 
 function leerColores(): Colores {
   const css = getComputedStyle(document.documentElement);
@@ -95,15 +100,43 @@ function semilla(s: number) {
 /**
  * La zona donde van los honeypots, según la forma de la pantalla: lejos de la tarjeta del formulario
  * y por encima del titular. Devuelve [x0, y0, x1, y1] y cuántos entran.
+ *
+ * En el teléfono el titular va en el flujo de la página y su altura depende del idioma y del ancho,
+ * así que una proporción fija de la pantalla lo pisa. Ahí la zona es la franja medida entre los
+ * controles de arriba y el comienzo del texto: la celda entera queda debajo de los controles, y el
+ * servicio y la cuenta de cada honeypot, por encima del texto.
  */
-function zona(w: number, h: number): [number, number, number, number, number] {
-  if (w < 700) return [w * 0.12, h * 0.05, w * 0.88, h * 0.36, 3];
+function zona(
+  w: number,
+  h: number,
+  franja: [number, number] | null,
+  radio: number,
+): [number, number, number, number, number] {
+  if (w < 700) {
+    if (!franja) return [w * 0.12, h * 0.05, w * 0.88, h * 0.36, 3];
+    const [arriba, abajo] = franja;
+    return [
+      w * 0.12,
+      arriba + AIRE_BAJO_LOS_CONTROLES + radio * 0.94,
+      w * 0.88,
+      abajo - radio - PIE_DEL_HONEYPOT,
+      3,
+    ];
+  }
   if (w / h < 1.02) return [w * 0.1, h * 0.04, w * 0.9, h * 0.16, 4];
   const tarjeta = Math.min(560, Math.max(380, w * 0.38)) + 28;
   return [w * 0.08, h * 0.12, w - tarjeta - w * 0.07, h * 0.6, 6];
 }
 
-export default function EscenaPanal({ etiqueta }: { etiqueta: string }) {
+export default function EscenaPanal({
+  etiqueta,
+  controles,
+  texto,
+}: {
+  etiqueta: string;
+  controles?: RefObject<HTMLElement>;
+  texto?: RefObject<HTMLElement>;
+}) {
   const lienzo = useRef<HTMLCanvasElement>(null);
   const quieto = useQuieto();
 
@@ -125,7 +158,19 @@ export default function EscenaPanal({ etiqueta }: { etiqueta: string }) {
     let capturas: Captura[] = [];
     let proximo = 0;
     let marco = 0;
+    let desfase = 0;
     const azar = semilla(11);
+
+    // La franja libre entre el borde inferior de los controles y el comienzo del texto. Se mide
+    // con offsetTop, que da la posición en reposo: no cambia al desplazar la página, como pasa
+    // cuando se abre el teclado, ni con la animación de entrada.
+    const franjaLibre = (): [number, number] | null => {
+      const arriba = controles?.current;
+      const abajo = texto?.current;
+      if (!arriba || !abajo) return null;
+      const relleno = parseFloat(getComputedStyle(abajo).paddingTop) || 0;
+      return [arriba.offsetTop + arriba.offsetHeight, abajo.offsetTop + relleno];
+    };
 
     const armar = () => {
       ancho = canvas.clientWidth;
@@ -142,13 +187,18 @@ export default function EscenaPanal({ etiqueta }: { etiqueta: string }) {
       // Los honeypots caen en celdas de la retícula, separados entre sí, en la zona libre.
       const dx = radio * 1.5;
       const dy = radio * Math.sqrt(3);
-      const [x0, y0, x1, y1, cuantos] = zona(ancho, alto);
+      const franja = ancho < 700 ? franjaLibre() : null;
+      const [x0, y0, x1, y1, cuantos] = zona(ancho, alto, franja, radio);
+      // Con la franja medida, la retícula se corre en vertical hasta que una fila de celdas cae
+      // justo en su borde superior. Si no, la fila más cercana podría quedar afuera y no entraría
+      // ningún honeypot aunque la franja tenga el alto de uno.
+      desfase = franja ? ((y0 % dy) + dy) % dy : 0;
       const celdas: [number, number][] = [];
       for (let col = -1; col * dx < ancho + radio; col++) {
         for (let fila = -1; fila * dy < alto + radio; fila++) {
           const x = col * dx;
-          const y = fila * dy + (col % 2 ? dy / 2 : 0);
-          if (x >= x0 && x <= x1 && y >= y0 && y <= y1) celdas.push([x, y]);
+          const y = fila * dy + (col % 2 ? dy / 2 : 0) + desfase;
+          if (x >= x0 && x <= x1 && y >= y0 - 0.5 && y <= y1) celdas.push([x, y]);
         }
       }
       const elegir = semilla(23);
@@ -185,7 +235,7 @@ export default function EscenaPanal({ etiqueta }: { etiqueta: string }) {
       for (let col = -1; col * dx < ancho + radio; col++) {
         for (let fila = -1; fila * dy < alto + radio; fila++) {
           const x = col * dx;
-          const y = fila * dy + (col % 2 ? dy / 2 : 0);
+          const y = fila * dy + (col % 2 ? dy / 2 : 0) + desfase;
           const cerca = Math.max(
             0,
             ...honeypots.map((h) => 1 - Math.min(1, Math.hypot(h.x - x, h.y - y) / (radio * 5))),
@@ -375,6 +425,9 @@ export default function EscenaPanal({ etiqueta }: { etiqueta: string }) {
     arrancar();
     const observador = new ResizeObserver(arrancar);
     observador.observe(canvas);
+    // El titular cambia de alto cuando llega su tipografía o cambia el idioma, y en el teléfono eso
+    // mueve el borde inferior de la franja.
+    if (texto?.current) observador.observe(texto.current);
     const tema = new MutationObserver(() => {
       colores = leerColores();
       arrancar();
@@ -396,7 +449,7 @@ export default function EscenaPanal({ etiqueta }: { etiqueta: string }) {
       tema.disconnect();
       document.removeEventListener('visibilitychange', alCambiarVisibilidad);
     };
-  }, [quieto]);
+  }, [quieto, controles, texto]);
 
   return <canvas ref={lienzo} className="escena-panal" role="img" aria-label={etiqueta} />;
 }
