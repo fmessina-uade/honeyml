@@ -1,8 +1,8 @@
 """La frontera de inferencia y su política de selección de modelo.
 
-Lo que se fija acá es la política (barato primero, capaz al reintentar) y las dos formas en que
-podría dejar de aplicarse sin que nadie se entere: que el modelo quede fijado por configuración sin
-que se note, o que el desglose por modelo se pierda y ya no se pueda evaluar si conviene.
+La política pone primero el modelo barato y pasa al capaz al reintentar. Puede dejar de aplicarse
+sin que nadie se entere de dos formas: que el modelo quede fijado por configuración, o que se pierda
+el desglose por modelo y no haya cómo evaluar si conviene.
 """
 
 from __future__ import annotations

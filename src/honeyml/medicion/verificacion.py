@@ -1,27 +1,22 @@
 """La verificación de la reutilización por firma: una segunda clasificación, independiente, de una
 muestra de conductas ya decididas, para medir cuánto coincide con la que el repertorio copia.
 
-El repertorio copia la decisión de la primera repetición de cada firma a todas las demás, sin volver
-a pagarle al proveedor. Para el piso de severidad eso es correcto por construcción: `severidad.piso`
-sale de la categoría y el resultado, que son campos de la firma, así que es el mismo para toda la
-firma y la escala nunca baja de ahí. Lo que no está garantizado es el valor exacto dentro de los
-límites ni la táctica, que la propia firma declara como su límite conocido.
+El repertorio copia la decisión de la primera repetición de cada firma a todas las demás. Para el
+piso de severidad eso es correcto por construcción, porque sale de la categoría y el resultado, que
+son campos de la firma; lo que no está garantizado es el valor exacto dentro de los límites ni la
+táctica. Esta medición toma una muestra de firmas reutilizadas, razona de nuevo un evento ya copiado
+de cada una sin consultar el repertorio y enfrenta la clasificación nueva con la copiada. El evento
+se arma con la conducta más la dirección, el momento y la sesión que guardó la decisión, porque sin
+dirección el nodo de contexto lo cortaría antes de razonarlo. De la severidad informa cuántas veces
+cae en el mismo nivel y cuántas, aun difiriendo, siguen dentro de los límites del evento (la
+invariante que vuelve defendible copiar); de la táctica, la coincidencia y en qué se fue cuando
+difiere.
 
-Esta medición le pone un número a ese límite. Toma una muestra de firmas que efectivamente se
-reutilizaron, razona de nuevo un evento ya copiado de cada una sin consultar el repertorio, y
-enfrenta la clasificación nueva con la que se había copiado. El evento se arma con la conducta (lo
-que define la firma) más la dirección, el momento y la sesión que guardó la decisión: el primer
-nodo corta por falta de contexto un evento sin dirección, antes de razonarlo, así que reconstruir
-esos campos es lo que deja que el grafo corra. De la severidad informa dos cosas: cuántas veces cae
-en el mismo nivel (estabilidad) y cuántas, aun difiriendo, siguen dentro de los límites del evento
-(la invariante que vuelve defendible copiar). De la táctica informa la coincidencia y en qué se fue
-cuando difiere.
-
-Cuesta una llamada de inferencia por firma de la muestra, así que la muestra es chica y fija por
-semilla. Razona con un almacén que no escribe y sin repertorio, de modo que no toca ni el corpus ni
-las firmas guardadas. Se corre en el servidor con `make verificacion`; con `--seco` muestra la
-población sin gastar, y con `--desde` se limita a las firmas nacidas de una fecha en adelante, para
-que la clasificación guardada y la nueva salgan del mismo criterio.
+Cuesta una llamada de inferencia por firma, así que la muestra es chica y fija por semilla. Razona
+con un almacén que no escribe y sin repertorio, de modo que no toca ni el corpus ni las firmas
+guardadas. Se corre en el servidor con `make verificacion`; con `--seco` muestra la población sin
+gastar, y con `--desde` se limita a las firmas nacidas de una fecha en adelante, para que la
+clasificación guardada y la nueva salgan del mismo criterio.
 """
 
 from __future__ import annotations
@@ -206,8 +201,9 @@ def _evento(conducta: Conducta, telemetria: dict[str, Any] | None) -> EventoDelB
 
     La conducta viene de la decisión guardada y el usuario con el comando, de la telemetría, igual
     que para la firma. Además se reponen la dirección, el momento y la sesión, que la firma no mira
-    pero el primer nodo sí: sin la dirección no hay contexto que armar y el evento se corta antes de
-    razonarlo. Reponerlos con lo que guardó la decisión es razonar el mismo evento, no uno parecido.
+    pero el nodo de contexto sí: sin la dirección no hay contexto que armar y el evento se corta
+    antes de razonarlo. Reponerlos con lo que guardó la decisión es razonar el mismo evento, no uno
+    parecido.
     """
     e = conducta.evento
     telemetria = telemetria or {}

@@ -9,9 +9,9 @@ const MINIMO = 10;
 const NOMBRE = /^[a-z0-9][a-z0-9._-]{2,31}$/;
 
 /**
- * La administración de cuentas. Arriba, la escalera de roles: qué suma cada escalón sobre el
- * anterior, y hasta dónde llega quien está mirando. Abajo, el alta y la lista. Solo se ofrecen los
- * roles que quedan por debajo del propio, que es lo mismo que exige la API.
+ * La administración de cuentas. Arriba, la escalera de roles, encendida hasta donde llega quien
+ * está mirando. Abajo, el alta y la lista. Solo se ofrecen los roles que quedan por debajo del
+ * propio, que es lo mismo que exige la API.
  */
 export default function Cuentas() {
   const { t } = useI18n();
@@ -55,7 +55,6 @@ export default function Cuentas() {
           >
             <span className="escalon-marca" aria-hidden />
             <span className="geist text-[15px] font-medium text-white">{t.roles[rol]}</span>
-            <span className="text-[12.5px] leading-snug text-white/60">{t.rolesDesc[rol]}</span>
           </li>
         ))}
       </ol>

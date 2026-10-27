@@ -118,7 +118,7 @@ def find_native(session: str, eventid: str) -> dict[str, Any] | None:
 
 
 def show(title: str, payload: dict[str, Any]) -> None:
-    print(f"\n{'=' * 78}\n{title}\n{'=' * 78}")
+    print(f"\n{title}\n")
     print(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True))
 
 

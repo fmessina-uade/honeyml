@@ -129,9 +129,9 @@ def main() -> int:
         for sensor, docs in sorted(by_sensor.items()):
             n_idx = sum(1 for i in cat if i["index"].split("-")[1:2] == [sensor])
             print(f"  {sensor:<12} {n_idx:>3} índices diarios  docs={docs:>9}")
-        print(f"  {'TOTAL':<12} {len(cat):>3} índices          docs={total:>9}{tamano}")
+        print(f"  {'total':<12} {len(cat):>3} índices          docs={total:>9}{tamano}")
     else:
-        print(f"  {'TOTAL':<32} docs={total:>8}{tamano}")
+        print(f"  {'total':<32} docs={total:>8}{tamano}")
 
     checks_ok = True
 
@@ -143,7 +143,7 @@ def main() -> int:
     if unrouted == 0:
         print(f"  {OK} 0 eventos sin enrutar")
     else:
-        print(f"  {FAIL} {unrouted} eventos en honeypot-unrouted-* (revisar filebeat/logstash)")
+        print(f"  {FAIL} {unrouted} eventos en honeypot-unrouted-* (revisar Filebeat y Logstash)")
         checks_ok = False
 
     print(f"\nCobertura de campos ECS (sobre {total} docs)")

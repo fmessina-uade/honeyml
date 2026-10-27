@@ -1,32 +1,21 @@
 """Frontera de entrada del motor: lee el bus con un grupo de consumidores y entrega los eventos.
 
-Todo lo que viene después (contexto, recuperación, inferencia, validación, persistencia) recibe
-eventos de acá y nunca habla con el bus.
+Lo que viene después (contexto, recuperación, inferencia, validación, persistencia) recibe eventos
+de acá y nunca habla con el bus. El contrato del manejador es corto: si levanta, el evento no se
+confirma y vuelve; si retorna, la decisión es durable y se confirma, y si además devuelve `True`, el
+evento se cuenta como repetido. `DetenerConsumo` avisa de algo que afecta a todos los eventos que
+siguen: la corrida se corta y el lote queda pendiente sin cobrarle la entrega. El que une este
+contrato con el grafo es `motor.py`.
 
-El contrato del manejador es una sola regla: si levanta una excepción el evento no se confirma y
-vuelve, y si retorna, la decisión es durable y se confirma. Si además devuelve `True`, la decisión
-ya existía de antes y el evento se cuenta como repetido. Y si levanta `DetenerConsumo`, el problema
-no es el evento sino algo que afecta a todos los que siguen: la corrida se corta y los eventos del
-lote quedan pendientes sin cobrarles la entrega. Con ese contrato el grafo se enchufa sin tocar la
-lógica de este módulo: quien los une es `motor.py`.
+El bus entrega al menos una vez, así que se deduplica por `doc_id` y la marca se escribe solo
+después de que el manejador tuvo éxito, para que un fallo nunca deje trabajo marcado como hecho. Lo
+que un consumidor caído deja pendiente más allá de un umbral de inactividad lo toma otro con
+`XCLAIM`. Un evento que siempre falla se reclamaría para siempre, gastando una llamada por vuelta,
+así que pasado un techo de entregas va a un stream de descartados y se confirma. `SIGTERM` y
+`SIGINT` terminan el lote en curso: lo no confirmado igual se reclamaría, pero cortar a mitad de
+una decisión desperdicia una llamada paga.
 
-Hay cuatro problemas resueltos a propósito, y los cuatro son silenciosos si no se los atiende.
-
-Los repetidos: el bus entrega al menos una vez por diseño, así que se deduplica por `doc_id`, que es
-el mismo identificador del índice, y la marca se escribe después de que el manejador tuvo éxito y
-nunca antes. Un fallo no puede marcar trabajo como hecho.
-
-El consumidor caído: lo que queda pendiente más allá de un umbral de inactividad lo toma otro con
-`XCLAIM`. Es lo que separa "el motor reinicia" de "el motor no pierde nada".
-
-El evento venenoso: uno que siempre falla se reclamaría para siempre, frenando al grupo y gastando
-una llamada de inferencia por vuelta. Pasado un techo de entregas va a un stream de descartados y se
-confirma, así la cola avanza y el evento queda inspeccionable.
-
-Y el corte a mitad de decisión: `SIGTERM` y `SIGINT` terminan el lote en curso en lugar de cortar.
-No es pérdida, porque lo no confirmado se reclama, pero evita desperdiciar una llamada paga.
-
-Se usa `XPENDING` y no `XAUTOCLAIM` para reclamar, porque solo el primero informa cuántas veces se
+Para reclamar se usa `XPENDING`, porque a diferencia de `XAUTOCLAIM` informa cuántas veces se
 entregó cada mensaje, que es lo que distingue un evento lento de uno venenoso.
 """
 
@@ -373,7 +362,7 @@ class ConsumidorDelBus:
     # Lectura
 
     def reclamar_huerfanos(self) -> list[EventoDelBus]:
-        """Toma los mensajes que dejó pendientes un consumidor que ya no responde.
+        """Toma los mensajes que dejó pendientes un consumidor que dejó de responder.
 
         Usa XPENDING y no XAUTOCLAIM porque solo el primero informa la cantidad de entregas, que es
         lo que distingue un evento lento de uno venenoso.
@@ -456,7 +445,7 @@ class ConsumidorDelBus:
 
             if not eventos:
                 vacios += 1
-                # En modo acotado, una lectura vacía significa que ya no queda atraso y no hay
+                # En modo acotado, una lectura vacía significa que no queda atraso y no hay
                 # nada que esperar. En modo seguimiento se sigue bloqueando, que es la gracia.
                 if limite is not None and vacios >= 2:
                     break

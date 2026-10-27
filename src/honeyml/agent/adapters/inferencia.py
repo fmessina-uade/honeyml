@@ -1,42 +1,22 @@
 """Cliente del proveedor de inferencia, con límites de tasa y contabilidad de consumo.
 
-Habla el dialecto compatible con OpenAI, que exponen tanto Groq como OpenRouter, por HTTP y con
-`urllib`, que es el mismo camino por el que el proyecto ya consulta Elasticsearch. No trae ningún
-cliente HTTP: el proveedor se alcanza por un adaptador, así que esa dependencia pertenece al
-adaptador y no al motor.
+Habla el dialecto compatible con OpenAI que exponen Groq y OpenRouter, por HTTP con `urllib`, así
+el motor no carga ningún cliente HTTP. Lo único que se agrega es `certifi`, el paquete de
+certificados raíz, para cuando el intérprete no trae almacén propio (ver `_contexto_tls`).
 
-La única dependencia que sí agrega es `certifi`, y no es un cliente sino el paquete de certificados
-raíz. Ver `_contexto_tls`: se usa como respaldo cuando el intérprete no tiene almacén propio, que es
-el caso del Python de python.org en macOS mientras no se corra su `Install Certificates.command`.
+Ante un 429 o un 5xx se reintenta con retroceso acotado, respetando el `retry-after`. Si no alcanza,
+o si la red se cae o vence el timeout, se levanta `ProveedorInalcanzableError` y el evento vuelve al
+bus sin confirmar, en vez de persistirse como no concluyente. Un `retry-after` por encima de
+`ESPERA_MAXIMA`, el bloqueo por límite de gasto o la falta de crédito dan `CuotaAgotadaError`, y el
+motor corta la corrida. Un 4xx que no sea 429 es un defecto nuestro y da `PedidoRechazadoError`.
 
-"Manejo de consumo" son tres cosas distintas y las tres están acá.
+Cada respuesta suma sus tokens y su costo en dólares, el que informa el proveedor o el de `PRECIOS`
+si no lo informa: cuánto sale clasificar un evento es una métrica operativa que se reporta.
 
-Los límites de tasa. Un 429 no es un fallo, es el proveedor pidiendo que se espere. Se respeta el
-`retry-after` que manda y se reintenta con retroceso acotado. Agotados los reintentos se levanta,
-porque un límite de tasa es transitorio y el evento tiene que volver al bus en vez de persistirse
-como no concluyente.
-
-La excepción es la cuota. Un `retry-after` más largo de lo que conviene esperar, el bloqueo por
-límite de gasto o la falta de crédito no se arreglan reintentando: levantan `CuotaAgotadaError`
-para que el motor corte la corrida en vez de seguir fallando evento por evento.
-
-La contabilidad. Cada respuesta trae cuántos tokens costó, se acumulan y se traducen a dólares.
-Cuando el proveedor informa el costo de la llamada se usa ese, y si no, la tabla de abajo. No es
-telemetría decorativa: "cuánto sale clasificar un evento" es una métrica operativa que hay que
-reportar, y medirla desde el principio evita reconstruirla después.
-
-Y la distinción que el grafo necesita. El grafo separa "el proveedor contestó mal" de "el proveedor
-no contestó" y las trata distinto (una persiste, la otra reintenta). Esa distinción se sostiene en
-la taxonomía de excepciones de este módulo: una red caída, un timeout o un 5xx dan
-`ProveedorInalcanzableError` y el motor no confirma el evento; un 4xx que no es 429 da
-`PedidoRechazadoError`, que es un defecto nuestro y tiene que verse.
-
-Sobre la salida estructurada: se pide `json_schema` con `strict: true`, que con decodificación
-restringida garantiza que la respuesta cumpla el esquema. Tiene dos requisitos que
-`esquema_estricto` se encarga de cumplir (todas las propiedades obligatorias y objetos cerrados) y
-una limitación que este diseño ya respetaba: no admite herramientas ni streaming. Con un enrutador,
-el mismo modelo lo sirven varios proveedores y no todos respetan el modo estricto: de eso se ocupa
-`preferencias_de_ruteo`.
+La salida se pide como `json_schema` con `strict: true`, y la decodificación restringida garantiza
+que cumpla el esquema. A cambio exige propiedades obligatorias y objetos cerrados (de eso se ocupa
+`esquema_estricto`) y no admite herramientas ni streaming. Con un enrutador, `preferencias_de_ruteo`
+descarta a los proveedores que no respetan el modo estricto.
 """
 
 from __future__ import annotations
@@ -85,9 +65,9 @@ ESPERA_BASE = 2.0
 ESPERA_MAXIMA = 30.0
 
 
-# Identificación del cliente. No es cortesía: sin ella `urllib` manda `Python-urllib/3.12`, y el
-# borde de Cloudflare que el proveedor tiene adelante lo rechaza con un 403 y el código 1010
-# ("navegador vedado") antes de que el proveedor llegue a ver la petición.
+# Identificación del cliente. Sin ella `urllib` manda `Python-urllib/3.12`, y el borde de
+# Cloudflare que el proveedor tiene adelante lo rechaza con un 403 y el código 1010 ("navegador
+# vedado") antes de que el proveedor llegue a ver la petición.
 #
 # El síntoma confunde, porque la misma petición por `curl` funciona y entonces todo apunta a la
 # credencial cuando la credencial está perfecta. Con una clave inválida se ve la diferencia: con el

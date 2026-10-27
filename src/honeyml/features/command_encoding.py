@@ -78,7 +78,7 @@ def main() -> None:
     out = pd.DataFrame(matrix.toarray(), index=docs.index, columns=[f"tfidf_{t}" for t in terms])
     MATRIX_OUT.parent.mkdir(parents=True, exist_ok=True)
     out.to_parquet(MATRIX_OUT)
-    print(f"\nMatriz TF-IDF: {out.shape[0]} IPs x {out.shape[1]} términos -> {MATRIX_OUT}")
+    print(f"\nMatriz TF-IDF de {out.shape[0]} IPs por {out.shape[1]} términos, en {MATRIX_OUT}")
 
 
 if __name__ == "__main__":

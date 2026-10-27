@@ -5,19 +5,16 @@ protocolo `Almacen` y no sabe que del otro lado hay un Elasticsearch. Acá no ha
 vaya a cambiar, pero la frontera igual paga: el nodo se prueba sin levantar el stack, que son
 treinta segundos de arranque en cada corrida de las pruebas.
 
-Un solo índice, `honeyml-decisiones`, y no uno por fecha como los de los honeypots. Aquellos reciben
-unos 40.000 eventos por día y el corte diario tiene sentido; acá son unas 800, así que un índice por
-día serían 365 fragmentos al año para un volumen que entra en uno.
+Las decisiones van a un solo índice, `honeyml-decisiones`, y no a uno por fecha como los eventos de
+los honeypots, porque son una fracción del volumen de los sensores y entran en uno. Lo que más pesa
+es la idempotencia: el identificador del documento es el `doc_id` del evento, así que escribir dos
+veces el mismo evento choca con la primera escritura en vez de duplicarla. Con índices por fecha, un
+reenvío que cruce la medianoche escribiría el mismo evento en dos índices distintos.
 
-Pero el argumento que decide es la idempotencia. El identificador del documento es el `doc_id` del
-evento, así que escribir dos veces el mismo evento choca con la primera en vez de duplicarla. Con
-índices por fecha eso se rompe: un reenvío que cruce la medianoche escribiría el mismo evento en dos
-índices distintos, y el duplicado es justamente lo que el identificador determinístico evita.
-
-El mapeo va en `dynamic: strict` a propósito. Si el motor algún día manda un campo que la plantilla
-no declara, conviene que Elasticsearch rechace el documento y el evento vuelva al bus, en vez de que
-el campo entre con un tipo adivinado y nadie se entere hasta que una consulta del panel devuelva
-algo raro.
+El mapeo va en `dynamic: strict` a propósito. Si el motor manda un campo que la plantilla no
+declara, conviene que Elasticsearch rechace el documento y el evento vuelva al bus, en vez de que el
+campo entre con un tipo adivinado y nadie se entere hasta que una consulta del panel devuelva algo
+raro.
 """
 
 from __future__ import annotations
@@ -108,7 +105,7 @@ class AlmacenElastic:
         Escribe con `_create`, que contesta 409 si el documento existe. Un `PUT` a `_doc`
         sobrescribe, y eso solo sería seguro si las repeticiones llegaran a los minutos de un
         reinicio. Una relectura de Filebeat trae eventos decididos semanas antes, cuando la marca
-        de deduplicación del consumidor, que vence a las 24 horas, ya no los reconoce, y con la
+        de deduplicación del consumidor, que vence a las 24 horas, dejó de reconocerlos, y con la
         reutilización encendida el evento de origen de una firma se copiaría de sí mismo y pisaría
         la decisión razonada.
 

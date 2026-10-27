@@ -11,6 +11,10 @@ import { useQuieto } from '../../lib/useQuieto';
  * va a SSH. Va en canvas y no en SVG porque en un teléfono cientos de nodos animados por el DOM
  * traban el desplazamiento; la retícula se dibuja una vez en una capa aparte y cada cuadro pinta
  * solo lo que se mueve. Con movimiento reducido o en modo captura queda un cuadro fijo.
+ *
+ * En el teléfono no hay lugar para repartirlos, así que seis honeypots van juntos en un panal de
+ * siete celdas, como el del logo: el núcleo en el centro y los honeypots alrededor, con su servicio
+ * y su cuenta adentro. El núcleo late en teal cada vez que el motor clasifica una captura.
  */
 
 interface Honeypot {
@@ -57,11 +61,18 @@ const SERVICIOS: { servicio: string; peso: number }[] = [
 
 const VIDA_CAPTURA_MS = 1800;
 const DEMORA_CLASIFICACION_MS = 520;
-// Lo que ocupa cada honeypot por debajo de su celda: el servicio, la cuenta y un respiro antes del
-// texto que tenga abajo. El relleno superior del titular en el teléfono (index.css) cuenta con
-// estas medidas.
-const PIE_DEL_HONEYPOT = 44;
-const AIRE_BAJO_LOS_CONTROLES = 4;
+// El panal del teléfono: qué honeypot va en cada celda alrededor del núcleo, desde la de arriba y en
+// el sentido de las agujas del reloj, y dónde queda cada celda respecto del centro, medido en pasos
+// de la retícula (dx en horizontal, dy en vertical).
+const RONDA = ['SSH :22', 'SMB :445', 'MySQL :3306', 'FTP :21', 'HTTP :80', 'Telnet :23'];
+const VECINOS: [number, number][] = [
+  [0, -1],
+  [1, -0.5],
+  [1, 0.5],
+  [0, 1],
+  [-1, 0.5],
+  [-1, -0.5],
+];
 
 function leerColores(): Colores {
   const css = getComputedStyle(document.documentElement);
@@ -99,30 +110,11 @@ function semilla(s: number) {
 
 /**
  * La zona donde van los honeypots, según la forma de la pantalla: lejos de la tarjeta del formulario
- * y por encima del titular. Devuelve [x0, y0, x1, y1] y cuántos entran.
- *
- * En el teléfono el titular va en el flujo de la página y su altura depende del idioma y del ancho,
- * así que una proporción fija de la pantalla lo pisa. Ahí la zona es la franja medida entre los
- * controles de arriba y el comienzo del texto: la celda entera queda debajo de los controles, y el
- * servicio y la cuenta de cada honeypot, por encima del texto.
+ * y por encima del titular. Devuelve [x0, y0, x1, y1] y cuántos entran. En el teléfono solo se usa
+ * si no se pudo medir dónde va el panal.
  */
-function zona(
-  w: number,
-  h: number,
-  franja: [number, number] | null,
-  radio: number,
-): [number, number, number, number, number] {
-  if (w < 700) {
-    if (!franja) return [w * 0.12, h * 0.05, w * 0.88, h * 0.36, 3];
-    const [arriba, abajo] = franja;
-    return [
-      w * 0.12,
-      arriba + AIRE_BAJO_LOS_CONTROLES + radio * 0.94,
-      w * 0.88,
-      abajo - radio - PIE_DEL_HONEYPOT,
-      3,
-    ];
-  }
+function zona(w: number, h: number): [number, number, number, number, number] {
+  if (w < 700) return [w * 0.12, h * 0.05, w * 0.88, h * 0.36, 3];
   if (w / h < 1.02) return [w * 0.1, h * 0.04, w * 0.9, h * 0.16, 4];
   const tarjeta = Math.min(560, Math.max(380, w * 0.38)) + 28;
   return [w * 0.08, h * 0.12, w - tarjeta - w * 0.07, h * 0.6, 6];
@@ -158,7 +150,9 @@ export default function EscenaPanal({
     let capturas: Captura[] = [];
     let proximo = 0;
     let marco = 0;
-    let desfase = 0;
+    let desfaseX = 0;
+    let desfaseY = 0;
+    let nucleo: [number, number] | null = null;
     const azar = semilla(11);
 
     // La franja libre entre el borde inferior de los controles y el comienzo del texto. Se mide
@@ -182,43 +176,68 @@ export default function EscenaPanal({
       }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       capaCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      radio = Math.max(28, Math.min(52, Math.min(ancho, alto) / 14));
+      // En el teléfono la celda es un poco más grande: ahí el panal hace de logo y lleva texto
+      // adentro. Igual no pasa de lo que entra en la franja, donde el panal ocupa 5,42 radios con
+      // el +1 de cada extremo, más un poco de aire: si los controles crecen, el panal se achica en
+      // lugar de pisarlos.
+      radio = Math.max(28, Math.min(52, Math.min(ancho, alto) / (ancho < 700 ? 12.5 : 14)));
+      const franja = ancho < 700 ? franjaLibre() : null;
+      if (franja) radio = Math.min(radio, Math.max(20, (franja[1] - franja[0] - 24) / 5.42));
 
-      // Los honeypots caen en celdas de la retícula, separados entre sí, en la zona libre.
       const dx = radio * 1.5;
       const dy = radio * Math.sqrt(3);
-      const franja = ancho < 700 ? franjaLibre() : null;
-      const [x0, y0, x1, y1, cuantos] = zona(ancho, alto, franja, radio);
-      // Con la franja medida, la retícula se corre en vertical hasta que una fila de celdas cae
-      // justo en su borde superior. Si no, la fila más cercana podría quedar afuera y no entraría
-      // ningún honeypot aunque la franja tenga el alto de uno.
-      desfase = franja ? ((y0 % dy) + dy) % dy : 0;
-      const celdas: [number, number][] = [];
-      for (let col = -1; col * dx < ancho + radio; col++) {
-        for (let fila = -1; fila * dy < alto + radio; fila++) {
-          const x = col * dx;
-          const y = fila * dy + (col % 2 ? dy / 2 : 0) + desfase;
-          if (x >= x0 && x <= x1 && y >= y0 - 0.5 && y <= y1) celdas.push([x, y]);
-        }
-      }
-      const elegir = semilla(23);
-      const elegidas: [number, number][] = [];
-      for (let intento = 0; intento < 400 && elegidas.length < cuantos; intento++) {
-        const c = celdas[Math.floor(elegir() * celdas.length)];
-        if (c && elegidas.every((e) => Math.hypot(e[0] - c[0], e[1] - c[1]) > radio * 2.9)) {
-          elegidas.push(c);
-        }
-      }
-      const servicios = SERVICIOS.slice(0, elegidas.length);
-      const total = servicios.reduce((s, x) => s + x.peso, 0);
       const anteriores = new Map(honeypots.map((h) => [h.servicio, h.capturas]));
-      honeypots = elegidas.map(([x, y], i) => ({
-        x,
-        y,
-        servicio: servicios[i].servicio,
-        peso: servicios[i].peso / total,
-        capturas: anteriores.get(servicios[i].servicio) ?? 0,
-      }));
+      if (franja) {
+        // El panal va al centro de la franja. Es simétrico: lo que asoma por arriba, el +1 de la
+        // celda superior, mide lo mismo que lo que asoma por abajo.
+        const cx = ancho / 2;
+        const cy = (franja[0] + franja[1]) / 2;
+        // La retícula se corre hasta que una celda de columna par cae en el centro, así el panal
+        // está hecho con celdas de la misma retícula que el fondo.
+        desfaseX = cx - 2 * Math.round(cx / (2 * dx)) * dx;
+        desfaseY = ((cy % dy) + dy) % dy;
+        nucleo = [cx, cy];
+        const peso = (s: string) => SERVICIOS.find((x) => x.servicio === s)?.peso ?? 0;
+        const total = RONDA.reduce((s, servicio) => s + peso(servicio), 0);
+        honeypots = RONDA.map((servicio, i) => ({
+          x: cx + VECINOS[i][0] * dx,
+          y: cy + VECINOS[i][1] * dy,
+          servicio,
+          peso: peso(servicio) / total,
+          capturas: anteriores.get(servicio) ?? 0,
+        }));
+      } else {
+        // Los honeypots caen en celdas de la retícula, separados entre sí, en la zona libre.
+        desfaseX = 0;
+        desfaseY = 0;
+        nucleo = null;
+        const [x0, y0, x1, y1, cuantos] = zona(ancho, alto);
+        const celdas: [number, number][] = [];
+        for (let col = -1; col * dx < ancho + radio; col++) {
+          for (let fila = -1; fila * dy < alto + radio; fila++) {
+            const x = col * dx;
+            const y = fila * dy + (col % 2 ? dy / 2 : 0);
+            if (x >= x0 && x <= x1 && y >= y0 - 0.5 && y <= y1) celdas.push([x, y]);
+          }
+        }
+        const elegir = semilla(23);
+        const elegidas: [number, number][] = [];
+        for (let intento = 0; intento < 400 && elegidas.length < cuantos; intento++) {
+          const c = celdas[Math.floor(elegir() * celdas.length)];
+          if (c && elegidas.every((e) => Math.hypot(e[0] - c[0], e[1] - c[1]) > radio * 2.9)) {
+            elegidas.push(c);
+          }
+        }
+        const servicios = SERVICIOS.slice(0, elegidas.length);
+        const total = servicios.reduce((s, x) => s + x.peso, 0);
+        honeypots = elegidas.map(([x, y], i) => ({
+          x,
+          y,
+          servicio: servicios[i].servicio,
+          peso: servicios[i].peso / total,
+          capturas: anteriores.get(servicios[i].servicio) ?? 0,
+        }));
+      }
       ataques = [];
       capturas = [];
       pintarReticula(dx, dy);
@@ -232,10 +251,10 @@ export default function EscenaPanal({
 
       const azarFijo = semilla(7);
       c.lineWidth = 1;
-      for (let col = -1; col * dx < ancho + radio; col++) {
+      for (let col = -1; col * dx + desfaseX < ancho + radio; col++) {
         for (let fila = -1; fila * dy < alto + radio; fila++) {
-          const x = col * dx;
-          const y = fila * dy + (col % 2 ? dy / 2 : 0) + desfase;
+          const x = col * dx + desfaseX;
+          const y = fila * dy + (col % 2 ? dy / 2 : 0) + desfaseY;
           const cerca = Math.max(
             0,
             ...honeypots.map((h) => 1 - Math.min(1, Math.hypot(h.x - x, h.y - y) / (radio * 5))),
@@ -264,9 +283,32 @@ export default function EscenaPanal({
         }
       }
 
-      // Cada honeypot es una celda con la marca del logo adentro y el servicio que emula debajo.
-      c.font = `500 ${ancho < 700 ? 10 : 11}px 'JetBrains Mono', monospace`;
+      // Cada honeypot es una celda con la marca del logo adentro y el servicio que emula debajo. En
+      // el panal no queda lugar alrededor, así que la marca chica no va y el servicio y la cuenta
+      // ocupan su lugar adentro de la celda; los escribe rotularPanal en cada cuadro, encima de
+      // los destellos.
       c.textAlign = 'center';
+      if (nucleo) {
+        // El núcleo repite el centro del logo: tres hexágonos ámbar que se vuelven más opacos hacia
+        // adentro.
+        const [nx, ny] = nucleo;
+        c.strokeStyle = colores.ambar;
+        c.globalAlpha = 0.7;
+        c.lineWidth = 1.6;
+        hexagono(c, nx, ny, radio * 0.94);
+        c.stroke();
+        c.fillStyle = colores.ambar;
+        for (const [escala, opacidad] of [
+          [0.72, 0.16],
+          [0.48, 0.36],
+          [0.24, 0.9],
+        ]) {
+          c.globalAlpha = opacidad;
+          hexagono(c, nx, ny, radio * escala);
+          c.fill();
+        }
+        c.globalAlpha = 1;
+      }
       for (const h of honeypots) {
         c.strokeStyle = colores.ambar;
         c.globalAlpha = 0.55;
@@ -277,11 +319,16 @@ export default function EscenaPanal({
         c.fillStyle = colores.ambar;
         hexagono(c, h.x, h.y, radio * 0.6);
         c.fill();
+        if (nucleo) {
+          c.globalAlpha = 1;
+          continue;
+        }
         c.globalAlpha = 0.85;
         hexagono(c, h.x, h.y, radio * 0.22);
         c.fill();
         c.globalAlpha = 1;
         c.fillStyle = `rgba(${colores.tinta},0.55)`;
+        c.font = `500 ${ancho < 700 ? 10 : 11}px 'JetBrains Mono', monospace`;
         c.fillText(h.servicio, h.x, h.y + radio + 16);
       }
     };
@@ -316,6 +363,32 @@ export default function EscenaPanal({
         duracion: Math.max(650, distancia / (0.8 + azar() * 0.6)),
         critico: azar() < 1 / 7,
       });
+    };
+
+    // El servicio, el puerto y la cuenta de cada celda del panal. Llevan un contorno del color del
+    // fondo para que se lean aunque la celda esté encendida por una captura.
+    const rotularPanal = () => {
+      ctx.globalAlpha = 1;
+      ctx.textAlign = 'center';
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = colores.fondo;
+      const escribir = (cadena: string, x: number, y: number, fuente: string, color: string) => {
+        ctx.font = fuente;
+        ctx.strokeText(cadena, x, y);
+        ctx.fillStyle = color;
+        ctx.fillText(cadena, x, y);
+      };
+      for (const h of honeypots) {
+        const [nombre, puerto] = h.servicio.split(' ');
+        const tinta = `rgba(${colores.tinta},`;
+        escribir(nombre, h.x, h.y + 4, `600 10px 'JetBrains Mono', monospace`, `${tinta}0.9)`);
+        escribir(puerto, h.x, h.y + 15, `500 9px 'JetBrains Mono', monospace`, `${tinta}0.55)`);
+        if (h.capturas > 0) {
+          const cuenta = h.capturas.toLocaleString();
+          escribir(cuenta, h.x, h.y - 8, `600 10px 'JetBrains Mono', monospace`, colores.ambar);
+        }
+      }
     };
 
     const suave = (t: number) => 1 - Math.pow(1 - t, 3);
@@ -390,25 +463,49 @@ export default function EscenaPanal({
 
         const clasificada = ahora - c.inicio - DEMORA_CLASIFICACION_MS;
         if (clasificada > 0) {
-          ctx.globalAlpha = Math.max(0, 1 - clasificada / 900) * 0.9;
+          const resto = Math.max(0, 1 - clasificada / 900);
+          ctx.globalAlpha = resto * 0.9;
           ctx.strokeStyle = colores.teal;
           ctx.lineWidth = 2;
           hexagono(ctx, x, y, radio * 0.94);
           ctx.stroke();
+          if (nucleo) {
+            ctx.globalAlpha = resto * 0.8;
+            hexagono(ctx, nucleo[0], nucleo[1], radio * 0.94);
+            ctx.stroke();
+            ctx.globalAlpha = resto * 0.18;
+            ctx.fillStyle = colores.teal;
+            hexagono(ctx, nucleo[0], nucleo[1], radio * 0.72);
+            ctx.fill();
+          }
         }
 
+        // El +1 sube desde la esquina de la celda; en el panal sale hacia afuera, lejos del núcleo,
+        // para no caer sobre la celda vecina.
+        let mx = x + radio * 0.75;
+        let my = y - radio * 0.7 - t * 22;
+        if (nucleo) {
+          const ang = Math.atan2(y - nucleo[1], x - nucleo[0]);
+          mx = x + Math.cos(ang) * (radio * 0.98 + t * 8);
+          my = y + Math.sin(ang) * (radio * 0.98 + t * 8) + 4;
+        }
         ctx.globalAlpha = Math.max(0, 1 - t * 1.3);
         ctx.fillStyle = tono;
         ctx.font = `600 ${ancho < 700 ? 11 : 12}px 'JetBrains Mono', monospace`;
-        ctx.fillText('+1', x + radio * 0.75, y - radio * 0.7 - t * 22);
+        ctx.fillText('+1', mx, my);
         ctx.globalAlpha = 1;
       }
 
-      // La cuenta de cada honeypot, debajo de su servicio.
-      ctx.font = `500 ${ancho < 700 ? 10 : 11}px 'JetBrains Mono', monospace`;
-      ctx.fillStyle = colores.ambar;
-      for (const h of honeypots) {
-        if (h.capturas > 0) ctx.fillText(h.capturas.toLocaleString(), h.x, h.y + radio + 30);
+      // La cuenta de cada honeypot, debajo de su servicio. En el panal va con el servicio, adentro
+      // de la celda.
+      if (nucleo) {
+        rotularPanal();
+      } else {
+        ctx.font = `500 ${ancho < 700 ? 10 : 11}px 'JetBrains Mono', monospace`;
+        ctx.fillStyle = colores.ambar;
+        for (const h of honeypots) {
+          if (h.capturas > 0) ctx.fillText(h.capturas.toLocaleString(), h.x, h.y + radio + 30);
+        }
       }
 
       marco = requestAnimationFrame(cuadro);
@@ -417,16 +514,20 @@ export default function EscenaPanal({
     const arrancar = () => {
       cancelAnimationFrame(marco);
       armar();
-      // La retícula se pinta ya, sin esperar el primer cuadro: así el fondo nunca aparece vacío.
+      // La retícula se pinta ya, sin esperar el primer cuadro: así el fondo nunca aparece vacío. Con
+      // el cuadro fijo, el panal lleva sus rótulos desde acá.
       ctx.drawImage(capa, 0, 0, ancho, alto);
+      if (nucleo) rotularPanal();
       if (!quieto) marco = requestAnimationFrame(cuadro);
     };
 
     arrancar();
     const observador = new ResizeObserver(arrancar);
     observador.observe(canvas);
-    // El titular cambia de alto cuando llega su tipografía o cambia el idioma, y en el teléfono eso
-    // mueve el borde inferior de la franja.
+    // En el teléfono la franja se mide contra los controles y el titular: si alguno cambia de lugar
+    // o de alto sin que cambie la pantalla, el panal se vuelve a centrar. La tarjeta no se observa,
+    // porque un mensaje de error la hace crecer y rearmar la escena borraría los ataques en vuelo.
+    if (controles?.current) observador.observe(controles.current);
     if (texto?.current) observador.observe(texto.current);
     const tema = new MutationObserver(() => {
       colores = leerColores();

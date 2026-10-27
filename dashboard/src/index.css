@@ -2846,9 +2846,10 @@ button.ranking-fila:hover {
   fill: rgb(var(--tinta) / 0.9);
 }
 
-/* El ingreso. La escena ocupa toda la pantalla y no se mueve con nada; la tarjeta del formulario
-   flota a la derecha, y la promesa de la marca se apoya abajo a la izquierda, lejos de ella. En el
-   teléfono la tarjeta sube desde abajo como una hoja, y la escena queda arriba, detrás del titular. */
+/* El ingreso. En pantallas anchas la escena ocupa toda la pantalla y queda quieta; la tarjeta del
+   formulario flota a la derecha, y la promesa de la marca se apoya abajo a la izquierda, lejos de
+   ella. En el teléfono la tarjeta sube desde abajo como una hoja, y la escena se desplaza con la
+   página, con el panal arriba del titular. */
 .ingreso {
   position: fixed;
   inset: 0;
@@ -2956,6 +2957,11 @@ button.ranking-fila:hover {
     right: 16px;
   }
 }
+/* La frase de la marca dentro de la tarjeta: solo en el teléfono, donde ocupa el lugar del título.
+   En la pantalla ancha va arriba del titular. */
+.ingreso-insignia-tarjeta {
+  display: none;
+}
 /* La marca arriba del formulario: el logo entero y el nombre, nada más. */
 .ingreso-marca {
   display: flex;
@@ -2965,13 +2971,13 @@ button.ranking-fila:hover {
   margin-bottom: 24px;
 }
 .ingreso-marca img {
-  width: 60px;
-  height: 60px;
+  width: 88px;
+  height: 88px;
   filter: drop-shadow(0 6px 18px color-mix(in srgb, var(--honey-amber) 35%, transparent));
 }
 .ingreso-marca span {
   font-family: 'Geist', 'Inter', sans-serif;
-  font-size: 17px;
+  font-size: 25px;
   font-weight: 600;
   letter-spacing: -0.03em;
   color: rgb(var(--tinta) / 0.9);
@@ -3097,6 +3103,7 @@ button.ranking-fila:hover {
     .ingreso-preferencias,
     .ingreso-marca,
     .ingreso-insignia,
+    .ingreso-insignia-tarjeta,
     .ingreso-h1,
     .ingreso-campo,
     .ingreso-pie
@@ -3121,6 +3128,15 @@ button.ranking-fila:hover {
   .ingreso-titular {
     font-size: clamp(44px, 7vw, 72px);
   }
+  /* La tarjeta va anclada abajo y la promesa arriba: con el logo grande, la tarjeta crece y en
+     algunas alturas tapa el titular. */
+  .ingreso-marca img {
+    width: 60px;
+    height: 60px;
+  }
+  .ingreso-marca span {
+    font-size: 17px;
+  }
   .ingreso-tarjeta {
     top: auto;
     right: 0;
@@ -3138,35 +3154,91 @@ button.ranking-fila:hover {
     flex-direction: column;
     overflow-y: auto;
   }
+  /* La escena se desplaza con la página: así el texto nunca le pasa por encima. Donde termina el
+     lienzo, el degradado de abajo del velo ya lo llevó al color del fondo, así que no se ve el
+     corte. */
   .escena-panal,
   .ingreso-velo {
-    position: fixed;
+    position: absolute;
+  }
+  /* Arriba el velo apenas oscurece la franja de los controles y se corta antes del panal, para no
+     apagarlo; el degradado de abajo queda como en la pantalla ancha. */
+  .ingreso-velo {
+    background:
+      linear-gradient(180deg, rgb(var(--fondo) / 0.85) 0%, transparent 9%),
+      linear-gradient(
+        0deg,
+        rgb(var(--fondo) / 0.92) 0%,
+        rgb(var(--fondo) / 0.5) 24%,
+        transparent 50%
+      );
   }
   .ingreso-heroe {
     position: relative;
     left: auto;
     right: auto;
     bottom: auto;
-    margin: auto 22px 24px;
-    /* Arriba del titular entra una fila de honeypots de la escena, entre los controles y el texto.
-       El mínimo sale de las medidas de EscenaPanal.tsx: los controles, el aire, la celda (1,94 veces
-       su radio, que es la catorceava parte del lado menor) y lo que va debajo de ella, más unos
-       píxeles de margen para que un control un poco más alto no deje la fila afuera. */
-    padding-top: calc(max(14vh, 98px + 13.9vmin, 153px) + env(safe-area-inset-top));
+    margin: 0 22px 30px;
+    /* Arriba del titular va el panal de la escena, entre los controles y el titular. EscenaPanal.tsx
+       lo centra en esa franja, y del +1 de la celda de arriba al de la celda de abajo hay 5,42
+       radios. El radio es el lado menor dividido 12,5 (de ahí los 43,4vmin) y nunca baja de 28 px,
+       que con los 90 da los 242. Los 90 px cubren los controles, la cifra del +1 en cada punta y un
+       poco de aire. */
+    padding-top: calc(max(90px + 43.4vmin, 242px) + env(safe-area-inset-top));
+    align-items: center;
+    text-align: center;
     gap: 14px;
   }
   .ingreso-titular {
     font-size: clamp(34px, 10.4vw, 46px);
   }
+  /* Arriba queda el mensaje y la tarjeta junta la marca con el formulario: el nombre sin el logo,
+     porque el panal ya lo es, y la frase en el lugar del título. Separadas así, cada mitad se lee
+     como un grupo y no como piezas sueltas apiladas. */
   .ingreso-insignia {
-    font-size: 11.5px;
+    display: none;
   }
+  .ingreso-marca {
+    margin-bottom: 12px;
+  }
+  .ingreso-marca img {
+    display: none;
+  }
+  .ingreso-marca span {
+    font-size: 30px;
+    letter-spacing: -0.04em;
+  }
+  .ingreso-insignia-tarjeta {
+    display: inline-flex;
+    align-self: center;
+    margin-bottom: 30px;
+    font-size: 12px;
+  }
+  /* El título sigue para los lectores de pantalla: a la vista, los campos y el botón ya dicen qué
+     es la tarjeta. */
+  .ingreso-h1 {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  /* Parte el primer renglón en dos parejos ("Del ataque / a la táctica,") en lugar de dejar la
+     última palabra sola. */
+  .ingreso-titular .ln > span {
+    text-wrap: balance;
+  }
+  /* En una pantalla alta el alto que sobra queda arriba de la tarjeta y no arriba del titular: así
+     el panal, que se centra en la franja de arriba, no se aleja del titular. */
   .ingreso-tarjeta {
     position: relative;
     inset: auto;
     width: auto;
     display: block;
     flex: none;
+    margin-top: auto;
     overflow: visible;
     border-radius: 28px 28px 0 0;
     border-bottom: 0;
@@ -3488,7 +3560,7 @@ button.ranking-fila:hover {
   flex-direction: column;
   gap: 6px;
   padding: 18px 16px 16px;
-  min-height: calc(120px + var(--escalon) * 26px);
+  min-height: calc(78px + var(--escalon) * 22px);
   border-radius: 16px 16px 4px 4px;
   background: linear-gradient(180deg, rgb(var(--tinta) / 0.035), transparent);
   box-shadow: inset 0 1px 0 rgb(var(--tinta) / 0.08);

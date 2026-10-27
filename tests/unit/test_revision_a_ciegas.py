@@ -1,7 +1,7 @@
 """La revisión a ciegas, sin Elasticsearch.
 
-Lo que importa fijar es que la clasificación del motor no llegue al panel antes de tiempo, que el
-veredicto lo calcule el servidor y que un veredicto común no pise la referencia de la medición.
+La clasificación del motor no puede llegar al panel antes de tiempo, el veredicto lo calcula el
+servidor y un veredicto común no pisa la referencia de la medición.
 """
 
 from __future__ import annotations

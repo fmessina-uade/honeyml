@@ -32,7 +32,7 @@ def _tarjeta(umbral: float) -> dict[str, Any]:
 
 
 def test_la_muestra_incluye_la_clase_debil_aunque_sea_rara() -> None:
-    """Al azar sobre toda la prueba, una clase del 0,03 % no aparecería nunca."""
+    """Al azar sobre toda la prueba, una clase tan rara como la débil no aparecería nunca."""
     y = pd.Series(["none"] * 1000 + ["Exfiltration"] * 3 + ["Reconnaissance"] * 50)
     clases = y.iloc[demo.muestra_por_clase(y, por_clase=2, semilla=1)]
     assert (clases == "Exfiltration").sum() == 2

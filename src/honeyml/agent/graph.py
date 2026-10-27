@@ -35,7 +35,7 @@ from .nodes import validacion as nodo_validacion
 from .state import MAX_INTENTOS, EstadoTriaje, decision_utilizable
 
 # Un nodo devuelve el estado parcial que tocó, no un diccionario cualquiera: con `dict[str, Any]`
-# entraban claves inventadas que LangGraph después descarta en silencio.
+# entrarían claves inventadas que LangGraph después descarta en silencio.
 Nodo = Callable[[EstadoTriaje], EstadoTriaje]
 
 MEMORIA = "memoria"
@@ -45,8 +45,8 @@ INFERENCIA = "inferencia"
 VALIDACION = "validacion"
 PERSISTENCIA = "persistencia"
 
-# Qué hace cada nodo, en una línea. Está acá porque es lo que vuelve accionable el error cuando
-# falta una implementación: el mensaje dice qué falta escribir.
+# La responsabilidad de cada nodo queda escrita en una línea porque eso vuelve accionable el error
+# cuando falta una implementación: el mensaje dice qué falta escribir.
 RESPONSABILIDAD: dict[str, str] = {
     MEMORIA: "calcula la firma de conducta y trae la decisión si esa firma ya se resolvió",
     CONTEXTO: "arma el contexto del evento a partir de las consultas de solo lectura",
@@ -156,10 +156,10 @@ def construir_grafo(nodos: Mapping[str, Nodo] | None = None) -> Any:
     for nombre in ORDEN:
         # El `cast` es contra una limitación de LangGraph, no contra un tipo mal puesto. `add_node`
         # acota el estado a un protocolo estructural, y su propio `_typing.py` lo avisa: "we cannot
-        # use either TypedDict or dataclass directly due to limitations in type checking". Probamos
-        # también con el TypedDict de typing_extensions (el que usa la propia biblioteca) y el
-        # veredicto no cambia. En ejecución el nodo recibe y devuelve `EstadoTriaje`, que es lo que
-        # declara `Nodo` unas líneas más arriba.
+        # use either TypedDict or dataclass directly due to limitations in type checking". El
+        # TypedDict de typing_extensions (el que usa la propia biblioteca) tampoco lo resuelve. En
+        # ejecución el nodo recibe y devuelve `EstadoTriaje`, que es lo que declara `Nodo` unas
+        # líneas más arriba.
         g.add_node(nombre, cast("Any", elegidos[nombre]))
 
     g.set_entry_point(MEMORIA)

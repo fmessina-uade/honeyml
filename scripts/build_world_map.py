@@ -1,23 +1,21 @@
 """Convierte un atlas mundial en TopoJSON en el contorno compacto que dibuja el globo.
 
-Un generador y no una dependencia: decodificar TopoJSON en tiempo de ejecución pide una biblioteca
-del lado del cliente, y el archivo crudo son 105 KB de deltas cuantizados que el navegador tendría
-que decodificar en cada carga para dibujar una esfera de 320 píxeles. Haciéndolo una sola vez, acá,
-lo que viaja son arreglos de coordenadas y el panel se queda sin otra dependencia.
+Genera el contorno una sola vez, así el panel no carga una biblioteca de TopoJSON del lado del
+cliente ni decodifica en cada carga los deltas cuantizados del archivo crudo (más de cien KB) para
+dibujar una esfera de 320 píxeles. Lo que viaja son arreglos de coordenadas.
 
 Va simplificado porque el contorno original tiene mucho más detalle del que un globo de ese tamaño
-puede mostrar: a 320 píxeles de ancho, un grado de longitud no llega a un píxel. Simplificar no es
-una concesión, saca puntos que igual no se podrían distinguir.
+puede mostrar: a 320 píxeles de ancho, un grado de longitud no llega a un píxel, así que simplificar
+saca puntos que a ese tamaño no se distinguen.
 
-El resultado queda versionado en el repositorio. Este script existe para poder regenerarlo y
-auditarlo, no para correr como parte del build: necesita una descarga, y un build que sale a la red
-es un build que se rompe cuando la red se cae.
+El resultado queda versionado en el repositorio. El script sirve para regenerarlo y auditarlo, y
+queda fuera del build porque necesita salir a la red, que puede estar caída.
 
 Fuente: world-atlas (Natural Earth 110m), dominio público.
     curl -o countries-110m.json https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json
     python scripts/build_world_map.py countries-110m.json
 
-Usage:
+Uso:
     python scripts/build_world_map.py <countries-110m.json> [--tolerancia 0.8]
 """
 
@@ -161,7 +159,7 @@ def main() -> None:
     )
 
     print(f"  anillos: {len(figuras)}")
-    print(f"  puntos: {originales:,} -> {puntos:,}".replace(",", "."))
+    print(f"  puntos: {originales:,} antes, {puntos:,} después".replace(",", "."))
     print(f"  tamaño: {len(compacto) / 1024:.0f} KB")
     print(f"  escrito en {SALIDA}")
 

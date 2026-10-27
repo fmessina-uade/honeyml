@@ -179,7 +179,7 @@ def informe(r: dict[str, Any]) -> list[str]:
     if r["motor_cambio_de_lado"]:
         cambios = r["motor_cambio_de_lado"]
         lineas.append(
-            f"Aviso: {cambios} decisiones cambiaron de lado de crítico desde el muestreo."
+            f"Hay {cambios} decisiones que cambiaron de lado de crítico desde el muestreo."
         )
     lineas.append("\nCon la regla como referencia, sobre toda la población con piso alto:")
     for unidad, t in r["regla"].items():

@@ -129,9 +129,9 @@ def piso_de(categoria: str, outcome: str = "") -> Severidad:
 def piso(evento: EventoDelBus) -> Severidad:
     """El nivel que la telemetría establece sola, sin interpretación de por medio.
 
-    Conservador a propósito: contesta qué prueba el registro y no qué tan grave parece. Los intentos
-    de credenciales de Dionaea contra MySQL y MSSQL quedan en `BAJO` porque ese sensor no puede
-    observar el resultado, y mejor un desconocido que un éxito sin respaldo.
+    Es conservador a propósito: contesta qué prueba el registro y no qué tan grave parece. Los
+    intentos de credenciales de Dionaea contra MySQL y MSSQL quedan en `BAJO` porque ese sensor no
+    puede observar el resultado, y mejor un desconocido que un éxito sin respaldo.
     """
     return piso_de(evento.category, evento.outcome)
 
@@ -190,9 +190,8 @@ def reproche(nivel: Severidad, evento: EventoDelBus) -> str | None:
 # no, que son los que traen `bajo` porque ese sensor casi nunca puede declarar el resultado.
 #
 # Esa cuarta condición es la que hay que tener presente al leer este conjunto: sin ella, `bajo` no
-# tendría por qué estar acá. `INFORMATIVO` sí está definido y no llega, y no se lo saca de la escala
-# porque la campaña de validación adversaria va a generar reconocimiento, y su etiqueta esperada
-# tiene que existir.
+# tendría por qué estar acá. `INFORMATIVO` está definido aunque no llegue, porque la campaña de
+# validación adversaria genera reconocimiento y su etiqueta esperada tiene que existir.
 LLEGAN_POR_EL_BUS: set[Severidad] = {
     Severidad.BAJO,
     Severidad.MEDIO,

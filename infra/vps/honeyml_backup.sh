@@ -115,7 +115,8 @@ main() {
     rotados_cowrie=$(copiar_rotados "$COWRIE_SRC" 'cowrie.json.*' "$BACKUP_ROOT/cowrie")
     instantanea_activo "$COWRIE_SRC/cowrie.json" "$BACKUP_ROOT/cowrie" "cowrie"
 
-    # Dionaea no rota: solo hay archivo activo
+    # De Dionaea se guarda solo la instantánea diaria del archivo activo. Sus rotados, los que deja
+    # logrotate al pasar los 100 MB, no se copian al archivo histórico.
     instantanea_activo "$DIONAEA_SRC/dionaea.json" "$BACKUP_ROOT/dionaea" "dionaea"
 
     local decisiones revisiones cuentas auditoria

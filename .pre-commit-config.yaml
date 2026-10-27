@@ -15,7 +15,7 @@ repos:
       - id: check-added-large-files
         args: [--maxkb=500]
 
-  # shellcheck: revisa los scripts de bash (usa el binario del sistema: brew install shellcheck)
+  # shellcheck sobre los scripts de bash, con el binario del sistema (brew install shellcheck)
   - repo: local
     hooks:
       - id: shellcheck
@@ -32,7 +32,7 @@ repos:
       - id: yamllint
         args: [--config-file=.yamllint.yml]
 
-  # ruff - linting y formato Python (reemplaza flake8 + isort + pyupgrade)
+  # ruff: linting y formato Python (reemplaza flake8, isort y pyupgrade)
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.9.10
     hooks:
@@ -40,7 +40,7 @@ repos:
         args: [--fix]
       - id: ruff-format
 
-  # mypy: Python type checking
+  # mypy: chequeo de tipos de Python
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.13.0
     hooks:

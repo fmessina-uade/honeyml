@@ -1,10 +1,10 @@
 #!/bin/bash
 # 03_monitoring.sh
-# Monitoreo básico de salud del VPS, para la fase 1 de HoneyML.
-# Instala un script de chequeo con alertas por webhook (Slack, Discord o el que sea).
-# En la fase 2 esto lo absorbe el Elastic Stack (Metricbeat).
+# Monitoreo básico de salud del VPS. Instala el chequeo periódico con alertas por webhook (Slack,
+# Discord o el que sea), el reporte diario, el watchdog de los sensores, el respaldo y la purga de
+# muestras, y los deja programados en cron. Sin webhook, las alertas quedan solo en el registro.
 #
-# Uso: sudo bash 03_monitoring.sh <url_del_webhook>
+# Uso: sudo bash 03_monitoring.sh [url_del_webhook]
 # Ejemplo: sudo bash 03_monitoring.sh "https://hooks.slack.com/services/..."
 
 set -euo pipefail
@@ -37,10 +37,9 @@ log() {
 
 [[ $EUID -eq 0 ]] || { echo "Ejecutar como root." >&2; exit 1; }
 
-log "=== HoneyML - Configuración de Monitoreo de Salud ==="
+log "HoneyML: monitoreo de salud"
 
-# 1. el script principal de chequeo de salud
-log "[1/4] Creando script de health check en $HEALTHCHECK_SCRIPT..."
+log "[1/4] Creando el chequeo de salud en $HEALTHCHECK_SCRIPT..."
 cat > "$HEALTHCHECK_SCRIPT" << HEALTH_SCRIPT
 #!/usr/bin/env bash
 # honeyml_health.sh: chequeo periódico de métricas del VPS, lo corre cron cada 5 minutos.
@@ -62,7 +61,7 @@ log_entry() {
 send_alert() {
     local severity="\$1"
     local message="\$2"
-    log_entry "ALERT [\$severity]: \$message"
+    log_entry "ALERTA [\$severity]: \$message"
 
     if [[ -n "\$WEBHOOK_URL" ]]; then
         curl -s -X POST "\$WEBHOOK_URL" \
@@ -80,7 +79,7 @@ if [[ "\${CPU_INT:-0}" -ge "\$THRESHOLD_CPU" ]]; then
     send_alert "aviso" "CPU al \${CPU_USED}% (umbral: \${THRESHOLD_CPU}%)"
 fi
 
-# memory
+# memoria
 MEM_INFO=\$(free | grep Mem)
 MEM_TOTAL=\$(echo "\$MEM_INFO" | awk '{print \$2}')
 MEM_USED=\$(echo "\$MEM_INFO" | awk '{print \$3}')
@@ -89,7 +88,7 @@ if [[ "\$MEM_PCT" -ge "\$THRESHOLD_MEM" ]]; then
     send_alert "aviso" "Memoria al \${MEM_PCT}% (umbral: \${THRESHOLD_MEM}%)"
 fi
 
-# disk
+# disco
 while IFS= read -r line; do
     PCT=\$(echo "\$line" | awk '{print \$5}' | tr -d '%')
     MOUNT=\$(echo "\$line" | awk '{print \$6}')
@@ -99,8 +98,8 @@ while IFS= read -r line; do
 done < <(df -h | tail -n +2 | grep -v tmpfs)
 
 # Contenedores de las dos zonas. Se pregunta por los que existen y no por los que corren: con
-# 'docker ps' un contenedor frenado no figura en la lista, así que la comprobación se salteaba justo
-# en el caso que tiene que avisar. Uno que no existe se omite, para que el mismo chequeo sirva en un
+# 'docker ps' un contenedor frenado no figura en la lista, y la comprobación se saltearía justo en
+# el caso que tiene que avisar. Uno que no existe se omite, para que el mismo chequeo sirva en un
 # anfitrión que solo tiene los sensores y en uno que además corre el análisis.
 for container in cowrie dionaea elasticsearch logstash filebeat valkey motor api; do
     STATUS=\$(docker inspect --format='{{.State.Status}}' "\$container" 2>/dev/null || echo "")
@@ -140,13 +139,12 @@ if ! ss -tlnp | grep -q ":2200 "; then
     send_alert "critico" "sshd no escucha en el puerto 2200: se pierde el acceso de administración"
 fi
 
-log_entry "Health check completado - CPU:\${CPU_USED}% MEM:\${MEM_PCT}% OK"
+log_entry "Chequeo de salud completo: CPU al \${CPU_USED}%, memoria al \${MEM_PCT}%"
 HEALTH_SCRIPT
 
 chmod +x "$HEALTHCHECK_SCRIPT"
 log "  Script creado."
 
-# 2. el script del reporte diario
 log "[2/4] Creando el reporte diario..."
 DAILY_REPORT_SCRIPT="/usr/local/bin/honeyml_daily_report.sh"
 cat > "$DAILY_REPORT_SCRIPT" << 'DAILY_SCRIPT'
@@ -188,8 +186,6 @@ DAILY_SCRIPT
 
 chmod +x "$DAILY_REPORT_SCRIPT"
 
-# 3. los scripts del anfitrión: watchdog de los sensores, respaldo, purga de muestras, y la imagen
-#    con la que se lee la pila de un proceso colgado
 log "[3/4] Instalando el watchdog, el respaldo y la purga..."
 install -m 755 "$REPO_VPS/honeyml_watchdog.sh" "$WATCHDOG_SCRIPT"
 install -m 755 "$REPO_VPS/honeyml_backup.sh" "$BACKUP_SCRIPT"
@@ -201,7 +197,6 @@ else
     log "  AVISO: sin Docker el watchdog no puede leer la pila de un sensor colgado."
 fi
 
-# 4. se registran las tareas de cron
 log "[4/4] Registrando tareas en cron..."
 
 CRON_FILE="/etc/cron.d/honeyml-monitoring"
@@ -237,15 +232,15 @@ chmod 644 "$CRON_FILE"
 systemctl restart cron 2>/dev/null || systemctl restart crond 2>/dev/null || true
 
 log ""
-log "=== Monitoreo configurado exitosamente ==="
+log "Monitoreo configurado."
 log ""
 log "Scripts instalados:"
-log "  Health check (c/5 min) : $HEALTHCHECK_SCRIPT"
-log "  Reporte diario (07:00) : $DAILY_REPORT_SCRIPT"
-log "  Watchdog (c/5 min)     : $WATCHDOG_SCRIPT"
-log "  Respaldo (03:00)       : $BACKUP_SCRIPT"
-log "  Purga (05:00)          : $PURGA_SCRIPT"
-log "  Log de monitoreo       : $HEALTHCHECK_LOG"
+log "  Chequeo de salud, cada 5 min:   $HEALTHCHECK_SCRIPT"
+log "  Reporte diario, 07:00 (UTC-3):  $DAILY_REPORT_SCRIPT"
+log "  Watchdog, cada 5 min:           $WATCHDOG_SCRIPT"
+log "  Respaldo, 03:00 UTC:            $BACKUP_SCRIPT"
+log "  Purga, 05:00 UTC:               $PURGA_SCRIPT"
+log "  Registro del monitoreo:         $HEALTHCHECK_LOG"
 log ""
 log "Para probar manualmente: bash $HEALTHCHECK_SCRIPT"
 if [[ -z "$WEBHOOK_URL" ]]; then

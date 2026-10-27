@@ -70,7 +70,6 @@ export default function MenuCuenta({
             </span>
           </span>
         </div>
-        <p className="text-[12px] leading-snug text-white/55 mt-2.5">{t.rolesDesc[sesion.rol]}</p>
       </div>
       {VISTAS.some((v) => sesion.puede(v.rol)) && (
         <div className="flex flex-col border-t border-white/[0.06] py-1.5">

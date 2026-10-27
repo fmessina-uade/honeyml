@@ -22,12 +22,11 @@ die() {
 
 [[ $EUID -eq 0 ]] || die "Este script debe ejecutarse como root."
 
-log "=== HoneyML - Hardening del Sistema Operativo ==="
+log "HoneyML: endurecimiento del sistema operativo"
 log "Usuario administrador: $ADMIN_USER"
 log "SO detectado: $(lsb_release -ds 2>/dev/null || uname -r)"
 
-# 1. actualización del sistema
-log "[1/12] Actualizando paquetes del sistema..."
+log "[1/13] Actualizando paquetes del sistema..."
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get dist-upgrade -y -qq
@@ -35,8 +34,7 @@ apt-get -f install -y -qq
 apt-get autoremove -y -qq
 apt-get autoclean -qq
 
-# 2. herramientas de seguridad y utilidades
-log "[2/12] Instalando herramientas de seguridad..."
+log "[2/13] Instalando herramientas de seguridad..."
 echo "postfix postfix/main_mailer_type select No configuration" | debconf-set-selections
 echo "postfix postfix/mailname string $(hostname -f)" | debconf-set-selections
 apt-get install -y -qq \
@@ -57,8 +55,8 @@ apt-get install -y -qq \
     net-tools \
     tcpdump
 
-# 3. se crea un usuario admin que no es root
-log "[3/12] Configurando usuario administrador..."
+# sshd no deja entrar a root, así que la administración necesita un usuario propio
+log "[3/13] Configurando usuario administrador..."
 if ! id "$ADMIN_USER" &>/dev/null; then
     useradd -m -s /bin/bash -G sudo "$ADMIN_USER"
     passwd -l "$ADMIN_USER"
@@ -86,8 +84,7 @@ echo "$ADMIN_USER ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/$ADMIN_USER"
 chmod 440 "/etc/sudoers.d/$ADMIN_USER"
 log "  Sudo NOPASSWD configurado para '$ADMIN_USER'."
 
-# 4. actualizaciones de seguridad automáticas
-log "[4/12] Configurando actualizaciones automáticas..."
+log "[4/13] Configurando actualizaciones automáticas..."
 cat > /etc/apt/apt.conf.d/20auto-upgrades << 'EOF'
 APT::Periodic::Update-Package-Lists "1";
 APT::Periodic::Download-Upgradeable-Packages "1";
@@ -95,8 +92,8 @@ APT::Periodic::AutocleanInterval "7";
 APT::Periodic::Unattended-Upgrade "1";
 EOF
 
-# 5. política de contraseñas (respalda la autenticación por clave)
-log "[5/12] Configurando política de contraseñas..."
+# la política de contraseñas es un respaldo: el acceso es solo por clave
+log "[5/13] Configurando política de contraseñas..."
 cat > /etc/security/pwquality.conf << 'EOF'
 minlen = 16
 dcredit = -1
@@ -108,8 +105,7 @@ reject_username = 1
 gecoscheck = 1
 EOF
 
-# 6. parámetros de seguridad del kernel (sysctl)
-log "[6/12] Aplicando parámetros de hardening del kernel..."
+log "[6/13] Aplicando parámetros de endurecimiento del kernel..."
 cat > /etc/sysctl.d/99-honeyml.conf << 'EOF'
 # protege contra suplantación de IP y enrutado desde el origen
 net.ipv4.conf.all.rp_filter = 1
@@ -148,18 +144,16 @@ net.ipv6.conf.default.disable_ipv6 = 1
 EOF
 sysctl -p /etc/sysctl.d/99-honeyml.conf
 
-# 7. límites del sistema
-log "[7/12] Configurando límites del sistema..."
+log "[7/13] Configurando límites del sistema..."
 cat >> /etc/security/limits.conf << 'EOF'
-# HoneyML limits
+# límites de HoneyML
 * soft nofile 65536
 * hard nofile 65536
 * soft nproc  4096
 * hard nproc  4096
 EOF
 
-# 8. se deshabilitan los servicios que no hacen falta
-log "[8/12] Deshabilitando servicios no requeridos..."
+log "[8/13] Deshabilitando servicios no requeridos..."
 UNWANTED_SERVICES=(avahi-daemon cups bluetooth rpcbind snapd)
 for svc in "${UNWANTED_SERVICES[@]}"; do
     if systemctl list-unit-files "$svc.service" &>/dev/null 2>&1; then
@@ -168,13 +162,12 @@ for svc in "${UNWANTED_SERVICES[@]}"; do
     fi
 done
 
-# 9. sincronización horaria, clave para poder correlacionar registros
-log "[9/12] Configurando sincronización NTP con chrony..."
+# sin la hora sincronizada no se pueden correlacionar los registros de los sensores
+log "[9/13] Configurando sincronización NTP con chrony..."
 systemctl enable --now chrony
 chronyc makestep || true
 
-# 10. fail2ban, protección de SSH
-log "[10/12] Configurando fail2ban..."
+log "[10/13] Configurando fail2ban..."
 cat > /etc/fail2ban/jail.local << 'EOF'
 [DEFAULT]
 bantime  = 86400
@@ -192,8 +185,7 @@ bantime  = 604800
 EOF
 systemctl enable --now fail2ban
 
-# 11. instalación de Docker Engine
-log "[11/12] Instalando Docker Engine..."
+log "[11/13] Instalando Docker Engine..."
 if ! command -v docker &>/dev/null; then
     curl -fsSL https://get.docker.com | bash
     usermod -aG docker "$ADMIN_USER"
@@ -224,7 +216,6 @@ if ! docker compose version &>/dev/null 2>&1; then
     apt-get install -y -qq docker-compose-plugin
 fi
 
-# 12. sshd con configuración endurecida, sin activación por socket (estable en Ubuntu 24.04)
 log "[12/13] Configurando SSH en puerto 2200..."
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -243,8 +234,8 @@ if [[ -f "$SSHD_CONFIG_SRC" ]]; then
     # AllowUsers y el bloque del túnel tienen que apuntar al usuario admin real
     sed -i "s/^AllowUsers.*/AllowUsers $ADMIN_USER/; s/^Match User .*/Match User $ADMIN_USER/" /etc/ssh/sshd_config
     mkdir -p /run/sshd  # sshd -t lo necesita en un sistema recién instalado
-    sshd -t || die "sshd_config inválido - verificar $SSHD_CONFIG_SRC"
-    log "  sshd_config hardened aplicado (Port 2200, AllowUsers $ADMIN_USER)."
+    sshd -t || die "sshd_config inválido: verificar $SSHD_CONFIG_SRC"
+    log "  sshd_config endurecido aplicado (Port 2200, AllowUsers $ADMIN_USER)."
 else
     log "  ADVERTENCIA: $SSHD_CONFIG_SRC no encontrado. Aplicar sshd_config manualmente."
 fi
@@ -258,19 +249,19 @@ systemctl enable ssh
 systemctl restart ssh
 sleep 2
 if ss -tlnp | grep -q ':2200 '; then
-    log "  OK - sshd escucha en puerto 2200 (servicio directo, sin socket activation)."
+    log "  OK: sshd escucha en el puerto 2200 (servicio directo, sin activación por socket)."
 else
-    log "  ADVERTENCIA - sshd no detectado en puerto 2200. Verificar manualmente antes de continuar."
+    log "  ADVERTENCIA: sshd no escucha en el puerto 2200. Verificarlo a mano antes de seguir."
 fi
 
-# 13. inicialización de AIDE (detección de intrusos por integridad de archivos)
+# AIDE detecta intrusiones por cambios en los archivos, y para eso necesita una base tomada con el
+# sistema recién instalado
 log "[13/13] Inicializando base de datos AIDE..."
 aideinit -y -f 2>/dev/null || aide --init 2>/dev/null || log "  AIDE: completar manualmente con 'aideinit'"
 
-# resumen
 log ""
-log "=== Hardening completado (13/13 pasos) ==="
+log "Endurecimiento completo (13 de 13 pasos)."
 log ""
 log "SSH listo en puerto 2200. Verificar acceso con otra terminal antes de continuar:"
 log "  ssh -p 2200 -i ~/.ssh/honeyml_ed25519 $ADMIN_USER@<IP>"
-log "Siguiente: ejecutar 02_firewall.sh"
+log "Después, correr 02_firewall.sh."

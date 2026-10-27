@@ -66,6 +66,13 @@ const PASOS: Paso[] = [
     desde: { opacity: 0, transform: 'translateY(10px) scale(.94)' },
   },
   {
+    sel: '.ingreso-insignia-tarjeta',
+    demora: 440,
+    duracion: 520,
+    curva: SUAVE,
+    desde: { opacity: 0, transform: 'translateY(8px)' },
+  },
+  {
     sel: '.ingreso-h1',
     demora: 500,
     duracion: 620,
@@ -220,9 +227,10 @@ export default function Ingreso({
       <main className="ingreso-tarjeta">
         <form className="ingreso-form" onSubmit={enviar} noValidate>
           <div className="ingreso-marca">
-            <img src="/logo.png" alt="" aria-hidden width={60} height={60} />
+            <img src="/logo.png" alt="" aria-hidden width={88} height={88} />
             <Marca />
           </div>
+          <span className="insignia ingreso-insignia-tarjeta">{a.insignia}</span>
           <h1 className="ingreso-h1">{a.titulo}</h1>
 
           <label className="ingreso-campo" data-campo="usuario">

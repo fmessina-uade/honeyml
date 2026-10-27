@@ -112,7 +112,7 @@ def exportar(r: redis.Redis, destino: TextIO, forzar: bool) -> int:
             ahora = _ahora_ms()
             for i, clave in enumerate(lote):
                 valor, restante = respuestas[2 * i], respuestas[2 * i + 1]
-                # Una clave que venció entre el recorrido y la lectura ya no existe: no se copia.
+                # Una clave que vence entre el recorrido y la lectura se saltea.
                 if valor is None or restante == -2:
                     continue
                 vence = None if restante == -1 else ahora + int(restante)

@@ -31,7 +31,7 @@ for nombre, ip, puerto in destinos:
     s.settimeout(3)
     try:
         s.connect((ip, puerto))
-        resultado = "CONECTA"
+        resultado = "conecta"
         abiertas += 1
     except socket.timeout:
         resultado = "bloqueado, sin respuesta en 3 s"

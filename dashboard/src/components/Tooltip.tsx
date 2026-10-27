@@ -8,10 +8,10 @@ interface Anchor {
 /**
  * Tooltip que sigue al cursor, para los gráficos.
  *
- * El atributo nativo `title` era el atajo obvio y el equivocado: espera un segundo antes de
- * aparecer, no se puede estilar para que combine con la superficie, y no muestra más de una línea.
- * Las lecturas de acá necesitan unidades, la proporción sobre el total y el desglose por sensor,
- * así que el componente vale la pena. Se dibuja en una capa fija y se da vuelta cerca del borde.
+ * El atributo nativo `title` no alcanza: tarda un segundo en aparecer, no se puede estilar para que
+ * combine con la superficie y no muestra más de una línea. Las lecturas de acá necesitan unidades,
+ * la proporción sobre el total y el desglose por sensor, así que el componente vale la pena. Se
+ * dibuja en una capa fija y se da vuelta cerca del borde.
  */
 export function useTooltip() {
   const [content, setContent] = useState<ReactNode>(null);

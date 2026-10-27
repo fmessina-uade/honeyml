@@ -1,17 +1,14 @@
 """Compara clasificadores candidatos sobre el conjunto de referencia, en igualdad de condiciones.
 
-El proyecto ya informa métricas de un modelo. Este módulo responde la pregunta que eso deja
-abierta: ¿era esa la elección correcta? Entrena varias familias sobre la misma partición, con el
-mismo preprocesamiento, y las ordena por la métrica que acá realmente importa.
+Sirve para saber si el modelo que se informa es la elección correcta. Entrena varias familias
+sobre la misma partición, con el mismo preprocesamiento, y las ordena por la métrica que acá
+importa: el promedio macro del F1. Dos de las seis clases se llevan casi todas las observaciones,
+así que la exactitud premia a un clasificador que ignore al resto, mientras que el promedio macro
+pesa todas las clases igual, que es lo que necesita un caso de uso de seguridad: la táctica rara es
+justamente la que vale la pena detectar.
 
-Esa métrica es el promedio macro del F1, no la exactitud. Dos de las seis clases se llevan el 96 %
-de las observaciones, así que la exactitud premia a un clasificador que ignore al resto. El promedio
-macro pesa todas las clases igual, que es lo que necesita un caso de uso de seguridad: la táctica
-rara es justamente la que vale la pena detectar.
-
-La comparación mira con particular atención la clase más débil, exfiltración, cuyo F1 con la
-configuración de partida es de 0,11. Un candidato que la levante importa más que uno que le rasque
-una décima al agregado.
+La comparación sigue aparte la clase más débil, exfiltración, que la configuración base apenas
+detecta. Un candidato que la levante importa más que uno que le rasque una décima al agregado.
 
 Se corre con `python -m honeyml.features.uwf_comparison`. Con `--rapido` submuestrea el
 entrenamiento para iterar, y con `--mostrar` imprime la tabla de la última comparación guardada sin
@@ -213,7 +210,7 @@ def imprimir(resultados: list[dict[str, Any]]) -> None:
 def mostrar_guardada() -> None:
     guardada = json.loads(OUT_FILE.read_text(encoding="utf-8"))
     if guardada["submuestreado"]:
-        print("  Ojo: la comparación guardada se hizo en modo rápido, con datos submuestreados.")
+        print("  La comparación guardada se hizo en modo rápido, con datos submuestreados.")
     entrenamiento = f"{guardada['n_entrenamiento']:,}".replace(",", ".")
     prueba = f"{guardada['n_prueba']:,}".replace(",", ".")
     print(f"Comparación guardada en {OUT_FILE}")

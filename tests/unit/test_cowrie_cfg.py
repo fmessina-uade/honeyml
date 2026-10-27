@@ -62,5 +62,5 @@ def test_telnet_enabled(cfg):
 
 def test_json_output_enabled(cfg):
     assert cfg.get("output_jsonlog", "enabled", fallback="false") == "true", (
-        "output_jsonlog debe estar habilitado, es la fuente de datos para el pipeline ECS (Fase 2)"
+        "output_jsonlog debe estar habilitado: es la fuente de datos del pipeline ECS"
     )

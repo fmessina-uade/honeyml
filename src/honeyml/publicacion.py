@@ -279,7 +279,7 @@ def main() -> int:
     )
     print(f"  {escritos:,} eventos en {archivo}".replace(",", "."))
     if escritos != total:
-        print(f"  Ojo: la ventana tenía {total} eventos y se escribieron {escritos}.")
+        print(f"  La ventana tenía {total} eventos y se escribieron {escritos}.")
         return 2
     return 0
 

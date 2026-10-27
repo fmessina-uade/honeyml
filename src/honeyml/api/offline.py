@@ -1,22 +1,17 @@
 """Congela la telemetría del panel en un archivo, para que funcione sin Elasticsearch.
 
-El stack es pesado y solo se levanta cuando hace falta. Hay dos momentos en los que necesitamos los
-datos sin él: sacar capturas del panel, y mostrarlo en una máquina que no es la de desarrollo. Los
-dos son malos momentos para descubrir que el tablero necesita un clúster arriba.
+El stack es pesado y solo se levanta cuando hace falta, pero sacar capturas del panel o mostrarlo
+en otra máquina necesita los datos igual. La API lee este archivo sola cuando no alcanza a
+Elasticsearch, y avisa en qué modo está sirviendo, así el panel lo dice en pantalla en lugar de
+pasar números viejos por datos en vivo.
 
-La API lee este archivo sola cuando no alcanza a Elasticsearch, y avisa en qué modo está sirviendo,
-así el panel lo dice en pantalla en lugar de pasar números viejos por datos en vivo.
+La serie horaria va en su propio archivo, porque el respaldo guarda un punto por día y la vista por
+hora no se puede reconstruir desde ahí. Se precalcula desde la tabla consolidada, que incluye el
+tráfico de healthcheck del propio contenedor; las consultas del panel lo excluyen, así que sin ese
+filtro las dos series difieren en decenas de miles de eventos y pasar de "por día" a "por hora"
+mostraría totales distintos para el mismo período.
 
-La serie horaria va en su propio archivo. El respaldo guarda un punto por día, que alcanza para
-acotar un rango, elegir sensor o agrupar por semana, pero la vista por hora no se puede reconstruir
-desde ahí, y la usan dos de los cinco atajos del panel.
-
-Se precalcula desde la tabla consolidada y no desde Elasticsearch. Ojo con una consecuencia: la
-tabla incluye el tráfico de healthcheck del propio contenedor y las consultas del panel lo excluyen,
-así que sin ese filtro las dos series difieren (32.732 eventos repartidos en once días) y pasar de
-"por día" a "por hora" mostraría totales distintos para el mismo período. Con el filtro coinciden.
-
-Usage:
+Uso:
     python -m honeyml.api.offline               # respaldo completo, necesita Elasticsearch
     python -m honeyml.api.offline --horario     # solo la serie horaria, desde la tabla consolidada
 """
@@ -192,7 +187,7 @@ def _por_semana(dias: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def _informar_horaria() -> None:
     n = guardar_serie_horaria()
     kb = HORARIO_FILE.stat().st_size / 1024
-    print(f"Serie horaria -> {HORARIO_FILE} ({kb:.0f} KB, {n} intervalos)")
+    print(f"Serie horaria en {HORARIO_FILE} ({kb:.0f} KB, {n} intervalos)")
 
 
 def main() -> None:
@@ -215,7 +210,7 @@ def main() -> None:
 
     ov = data["overview"]
     size_kb = OUT_FILE.stat().st_size / 1024
-    print(f"Snapshot congelado -> {OUT_FILE} ({size_kb:.0f} KB)")
+    print(f"Respaldo congelado en {OUT_FILE} ({size_kb:.0f} KB)")
     print(f"  {ov['events']:,} eventos, {ov['unique_ips']:,} direcciones".replace(",", "."))
     print(f"  ventana {ov['first_event'][:10]} a {ov['last_event'][:10]}")
     print(f"  tomado {data['generated_at']}")
@@ -228,7 +223,7 @@ def main() -> None:
     except FileNotFoundError as exc:
         print(f"  sin serie horaria: {exc}")
 
-    print("\nEl panel ahora funciona sin Elasticsearch levantado.")
+    print("\nEl panel ya puede funcionar sin Elasticsearch levantado.")
 
 
 if __name__ == "__main__":

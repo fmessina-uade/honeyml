@@ -31,8 +31,8 @@ from honeyml.api import decisiones, queries
 
 PROCESADOS = Path("data/processed")
 
-# Un día cuenta como captura efectiva desde este volumen. Por debajo, el sensor estaba caído y solo
-# registró algún evento suelto al volver.
+# Un día cuenta como captura efectiva desde este volumen. Por debajo, el sensor está caído y solo
+# registra algún evento suelto al volver.
 CAPTURA_EFECTIVA = 10
 
 # El filtro del instante tope, vacío sin `--hasta`. Lo usan los conteos que este script arma por su

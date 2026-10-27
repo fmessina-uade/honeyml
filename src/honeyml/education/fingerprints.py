@@ -103,7 +103,7 @@ def main() -> None:
     OUT_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
     pct = 100 * data["grouped_sessions"] / (data["total_sessions"] or 1)
-    print(f"Familias -> {OUT_FILE}")
+    print(f"Familias guardadas en {OUT_FILE}")
     print(f"  {data['total_sessions']:,} sesiones con comandos".replace(",", "."))
     print(f"  {data['families_found']:,} familias de 3+ sesiones idénticas".replace(",", "."))
     print(f"  {data['grouped_sessions']:,} sesiones agrupadas ({pct:.0f}%)".replace(",", "."))

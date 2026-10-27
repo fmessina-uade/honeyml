@@ -1,8 +1,8 @@
 """El reporte general por rango, sin Elasticsearch.
 
-Lo que se fija: que el rango se valide antes de llegar a la consulta, que una credencial con forma
-de dirección no salga en el reporte aunque esté entre las más probadas, que los comandos lleguen
-tapados, y que cada exportación quede en la auditoría con su rango.
+El rango se valida antes de llegar a la consulta, una credencial con forma de dirección no sale en
+el reporte aunque esté entre las más probadas, los comandos llegan tapados y cada exportación queda
+en la auditoría con su rango.
 """
 
 from __future__ import annotations

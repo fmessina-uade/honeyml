@@ -20,9 +20,9 @@ from pydantic import BaseModel, ConfigDict, Field
 from .consumer import EventoDelBus
 from .severidad import Severidad, dentro_de_limites
 
-# Cuántas veces se le devuelve el reproche al proveedor antes de abandonar. Tres y no diez: si el
-# modelo no acertó el esquema con el error explicado dos veces, la vuelta once tampoco lo va a
-# arreglar, y cada intento es una llamada paga.
+# Cuántas veces se le devuelve el reproche al proveedor antes de abandonar. Si el modelo no acertó
+# el esquema con el error explicado dos veces, una vuelta más tampoco lo va a arreglar, y cada
+# intento es una llamada paga.
 MAX_INTENTOS = 3
 
 # Cómo anotan los nodos de contexto e historial una consulta que falló: `historial_falló`, con el
@@ -30,10 +30,10 @@ MAX_INTENTOS = 3
 # revisión, así que los tres lo toman de acá.
 SUFIJO_DE_FALLA = "_falló"
 
-# Por qué una decisión no lleva táctica. Un nulo solo no distingue una acción sin propósito (un
-# `cd`, un `echo` de marcador) de un comando que no se entiende, ni de una conducta clara que el
-# vocabulario no cubre, como una transferencia de archivos sin ejecución. Son tres lecturas que
-# piden cosas distintas a quien revisa.
+# Una decisión sin táctica dice por qué no la lleva. Un nulo solo no distingue una acción sin
+# propósito (un `cd`, un `echo` de marcador) de un comando que no se entiende, ni de una conducta
+# clara que el vocabulario no cubre, como una transferencia de archivos sin ejecución. Son tres
+# lecturas que piden cosas distintas a quien revisa.
 MotivoSinTactica = Literal[
     "sin_objetivo_tactico",
     "evidencia_insuficiente",
@@ -75,7 +75,7 @@ class Decision(BaseModel):
     tactica_mitre: str | None = Field(default=None, description="táctica observada, si aplica")
     # Sin valor por defecto a propósito: una decisión guardada en el repertorio antes de que el
     # campo existiera no valida, y `memoria.recordar` la descarta. Así cada conducta se vuelve a
-    # razonar con el criterio de táctica vigente en vez de copiar uno que ya no rige.
+    # razonar con el criterio de táctica vigente en vez de copiar uno que perdió vigencia.
     motivo_sin_tactica: MotivoSinTactica | None = Field(
         description="por qué no hay táctica; nulo cuando la hay"
     )
@@ -158,8 +158,8 @@ class EstadoTriaje(TypedDict, total=False):
     # motor lo usa para que el consumidor cuente el evento como repetido y no como procesado.
     ya_existia: bool
     # Que esta decisión reemplaza a otra, porque se volvió a triar a propósito tras cambiar el
-    # criterio. Se guarda porque su marca temporal ya no mide cuánto tardó el motor: el evento pudo
-    # haber ocurrido semanas antes de que se lo volviera a decidir.
+    # criterio. Se guarda porque su marca temporal deja de medir cuánto tardó el motor: el evento
+    # pudo haber ocurrido semanas antes de que se lo volviera a decidir.
     retriaje: bool
 
 

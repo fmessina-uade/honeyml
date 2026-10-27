@@ -18,14 +18,12 @@ NC='\033[0m'
 
 ok()   { echo -e "${GREEN}  bien ${NC} $*"; ((PASS++)) || true; }
 fail() { echo -e "${RED}  falla${NC} $*"; ((FAIL++)) || true; }
-info() { echo -e "${YELLOW}  ->${NC} $*"; }
+info() { echo -e "${YELLOW}  aviso${NC} $*"; }
 
 cd "$(git rev-parse --show-toplevel 2>/dev/null || echo '.')"
 
 echo ""
-echo "========================================"
-echo "  HoneyML - Validación local pre-deploy"
-echo "========================================"
+echo "HoneyML, validación local antes de desplegar"
 echo ""
 
 echo "[ 1 ] Dependencias del sistema"
@@ -42,8 +40,8 @@ else
     fail "Docker Compose V2 no disponible. Usar Docker Desktop >= 3.6"
 fi
 
-command -v python3 &>/dev/null && ok "python3: $(python3 --version)" || info "python3 no encontrado (necesario para Fase 2)"
-command -v shellcheck &>/dev/null && ok "shellcheck disponible" || info "shellcheck no encontrado - instalar con: brew install shellcheck"
+command -v python3 &>/dev/null && ok "python3: $(python3 --version)" || info "python3 no encontrado (lo necesita el pipeline de datos)"
+command -v shellcheck &>/dev/null && ok "shellcheck disponible" || info "shellcheck no encontrado. Se instala con: brew install shellcheck"
 
 echo ""
 echo "[ 2 ] Linting de scripts de shell"
@@ -57,7 +55,7 @@ if command -v shellcheck &>/dev/null; then
         fi
     done
 else
-    info "shellcheck no disponible - solo validando sintaxis bash"
+    info "shellcheck no disponible: solo se valida la sintaxis de bash"
     for script in infra/vps/scripts/*.sh; do
         if bash -n "$script" 2>/dev/null; then
             ok "Sintaxis bash OK: $script"
@@ -111,13 +109,13 @@ COWRIE_CFG="infra/honeypots/cowrie/cowrie.cfg"
 if grep -q "^contents_path = honeyfs" "$COWRIE_CFG"; then
     ok "cowrie.cfg: contents_path = honeyfs (directorio real en la imagen)"
 else
-    fail "cowrie.cfg: contents_path incorrecto - debe ser 'honeyfs' (no share/cowrie/txtcmds)"
+    fail "cowrie.cfg: contents_path incorrecto, tiene que ser 'honeyfs' (no share/cowrie/txtcmds)"
 fi
 
 if grep -q "^txtcmds_path = src/cowrie/data/txtcmds" "$COWRIE_CFG"; then
     ok "cowrie.cfg: txtcmds_path = src/cowrie/data/txtcmds"
 else
-    fail "cowrie.cfg: txtcmds_path incorrecto - debe ser 'src/cowrie/data/txtcmds'"
+    fail "cowrie.cfg: txtcmds_path incorrecto, tiene que ser 'src/cowrie/data/txtcmds'"
 fi
 
 if grep -q "^auth_class = UserDB" "$COWRIE_CFG"; then
@@ -144,7 +142,7 @@ echo "[ 6 ] Validación de userdb.txt (formato y encoding)"
 
 USERDB="infra/honeypots/cowrie/userdb.txt"
 
-# 6a. solo ASCII: Cowrie abre el archivo sin encoding=, así que usa ascii por defecto
+# solo ASCII: Cowrie abre el archivo sin encoding=, así que usa ascii por defecto
 if python3 -c "
 import sys
 with open('$USERDB', 'rb') as f:
@@ -160,7 +158,7 @@ else
     info "  Causa probable: comentarios con ñ, tildes, em-dash u otros UTF-8"
 fi
 
-# 6b. formato usuario:x:contraseña (el campo 2 es 'x', no un UID numérico)
+# formato usuario:x:contraseña (el campo 2 es 'x', no un UID numérico)
 BAD_FORMAT=$(grep -v "^#" "$USERDB" | grep -v "^$" | grep -v "^[^:]*:x:" || true)
 if [[ -z "$BAD_FORMAT" ]]; then
     ok "userdb.txt: formato usuario:x:password correcto"
@@ -169,12 +167,12 @@ else
     echo "$BAD_FORMAT" | sed 's/^/     /'
 fi
 
-# 6c. sin contraseñas vacías, que provocan un IndexError en auth.py
+# sin contraseñas vacías, que provocan un IndexError en auth.py
 EMPTY_PASS=$(grep -v "^#" "$USERDB" | grep -v "^$" | grep ":$" || true)
 if [[ -z "$EMPTY_PASS" ]]; then
     ok "userdb.txt: sin contraseñas vacías (evita IndexError en auth.py)"
 else
-    fail "userdb.txt: entradas con contraseña vacía - causan IndexError en Cowrie:"
+    fail "userdb.txt: entradas con contraseña vacía, que hacen fallar a Cowrie con IndexError:"
     echo "$EMPTY_PASS" | sed 's/^/     /'
 fi
 
@@ -182,7 +180,7 @@ ENTRY_COUNT=$(grep -v "^#" "$USERDB" | grep -v "^$" | wc -l | tr -d ' ')
 ok "userdb.txt: $ENTRY_COUNT entradas de credenciales"
 
 echo ""
-echo "[ 7 ] .gitignore - datos sensibles excluidos"
+echo "[ 7 ] .gitignore: datos sensibles excluidos"
 
 SENSITIVE_PATTERNS=("*.pkl" "*.pem" "*.key" "*.pcap" "*.malware" ".env" "id_rsa" "*.joblib")
 for pattern in "${SENSITIVE_PATTERNS[@]}"; do
@@ -192,9 +190,9 @@ for pattern in "${SENSITIVE_PATTERNS[@]}"; do
 done
 
 echo ""
-echo "[ 8 ] Smoke tests - contenedores y conectividad"
+echo "[ 8 ] Pruebas de humo: contenedores y conectividad"
 
-info "Iniciando contenedores en modo dev..."
+info "Iniciando contenedores en modo de desarrollo..."
 docker compose -f "$COMPOSE_FILE" -f "$COMPOSE_DEV" up -d 2>/dev/null
 ok "docker compose up sin errores"
 sleep 6
@@ -256,7 +254,7 @@ if command -v sshpass &>/dev/null; then
         fail "Cowrie: autenticación SSH con root:root falló"
     fi
 else
-    info "sshpass no disponible - test de auth SSH salteado (brew install hudochenkov/sshpass/sshpass)"
+    info "sshpass no disponible: se saltea la prueba de autenticación SSH (brew install hudochenkov/sshpass/sshpass)"
 fi
 
 # contenido HTTP de Dionaea
@@ -282,15 +280,13 @@ docker compose -f "$COMPOSE_FILE" -f "$COMPOSE_DEV" down --remove-orphans -v 2>/
 ok "Contenedores detenidos y volúmenes de prueba eliminados"
 
 echo ""
-echo "========================================"
-printf "  Resultado: %s OK  |  %s FALLIDOS\n" "$PASS" "$FAIL"
-echo "========================================"
+printf "Resultado: %s bien y %s con falla\n" "$PASS" "$FAIL"
 echo ""
 
 if [[ $FAIL -gt 0 ]]; then
     echo -e "${RED}Hay $FAIL error(es) que corregir antes de desplegar en el VPS.${NC}"
     exit 1
 else
-    echo -e "${GREEN}Todo OK. El stack está listo para desplegar en el VPS.${NC}"
+    echo -e "${GREEN}Todo en orden. El stack está listo para desplegar en el VPS.${NC}"
     exit 0
 fi

@@ -50,24 +50,22 @@ def load() -> pd.DataFrame:
 
 def clean(df: pd.DataFrame) -> pd.DataFrame:
     """Hace la limpieza, la informa por pantalla y devuelve el DataFrame limpio."""
-    print("\n" + "=" * 70)
-    print("LIMPIEZA DE DATOS")
-    print("=" * 70)
+    print("\nLimpieza de datos")
     print(f"Eventos crudos:             {len(df):,}")
 
-    # 1. orígenes internos (healthcheck de los contenedores y pruebas propias): no son ataques
+    # los orígenes internos (healthcheck de los contenedores y pruebas propias) no son ataques
     externa = redes.mascara_externa(df["source.ip"])
     internos = int((~externa).sum())
     df = df[externa].copy()
     print(f"Orígenes internos:          -{internos:,} eliminados")
 
-    # 2. duplicados exactos que hayan quedado; el pipeline ya deduplica por document_id
+    # duplicados exactos que se le hayan escapado al pipeline, que ya deduplica por document_id
     dup = df.duplicated().sum()
     df = df.drop_duplicates().reset_index(drop=True)
     print(f"Duplicados exactos:         -{dup:,} eliminados")
 
     print(f"Eventos de ataque limpios:  {len(df):,}")
-    print(f"Rango temporal:             {df['@timestamp'].min()}  ->  {df['@timestamp'].max()}")
+    print(f"Rango temporal:             {df['@timestamp'].min()} a {df['@timestamp'].max()}")
 
     # los nulos son esperables y significan algo: cada tipo de evento llena campos distintos
     print("\nNulos por campo (%):")
@@ -75,8 +73,8 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
     for col, pct in nulls.items():
         print(f"  {col:<24} {pct:5.1f}%")
 
-    # atípicos de duración de sesión; solo los eventos de cierre traen duración
-    dur = df.loc[df["event.duration"].notna(), "event.duration"] / 1e9  # ns -> s
+    # atípicos de duración de sesión; solo los eventos de cierre traen duración, en nanosegundos
+    dur = df.loc[df["event.duration"].notna(), "event.duration"] / 1e9
     if len(dur):
         q1, q3 = dur.quantile(0.25), dur.quantile(0.75)
         iqr = q3 - q1
@@ -92,9 +90,7 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def class_distribution(df: pd.DataFrame) -> None:
-    print("\n" + "=" * 70)
-    print("DISTRIBUCIÓN DE CLASES DE ATAQUE")
-    print("=" * 70)
+    print("\nDistribución de clases de ataque")
 
     print("\nPor acción (event.action):")
     for action, n in df["event.action"].value_counts().head(15).items():
@@ -116,13 +112,11 @@ def class_distribution(df: pd.DataFrame) -> None:
     fig.tight_layout()
     fig.savefig(FIG_DIR / "distribucion_clases.png", dpi=120)
     plt.close(fig)
-    print(f"\n  -> figura: {FIG_DIR / 'distribucion_clases.png'}")
+    print(f"\n  Figura en {FIG_DIR / 'distribucion_clases.png'}")
 
 
 def attacker_summary(df: pd.DataFrame) -> None:
-    print("\n" + "=" * 70)
-    print("PERFIL DE ATACANTES")
-    print("=" * 70)
+    print("\nPerfil de atacantes")
     ext = df[df["source.ip"].notna()]
     print(f"IPs origen únicas:          {ext['source.ip'].nunique():,}")
     print("\nTop 10 IPs por volumen:")
@@ -137,10 +131,8 @@ def attacker_summary(df: pd.DataFrame) -> None:
 
 
 def correlation_matrix(df: pd.DataFrame) -> None:
-    """Matriz de correlación sobre las características por IP, la base del feature engineering."""
-    print("\n" + "=" * 70)
-    print("MATRIZ DE CORRELACIÓN (features agregadas por IP)")
-    print("=" * 70)
+    """Matriz de correlación por IP, el punto de partida de la ingeniería de características."""
+    print("\nMatriz de correlación (características agregadas por IP)")
 
     df = df.copy()
     df["is_login_fail"] = df["event.outcome"].eq("failure") & df["event.action"].eq("login")
@@ -172,10 +164,10 @@ def correlation_matrix(df: pd.DataFrame) -> None:
     fig.tight_layout()
     fig.savefig(FIG_DIR / "matriz_correlacion.png", dpi=120)
     plt.close(fig)
-    print(f"\n  -> figura: {FIG_DIR / 'matriz_correlacion.png'}")
+    print(f"\n  Figura en {FIG_DIR / 'matriz_correlacion.png'}")
 
     feats.to_parquet("data/processed/features_por_ip.parquet")
-    print("  -> features: data/processed/features_por_ip.parquet")
+    print("  Características en data/processed/features_por_ip.parquet")
 
 
 def main() -> None:

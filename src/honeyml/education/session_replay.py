@@ -163,7 +163,7 @@ def main() -> None:
     OUT_FILE.parent.mkdir(parents=True, exist_ok=True)
     OUT_FILE.write_text(json.dumps(replays, indent=2, ensure_ascii=False), encoding="utf-8")
 
-    print(f"Sesiones publicadas: {len(replays)} -> {OUT_FILE}")
+    print(f"Sesiones publicadas: {len(replays)}, en {OUT_FILE}")
     top = replays[0]
     print(
         f"\nLa más instructiva: {top['attacker']} ({top['credentials']['user']}:"

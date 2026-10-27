@@ -9,8 +9,8 @@ services:
   cowrie:
     ports:
       - "127.0.0.1:2222:2222/tcp"   # honeypot SSH  (se prueba con: ssh -p 2222 root@localhost)
-      - "127.0.0.1:2323:2223/tcp"   # Telnet honeypot
-    # sin tope de CPU en local, para que no moleste mientras se desarrolla
+      - "127.0.0.1:2323:2223/tcp"   # honeypot Telnet
+    # un núcleo entero en local, para que el tope no moleste mientras se desarrolla
     cpus: "1.0"
     mem_limit: 256m
 

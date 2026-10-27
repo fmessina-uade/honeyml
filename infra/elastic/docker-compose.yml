@@ -74,7 +74,7 @@ services:
       # con cada recreación, que es justo el escenario del que protege.
       - ls_data:/usr/share/logstash/data
     ports:
-      - "127.0.0.1:5044:5044"   # beats input
+      - "127.0.0.1:5044:5044"   # entrada de beats
     networks:
       - elastic_net
     healthcheck:

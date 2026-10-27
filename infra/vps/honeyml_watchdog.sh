@@ -75,21 +75,21 @@ diagnosticar() {
     (
         # un paso que falle no puede dejar la captura a medias ni frenar el reinicio
         set +e
-        echo "== contenedor"
+        echo "[contenedor]"
         docker stats "$nombre" --no-stream
         if [[ -n "$pid" && "$pid" != "0" ]]; then
-            echo "== cpu por hilo"
+            echo "[cpu por hilo]"
             top -H -b -n 1 -p "$pid" | head -40
-            echo "== hilo, estado, espera y nombre"
+            echo "[hilo, estado, espera y nombre]"
             for tarea in /proc/"$pid"/task/*; do
                 echo "$(basename "$tarea") $(cut -d' ' -f3 "$tarea/stat") $(cat "$tarea/wchan") $(cat "$tarea/comm")"
             done
-            echo "== conexiones"
+            echo "[conexiones]"
             nsenter -t "$pid" -n ss -tanp | head -60
         fi
         # dos lecturas separadas: si la pila se repite, el proceso está girando en ese lugar
         for vuelta in 1 2; do
-            echo "== pila, lectura ${vuelta}"
+            echo "[pila, lectura ${vuelta}]"
             # sin --native: con el intérprete embebido en el binario del sensor, esa opción falla
             # al resolver el hilo del sistema y no devuelve ninguna pila
             timeout 60 docker run --rm --network none --pid="container:${nombre}" \

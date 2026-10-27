@@ -9,8 +9,8 @@ cuatro o cinco consultas al índice que arma el contexto, y sobre decenas de mil
 cientos de miles de consultas para un resultado que nadie va a leer. Puesto acá, un acierto cuesta
 una lectura en el bus.
 
-Lo que no se reutiliza. La identidad del evento, su momento, su origen y los límites de severidad
-se recalculan siempre, porque son del evento y no de la conducta. Y el documento que se persiste
+La identidad del evento, su momento, su origen y los límites de severidad nunca se reutilizan: se
+recalculan siempre, porque son del evento y no de la conducta. Y el documento que se persiste
 declara de qué decisión copió: una decisión reutilizada tiene que ser distinguible de una razonada,
 o el registro estaría afirmando algo que no pasó.
 """
@@ -46,9 +46,9 @@ def recordar(estado: EstadoTriaje, repertorio: Repertorio | None = None) -> Esta
     try:
         decision = Decision.model_validate(guardado.get("decision") or {})
     except ValidationError:
-        # El repertorio guardó algo que hoy ya no valida: pasó a haber un campo nuevo, o cambió una
-        # restricción. Se descarta y el evento se razona de nuevo, que es lo que corresponde cuando
-        # el criterio cambió debajo de una decisión vieja.
+        # El repertorio guardó algo que no valida con el modelo vigente: hay un campo nuevo, o
+        # cambió una restricción. Se descarta y el evento se razona de nuevo, que es lo que
+        # corresponde cuando el criterio cambió debajo de una decisión vieja.
         return {"firma": marca}
 
     return {

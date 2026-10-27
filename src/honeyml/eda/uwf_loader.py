@@ -63,13 +63,10 @@ def verificar(raw_dir: str | Path = RAW_DIR) -> list[str]:
 
 
 def load_uwf(raw_dir: str | Path = RAW_DIR, drop_duplicates: bool = True) -> pd.DataFrame:
-    """Lee todos los parquet de UWF-ZeekData24 en un solo DataFrame.
+    """Lee las particiones parquet semanales de `raw_dir` en un solo DataFrame.
 
-    Parámetros
-    ----------
-    raw_dir : el directorio con las particiones parquet semanales.
-    drop_duplicates : si es True, descarta las filas que el conjunto marca como Duplicate en
-        label_binary.
+    Con `drop_duplicates` se descartan las filas que el propio conjunto marca como Duplicate en
+    label_binary.
     """
     files = sorted(glob.glob(str(Path(raw_dir) / "*" / "*.parquet")))
     if not files:
@@ -77,7 +74,7 @@ def load_uwf(raw_dir: str | Path = RAW_DIR, drop_duplicates: bool = True) -> pd.
     diferencias = verificar(raw_dir)
     if diferencias:
         print(
-            "Aviso: esta copia de UWF-ZeekData24 no es la de referencia y las métricas pueden "
+            "Esta copia de UWF-ZeekData24 no es la de referencia, así que las métricas pueden "
             "no coincidir con las de la tarjeta del modelo.",
             *diferencias,
             sep="\n  ",

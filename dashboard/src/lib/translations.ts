@@ -83,8 +83,7 @@ const es = {
     mitre: 'El marco con el que se clasifica cada acción, iluminado con las capturas propias.',
     triaje:
       'Lo que el motor decidió sobre cada evento, con qué evidencia y a qué costo. Lo que no pudo cerrar solo lo termina de decidir quien opera el panel.',
-    cuentas:
-      'Quién entra al panel y con qué rol. Cada uno administra solo las cuentas de los roles que quedan por debajo del suyo.',
+    cuentas: 'Quién entra al panel y con qué rol.',
     auditoria:
       'Lo que hizo cada cuenta en el panel y lo que pasó en el servidor, de lo más nuevo a lo más viejo.',
     envivo:
@@ -814,12 +813,6 @@ const es = {
     admin: 'Admin',
     superadmin: 'Superadmin',
   },
-  rolesDesc: {
-    invitado: 'Mira el panel y exporta reportes. No escribe nada.',
-    analista: 'Además deja veredictos y hace la revisión a ciegas.',
-    admin: 'Además da de alta y de baja a invitados y analistas.',
-    superadmin: 'Además ve la auditoría y la telemetría en vivo, y administra admins.',
-  },
   cuenta: {
     abrir: 'Tu cuenta',
     reporte: 'Reportes',
@@ -1113,8 +1106,7 @@ const en: typeof es = {
     mitre: 'The framework used to classify each action, lit up with our own captures.',
     triaje:
       'What the engine decided about each event, on what evidence and at what cost. Whatever it could not settle on its own is decided by whoever operates the panel.',
-    cuentas:
-      'Who can enter the panel and with which role. Each role manages only the accounts of the roles below it.',
+    cuentas: 'Who can enter the panel and with which role.',
     auditoria: 'What each account did in the panel and what happened on the server, newest first.',
     envivo:
       'Normalized events as they leave the pipeline. No addresses: the ones inside a command are masked.',
@@ -1833,12 +1825,6 @@ const en: typeof es = {
     analista: 'Analyst',
     admin: 'Admin',
     superadmin: 'Superadmin',
-  },
-  rolesDesc: {
-    invitado: 'Views the panel and exports reports. Writes nothing.',
-    analista: 'Also leaves verdicts and does the blind review.',
-    admin: 'Also creates and disables guests and analysts.',
-    superadmin: 'Also sees the audit log and live telemetry, and manages admins.',
   },
   cuenta: {
     abrir: 'Your account',

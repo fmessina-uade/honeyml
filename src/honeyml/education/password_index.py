@@ -1,16 +1,14 @@
 """Arma la consulta que le permite a un visitante comparar su contraseña con las capturadas.
 
-El diseño de privacidad es el punto, y es el mismo que usa Have I Been Pwned (k-anonimato):
+Sigue el mismo diseño de k-anonimato que Have I Been Pwned. El navegador hashea con SHA-256 la
+contraseña tipeada y manda solo los primeros cinco caracteres hexadecimales del resumen; el servicio
+contesta con todos los hashes capturados que comparten ese prefijo, con su conteo, y el navegador
+termina la comparación localmente.
 
-  1. El navegador hashea con SHA-256 la contraseña tipeada y manda solo los primeros cinco
-     caracteres hexadecimales del resumen.
-  2. El servicio contesta con todos los hashes capturados que comparten ese prefijo, y su conteo.
-  3. El navegador termina la comparación localmente.
-
-La contraseña nunca sale del navegador, y el servicio no puede saber por cuál de los hashes
-devueltos estaba preguntando el visitante. Pedirle a alguien que tipee una contraseña real en un
-formulario que la transmite enseñaría exactamente la lección equivocada, y en un panel cuyo tema
-entero son los ataques a credenciales eso sería indefendible.
+Así la contraseña nunca sale del navegador, y el servicio no puede saber por cuál de los hashes
+devueltos pregunta el visitante. Pedirle a alguien que tipee una contraseña real en un formulario
+que la transmite enseñaría justo la lección equivocada, y en un panel cuyo tema son los ataques a
+credenciales sería indefendible.
 
 Uso:
     python -m honeyml.education.password_index
@@ -128,7 +126,7 @@ def main() -> None:
     OUT_FILE.write_text(json.dumps(index, ensure_ascii=False), encoding="utf-8")
 
     size_mb = OUT_FILE.stat().st_size / 1024 / 1024
-    print(f"Índice de contraseñas -> {OUT_FILE} ({size_mb:.1f} MB)")
+    print(f"Índice de contraseñas en {OUT_FILE} ({size_mb:.1f} MB)")
     print(f"  {index['distinct']:,} contraseñas distintas".replace(",", "."))
     print(f"  {index['attempts']:,} intentos en total".replace(",", "."))
     print(f"  {len(index['buckets']):,} prefijos de {PREFIX_LEN} caracteres".replace(",", "."))

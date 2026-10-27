@@ -211,8 +211,8 @@ def test_una_firma_conocida_trae_la_decision_y_de_donde_salio() -> None:
 def test_una_entrada_que_ya_no_valida_se_descarta() -> None:
     """Si cambió el esquema, la decisión vieja no se copia: el evento se razona de nuevo.
 
-    Copiar algo que hoy no valida metería en el índice un documento que el propio motor rechazaría
-    si lo produjera ahora.
+    Copiar algo que el esquema vigente no valida metería en el índice un documento que el propio
+    motor rechazaría si lo produjera.
     """
     repertorio = RepertorioFalso()
     marca = modulo_firma.de_evento(_evento())
@@ -341,11 +341,11 @@ def test_una_copia_no_se_atribuye_consumo_ni_intentos() -> None:
     Es lo que mantiene honestas las métricas del motor. Una copia con bloque `modelo` relleno
     contaría un costo que nadie pagó, y un `intentos` en uno contaría un intento que no hubo.
 
-    La trampa que esto previene es sutil y va a aparecer al armar el panel: a medida que la
-    reutilización crece, cualquier promedio de `ciclo.intentos` o de `modelo.costo_usd` sobre TODAS
-    las decisiones se acerca a cero, y eso parece que el motor mejoró cuando lo que pasa es que la
-    mayoría de los eventos no pasó por el motor. La regla es que toda métrica de desempeño filtre
-    `ciclo.reutilizada_de` en nulo; las de cobertura del triaje, en cambio, cuentan todo.
+    La trampa es sutil: a medida que la reutilización crece, cualquier promedio de
+    `ciclo.intentos` o de `modelo.costo_usd` sobre el total de las decisiones se acerca a cero, y
+    parece que el motor mejoró cuando en realidad la mayoría de los eventos no pasó por él. Por eso
+    toda métrica de desempeño filtra `ciclo.reutilizada_de` en nulo, mientras que las de cobertura
+    del triaje cuentan todo.
     """
     consumo = {
         "nombre": "openai/gpt-oss-20b",

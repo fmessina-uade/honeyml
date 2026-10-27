@@ -37,7 +37,7 @@ def miles(v: int) -> str:
 
 
 def event_mapping() -> None:
-    """Afirmación 8: las nueve filas de eventos de Cowrie, con categoría, acción y resultado."""
+    """Cómo se mapea cada evento de Cowrie a categoría, acción y resultado de ECS."""
     body = {
         "size": 0,
         "query": NOT_LOCAL,
@@ -62,7 +62,7 @@ def event_mapping() -> None:
 
 
 def sensor_namespace() -> None:
-    """Afirmación 9: los atributos sin equivalente ECS van bajo un espacio de nombres por sensor."""
+    """Los atributos sin equivalente ECS van bajo un espacio de nombres por sensor."""
     for sensor in ("cowrie", "dionaea"):
         body = {"size": 1, "query": {"bool": {"filter": [{"exists": {"field": sensor}}]}}}
         hits = search(f"honeypot-{sensor}-*", body)["hits"]["hits"]
@@ -70,11 +70,11 @@ def sensor_namespace() -> None:
             print(f"  {sensor}: sin espacio de nombres propio")
             continue
         keys = sorted(hits[0]["_source"].get(sensor, {}).keys())
-        print(f"  {sensor}.*  ->  {', '.join(keys)}")
+        print(f"  {sensor}.*: {', '.join(keys)}")
 
 
 def unrouted() -> None:
-    """Afirmación 7: el índice de descarte está vacío en operación normal."""
+    """El índice de descarte está vacío en operación normal."""
     req = urllib.request.Request(f"{ES}/_cat/indices/honeypot-unrouted-*?format=json")
     with urllib.request.urlopen(req, timeout=30) as r:
         rows = json.load(r)
@@ -86,7 +86,7 @@ def unrouted() -> None:
 
 
 def complementarity() -> None:
-    """Afirmación 11: el sensor de servicios ve protocolos de base de datos que el de SSH no."""
+    """El sensor de servicios ve protocolos de base de datos que el de SSH no ve."""
     body = {
         "size": 0,
         "query": NOT_LOCAL,
@@ -99,7 +99,7 @@ def complementarity() -> None:
     }
     for s in search("honeypot-*", body)["aggregations"]["s"]["buckets"]:
         protos = ", ".join(f"{p['key']} ({miles(p['doc_count'])})" for p in s["p"]["buckets"])
-        print(f"  {s['key']:<9} -> {protos}")
+        print(f"  {s['key'] + ':':<10} {protos}")
 
 
 def totals() -> None:
@@ -142,13 +142,13 @@ def totals() -> None:
 
 def main() -> None:
     for title, fn in [
-        ("Afirmación 8: mapeo de eventos del sensor de acceso remoto", event_mapping),
-        ("Afirmación 9: espacio de nombres por sensor", sensor_namespace),
-        ("Afirmación 7: índice de descarte", unrouted),
-        ("Afirmación 11: complementariedad de sensores", complementarity),
-        ("Parte 3: números finales del corte", totals),
+        ("Mapeo de eventos del sensor de acceso remoto", event_mapping),
+        ("Espacio de nombres por sensor", sensor_namespace),
+        ("Índice de descarte", unrouted),
+        ("Complementariedad de sensores", complementarity),
+        ("Totales del corpus", totals),
     ]:
-        print(f"\n{'=' * 72}\n{title}\n{'=' * 72}")
+        print(f"\n{title}\n")
         fn()
     print()
 

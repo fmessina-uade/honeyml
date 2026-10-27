@@ -128,7 +128,7 @@ def main() -> None:
     mejora_val = mejor["f1_macro"] - base_val["f1_macro"]
     print(f"\n  elegido en validación: umbral {mejor['umbral']:.2f} (F1 macro {mejora_val:+.4f})")
 
-    # Recién ahora se toca la prueba, con el umbral ya fijado.
+    # La prueba se toca recién acá, con el umbral ya fijado.
     proba_te = pipe.predict_proba(x_te)
     base_te = _fila(y_te, clases[proba_te.argmax(axis=1)], None)
     ajustado_te = _fila(
@@ -157,7 +157,7 @@ def main() -> None:
     if diferencia > 0.002:
         print(f"  El umbral mejora el F1 macro en {diferencia:+.4f} sobre datos no vistos.")
     elif diferencia > -0.002:
-        print(f"  El cambio es de {diferencia:+.4f}: el umbral por defecto ya estaba bien ubicado.")
+        print(f"  El cambio es de {diferencia:+.4f}: el umbral por defecto ya está bien ubicado.")
         print("  El valor de esto no es la mejora sino la frontera: muestra qué se puede comprar")
         print("  y a qué precio, en lugar de dejar el punto de operación como algo dado.")
     else:
@@ -186,7 +186,7 @@ def main() -> None:
         ),
         encoding="utf-8",
     )
-    print(f"\n  Resultado -> {OUT_FILE}")
+    print(f"\n  Resultado en {OUT_FILE}")
 
 
 if __name__ == "__main__":

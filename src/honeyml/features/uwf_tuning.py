@@ -1,25 +1,18 @@
 """Optimización de hiperparámetros del clasificador que ganó la comparación de modelos.
 
-La comparación elige la familia: potenciación por gradiente con histograma, en valores más o menos
-por defecto. Este módulo responde la pregunta que queda, si esa configuración es buena, y lo
-hace sobre la misma partición, el mismo preprocesamiento y las mismas métricas, así los dos
-resultados se pueden leer uno al lado del otro.
+La comparación elige la familia (potenciación por gradiente con histograma, con valores cercanos a
+los de fábrica) y este módulo mide si esa configuración es buena, sobre la misma partición, el mismo
+preprocesamiento y las mismas métricas, para que los dos resultados se lean uno al lado del otro.
 
-Se busca por halving sucesivo y no por grilla completa. Con 1,42 millones de filas de
-entrenamiento, un solo ajuste cuesta unos 35 segundos, así que una grilla de cien combinaciones
-sobre tres particiones correría durante horas. El halving gasta poco en muchos candidatos, se queda
-con el mejor tercio y les da más datos, de modo que el presupuesto va a donde todavía puede cambiar
-la respuesta.
+La búsqueda es por halving sucesivo: con más de un millón de filas cada ajuste tarda decenas de
+segundos, y una grilla completa de cien combinaciones sobre tres particiones correría horas. El
+halving gasta poco en muchos candidatos y le da más datos al mejor tercio, así el presupuesto va a
+donde todavía puede cambiar la respuesta.
 
-Lo que no se busca es el balanceo de clases, que queda fijo en "balanced". Acá no es un
-hiperparámetro sino una decisión ya tomada y justificada: sin él el modelo ignora las clases raras,
-que son las que vale la pena detectar. Dejarlo dentro de la búsqueda permitiría que el proceso
-negocie justamente aquello para lo que el modelo existe.
-
-Un límite que conviene declarar. Exfiltration tiene 559 observaciones en todo el conjunto, el
-0,029 %. Tras la partición quedan unas 419 para entrenar y 140 para medir, así que cualquier F1
-sobre esa clase se calcula sobre esos 140 casos y diferencias de centésimas son ruido y no mejora.
-La búsqueda optimiza el promedio macro e informa la clase débil, en vez de perseguirla.
+El balanceo de clases queda fijo en "balanced": sin él el modelo ignora las clases raras, que son
+las que vale la pena detectar, y dejarlo en la búsqueda permitiría negociar justo aquello para lo
+que el modelo existe. Exfiltration deja tan pocos casos para medir que en su F1 las diferencias de
+centésimas son ruido, y por eso la búsqueda optimiza el promedio macro y no esa clase.
 
 Uso:
     python -m honeyml.features.uwf_tuning --rapido    # búsqueda corta, para validar el armado
@@ -72,7 +65,7 @@ def _modelo(**kw: Any) -> HistGradientBoostingClassifier:
     # `_modelo(**BASE)` reproduce exactamente el candidato de la comparación, incluido el corte
     # temprano que sklearn activa solo por encima de 10.000 filas, y el ajustado difiere de él
     # únicamente en los parámetros buscados. Fijar acá cualquier otra cosa metería una segunda
-    # diferencia entre los dos, y ya no se sabría a cuál atribuir el cambio.
+    # diferencia entre los dos, y no habría forma de saber a cuál atribuir el cambio.
     return HistGradientBoostingClassifier(
         class_weight="balanced",
         random_state=RANDOM_STATE,
@@ -124,23 +117,19 @@ def main() -> None:
     args = ap.parse_args()
 
     x_tr, x_te, y_tr, y_te = cargar_y_partir()
-    print(f"Entrenamiento: {len(x_tr):,}  |  Prueba: {len(x_te):,}".replace(",", "."))
+    print(f"Entrenamiento: {len(x_tr):,}, prueba: {len(x_te):,}".replace(",", "."))
     n_debil_te = int((y_te == WEAK_CLASS).sum())
-    print(f"Clases: {y_tr.nunique()}  |  {WEAK_CLASS} en prueba: {n_debil_te} casos\n")
+    print(f"Clases: {y_tr.nunique()}, {WEAK_CLASS} en prueba: {n_debil_te} casos\n")
 
-    # "exhaust" en lugar de un piso fijo, y no es un detalle.
-    #
     # Con un piso elegido a mano, la progresión geométrica casi nunca cae justo sobre el total: con
-    # 200.000 y factor 3 da 200k, después 600k y después 1,8M, y como 1,8M excede las 1.423.959
-    # filas disponibles, sklearn corta en 600k. El ganador queda elegido sobre el 42 % de los datos.
-    #
-    # Con "exhaust", sklearn calcula el piso hacia atrás desde el total, de modo que la última
-    # ronda use todas las filas. Las primeras rondas quedan más chicas y por lo tanto más ruidosas,
-    # pero eso es un descarte grueso: la decisión final se toma sobre el conjunto entero, que es
-    # donde tiene que tomarse.
+    # 200.000 y factor 3 da 200.000, 600.000 y 1,8 millones, y si la última ronda excede las filas
+    # disponibles sklearn se queda con la anterior, así que el ganador puede salir de menos de la
+    # mitad de los datos. Con "exhaust", sklearn calcula el piso hacia atrás desde el total para que
+    # la última ronda use todas las filas. Las primeras quedan más chicas y más ruidosas, pero son
+    # un descarte grueso: la decisión final se toma sobre el conjunto entero.
     candidatos = 12 if args.rapido else 36
     if args.rapido:
-        print("  MODO RÁPIDO: búsqueda recortada, resultados solo orientativos\n")
+        print("  Modo rápido: búsqueda recortada, resultados solo orientativos\n")
 
     busqueda = HalvingRandomSearchCV(
         Pipeline([("prep", _preprocessor(scale=False)), ("clf", _modelo())]),
@@ -173,13 +162,13 @@ def main() -> None:
         "  ".join(f"{c} por {r:,}" for c, r in rondas).replace(",", "."),
     )
     # Con tolerancia y no con `<` a secas: la progresión geométrica deja un resto de unas pocas
-    # filas (1.423.953 de 1.423.959 en una corrida) y avisar por eso sería ruido que enseña a
-    # ignorar el aviso. Lo que hay que detectar es una ronda final materialmente más chica.
+    # filas, y avisar por eso sería ruido que enseña a ignorar el aviso. Lo que hay que detectar es
+    # una ronda final materialmente más chica.
     completa = rondas[-1][1] >= len(x_tr) * 0.99
     if not completa:
         faltante = 100 - rondas[-1][1] / len(x_tr) * 100
         print(
-            f"  Ojo, la última ronda usó {rondas[-1][1]:,} de {len(x_tr):,} filas "
+            f"  La última ronda usó {rondas[-1][1]:,} de {len(x_tr):,} filas "
             f"({faltante:.0f} % menos). El ganador no se midió sobre el total.".replace(",", ".")
         )
     print()
@@ -198,7 +187,7 @@ def main() -> None:
 
     print("  hiperparámetros elegidos")
     for k, v in sorted(mejores.items()):
-        marca = "  (era " + str(BASE[k]) + ")" if k in BASE and BASE[k] != v else ""
+        marca = "  (referencia: " + str(BASE[k]) + ")" if k in BASE and BASE[k] != v else ""
         print(f"    {k:24} {v}{marca}")
 
     filas = [
@@ -221,14 +210,14 @@ def main() -> None:
         print(f"  El ajuste mejora el F1 macro en {mejora:+.4f}. Conviene adoptarlo.")
     elif mejora > 0:
         print(f"  La mejora es de {mejora:+.4f}: demasiado chica para justificar el cambio.")
-        print("  Los valores por defecto ya estaban bien para este problema, que también es")
-        print("  un resultado: dice que el margen no está en los hiperparámetros.")
+        print("  Los valores por defecto ya están bien para este problema, y eso también es")
+        print("  un resultado: el margen no está en los hiperparámetros.")
     else:
         print(f"  El ajuste no mejora ({mejora:+.4f}). Se mantiene la configuración de referencia.")
 
     print(
-        f"\n  Recordatorio: el F1 de {WEAK_CLASS} se calcula sobre {n_debil_te} casos. "
-        "Diferencias de centésimas ahí son ruido."
+        f"\n  El F1 de {WEAK_CLASS} se calcula sobre {n_debil_te} casos, así que "
+        "diferencias de centésimas ahí son ruido."
     )
 
     OUT_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -257,7 +246,7 @@ def main() -> None:
         ),
         encoding="utf-8",
     )
-    print(f"\n  Resultado -> {OUT_FILE}")
+    print(f"\n  Resultado en {OUT_FILE}")
 
 
 if __name__ == "__main__":

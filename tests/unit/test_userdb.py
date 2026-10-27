@@ -1,11 +1,8 @@
-"""
-Tests unitarios para la validación de userdb.txt de Cowrie.
+"""Las restricciones que la imagen cowrie/cowrie:latest le impone al formato de userdb.txt.
 
-Estos tests documentan las restricciones del formato que impone
-la imagen cowrie/cowrie:latest (auth.py, pwd.py):
-  - El archivo se abre con codec ASCII implícito, así que solo admite bytes 0x00-0x7F
-  - El campo 2 debe ser 'x' y no un UID numérico: auth.py lo ignora, pero espera 3 campos
-  - Las contraseñas vacías causan IndexError en auth.py:115 (passwd[0])
+Cowrie lo abre con el codec ASCII implícito, así que solo admite bytes de 0x00 a 0x7F. auth.py
+ignora el segundo campo pero espera tres, y la convención es poner 'x' en lugar de un UID. Una
+contraseña vacía hace fallar a auth.py:115 con un IndexError, porque lee passwd[0].
 """
 
 import pathlib
@@ -50,7 +47,7 @@ def test_userdb_field2_is_x(userdb_text):
 
 
 def test_userdb_no_empty_passwords(userdb_text):
-    """Contraseña vacía ('user:x:') causa IndexError en auth.py:115."""
+    """Una contraseña vacía ('user:x:') causa un IndexError en auth.py:115."""
     bad = [line for line in _data_lines(userdb_text) if line.endswith(":")]
     assert not bad, f"Entradas con contraseña vacía (causan IndexError en Cowrie): {bad}"
 

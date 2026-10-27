@@ -1,9 +1,9 @@
-"""Bloquea hasta que el pipeline de ingesta alcanzó a los registros que hay en disco.
+"""Bloquea hasta que el pipeline de ingesta alcance a los registros que hay en disco.
 
-Por qué existe: `make refresh` baja registros nuevos y después regenera todos los artefactos
-derivados. El colector levanta las líneas nuevas por su cuenta, pero tarda. Sin esta espera, los
-artefactos se rearmarían desde un índice ingerido a medias y no coincidirían entre sí: la tabla
-consolidada tendría un número y el respaldo congelado, otro.
+`make refresh` baja registros nuevos y después regenera todos los artefactos derivados. El colector
+levanta las líneas nuevas por su cuenta, pero tarda. Sin esta espera, los artefactos se rearmarían
+desde un índice ingerido a medias y no coincidirían entre sí: la tabla consolidada tendría un número
+y el respaldo congelado, otro.
 
 La señal es que el conteo de documentos se aquiete: cuando deja de crecer durante unas cuantas
 lecturas seguidas, el colector ya drenó lo que tenía. Eso es más confiable que compararlo contra la

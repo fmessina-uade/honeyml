@@ -1,36 +1,18 @@
-"""Ajusta el clasificador final una vez y lo persiste con todo lo necesario para confiar en él.
+"""Ajusta el clasificador final una vez y lo persiste con lo necesario para confiar en él.
 
-Los módulos de comparación y de ajuste entrenan el modelo y lo descartan en cada corrida. Eso está
-bien mientras la pregunta es cuál modelo, y deja de servir cuando la respuesta es este modelo: la
-demostración y cualquier lectura posterior tienen que usar exactamente el modelo que se informa, y
-un número que nadie puede reproducir es una afirmación, no un resultado.
+La comparación y el ajuste descartan el modelo en cada corrida, pero la demostración y cualquier
+lectura posterior tienen que usar el mismo que se informa: un número que nadie puede reproducir
+no pasa de afirmación. El modelo vive en el subsistema de validación, fuera del motor de triaje:
+aprende de flujos de Zeek que los sensores de HoneyML no producen y queda como línea base.
 
-El modelo vive en el subsistema de validación y no en el motor de triaje. Aprende de flujos de Zeek
-de un laboratorio etiquetado, y los sensores de HoneyML no producen esos campos: se evalúa sobre su
-conjunto de referencia y sirve de línea base, no clasifica la telemetría capturada.
-
-El módulo produce dos archivos que viajan juntos:
-
-    models/uwf_tactica.joblib   el pipeline ajustado, preprocesamiento y clasificador en un objeto
-    models/uwf_tactica.json     la tarjeta: con qué se entrenó, cuánto puntúa, qué necesita
-
-Deja resueltas tres cosas que el joblib no puede decir por sí solo.
-
-El punto de operación. El estudio del umbral (`uwf_umbral`) recorta la validación de la mitad de
-entrenamiento, lo que le cuesta el 20 % de los datos y deja su línea base (0,8741) por debajo de la
-del modelo completo (0,8782), una salvedad que habría que explicar cada vez que se los pone lado a
-lado. Acá el umbral sale de probabilidades fuera de muestra sobre la mitad de entrenamiento entera,
-así que el modelo exportado se entrena con toda ella y el umbral sigue sin ver una fila con la que
-se ajustó.
-
-El ranking de características. Importancia por permutación sobre las quince columnas originales,
-medida sobre el modelo que efectivamente se exporta, y no la del bosque aleatorio que se descarta
-en la comparación, que responde qué le importa a un clasificador que nadie corre.
-
-Y la procedencia. Versiones de las bibliotecas, orden de clases, lista de columnas, tamaños de
-partición y el resumen criptográfico del propio artefacto. Un objeto de sklearn cargado bajo otra
-versión falla de formas que parecen un problema de datos, y la tarjeta convierte eso en un
-diagnóstico de una línea.
+Escribe el pipeline ajustado en models/uwf_tactica.joblib y, al lado, la tarjeta en
+models/uwf_tactica.json con lo que el joblib no dice solo. El umbral de la clase débil sale de
+probabilidades fuera de muestra sobre toda la mitad de entrenamiento, así el modelo exportado se
+entrena con toda ella y el umbral nunca ve una fila con la que se ajustó (`uwf_umbral`, en cambio,
+reserva una porción y su línea base queda algo más abajo). La importancia por permutación se mide
+sobre el modelo exportado y no sobre uno que nadie corre. Las versiones de las bibliotecas, el orden
+de clases, las columnas, los tamaños de partición y el SHA-256 del artefacto vuelven un diagnóstico
+de una línea lo que, bajo otra versión de sklearn, parece un problema de datos.
 
 Uso:
     python -m honeyml.features.uwf_export
@@ -66,14 +48,14 @@ from .uwf_umbral import UMBRALES, _fila, _predecir_con_umbral
 MODEL_FILE = Path("models/uwf_tactica.joblib")
 CARD_FILE = Path("models/uwf_tactica.json")
 
-# Tres particiones y no cinco. Cada una es un entrenamiento completo sobre 950.000 filas, y lo que
-# se busca acá es una probabilidad honesta por fila, no una estimación fina del error: cinco
-# particiones cuestan casi el doble y mueven el umbral elegido menos que el paso de la grilla.
+# Tres particiones alcanzan. Cada una es un entrenamiento completo sobre casi un millón de filas, y
+# lo que se busca es una probabilidad honesta por fila más que una estimación fina del error: cinco
+# particiones costarían casi el doble y moverían el umbral elegido menos que el paso de la grilla.
 PARTICIONES = 3
 
-# La importancia por permutación reentrena nada pero predice n_repeticiones por n_columnas veces.
-# Sobre las 474.654 filas de prueba serían 75 pasadas completas; sobre una submuestra estratificada
-# el ranking es el mismo y la corrida baja de media hora a medio minuto.
+# La importancia por permutación no reentrena, pero predice n_repeticiones por n_columnas veces.
+# Sobre toda la prueba son decenas de pasadas completas por casi medio millón de filas; sobre una
+# submuestra estratificada el ranking sale igual y la corrida tarda segundos en lugar de media hora.
 MUESTRA_PERMUTACION = 60_000
 REPETICIONES_PERMUTACION = 5
 
@@ -263,7 +245,7 @@ def main() -> None:
         )
     print(f"\n  umbral elegido: {umbral:.2f}")
 
-    # Recién ahora se toca la prueba, con el punto de operación ya fijado.
+    # La prueba se toca recién acá, con el punto de operación ya fijado.
     proba_te = pipe.predict_proba(x_te)
     y_defecto = clases[proba_te.argmax(axis=1)]
     y_umbral = _predecir_con_umbral(proba_te, clases, indice_debil, umbral)
@@ -386,9 +368,9 @@ def main() -> None:
     CARD_FILE.write_text(json.dumps(tarjeta, indent=2, ensure_ascii=False), encoding="utf-8")
 
     tamano = MODEL_FILE.stat().st_size / 1024
-    print(f"\n  Modelo   -> {MODEL_FILE} ({tamano:.0f} KB)")
-    print(f"  Tarjeta  -> {CARD_FILE}")
-    print(f"  Digest   -> {digest[:16]}")
+    print(f"\n  Modelo:  {MODEL_FILE} ({tamano:.0f} KB)")
+    print(f"  Tarjeta: {CARD_FILE}")
+    print(f"  Resumen: {digest[:16]}")
 
 
 def cargar_modelo() -> tuple[Pipeline, dict[str, Any]]:

@@ -4,8 +4,8 @@ Es el único nodo que no habla con nadie. No hay red, no hay índice, no hay pro
 borrador y sale una decisión o una lista de reproches. Por eso tampoco levanta excepciones, a
 diferencia de contexto y de historial: acá no hay nada que pueda estar caído.
 
-Lo que no se comprueba, porque ya no se pide: que el modelo repita el identificador del evento. Ver
-el comentario de `Decision` en `state.py`.
+Que el modelo repita el identificador del evento no se comprueba, porque no se le pide (ver el
+comentario de `Decision` en `state.py`).
 
 El reproche tiene dos lectores y eso condiciona cómo se escribe. Uno es el modelo, que lo recibe en
 el siguiente intento y tiene que poder corregir con eso. El otro es quien audite la decisión meses

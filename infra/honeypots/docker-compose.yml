@@ -12,8 +12,8 @@ services:
     networks:
       - honeypot_net
     ports:
-      - "0.0.0.0:22:2222/tcp"   # SSH honeypot
-      - "0.0.0.0:23:2223/tcp"   # Telnet honeypot
+      - "0.0.0.0:22:2222/tcp"   # honeypot SSH
+      - "0.0.0.0:23:2223/tcp"   # honeypot Telnet
     volumes:
       # el CWD del proceso es /cowrie/cowrie-git (no /cowrie), y todas las rutas cuelgan de ahí
       - ./cowrie/cowrie.cfg:/cowrie/cowrie-git/etc/cowrie.cfg:ro
@@ -91,7 +91,8 @@ services:
       interval: 60s
       timeout: 10s
       retries: 3
-      # el registro tiene que estar escrito hace poco; tras un reinicio eso se hereda de antes
+      # el registro tiene que haberse escrito hace poco, y tras un reinicio el archivo conserva la
+      # fecha de la última escritura previa, así que el margen le da tiempo a escribir de nuevo
       start_period: 120s
     security_opt:
       - no-new-privileges:true
@@ -109,11 +110,10 @@ services:
         max-size: "10m"
         max-file: "5"
 
-# red bridge interna de los honeypots.
-# entrada permitida (reciben ataques de internet), salida bloqueada con iptables en DOCKER-USER
-# (02_firewall.sh). Los sensores no se hablan entre sí: un atacante que gane ejecución en uno no
-# puede usarlo para llegar al otro. DOCKER-USER repite ese descarte, porque se evalúa antes que las
-# reglas con que Docker implementa enable_icc.
+# Red bridge interna de los honeypots. La entrada queda abierta, porque por ahí llegan los ataques,
+# y la salida la bloquea iptables en DOCKER-USER (02_firewall.sh). Los sensores no se hablan entre
+# sí: un atacante que gane ejecución en uno no puede usarlo para llegar al otro. DOCKER-USER repite
+# ese descarte porque se evalúa antes que las reglas con que Docker implementa enable_icc.
 networks:
   honeypot_net:
     name: honeypot_net

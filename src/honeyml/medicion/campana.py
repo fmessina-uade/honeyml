@@ -1,30 +1,22 @@
 """La campaña de validación: sesiones controladas contra los sensores, con la clasificación esperada
 fijada antes de correr.
 
-El motor se mide en producción contra la revisión a ciegas del analista, pero ahí la verdad de
-referencia es un juicio humano sobre tráfico real. La campaña agrega la otra mitad: conductas cuya
-clasificación se conoce de antemano, porque las elige quien corre la prueba. Cada escenario declara
-el sensor, lo que se envía, la severidad esperada con las dos referencias (la escala del proyecto y
-el criterio de impacto del analista) y la táctica esperada con su motivo cuando es nula.
+En producción el motor se mide contra la revisión a ciegas del analista, donde la referencia es un
+juicio humano sobre tráfico real. La campaña agrega conductas cuya clasificación se conoce de
+antemano, porque las elige quien corre la prueba. Cada escenario declara el sensor, lo que se envía,
+la severidad esperada con las dos referencias (la escala del proyecto y el criterio de impacto del
+analista) y la táctica esperada, con su motivo cuando es nula. Que estén en el código y entren al
+repositorio antes de la primera corrida deja constancia de que se fijaron antes de ver el resultado.
 
-Que los escenarios estén en el código y entren al repositorio antes de la primera corrida es la
-constancia de que se fijaron antes de ver el resultado. La comparación (`--comparar`) lee después
-las decisiones de origen interno dentro de la ventana de la corrida y las enfrenta con lo esperado.
+Los escenarios se adaptan al entorno. Al motor solo llegan los eventos que publica el bus, y un
+intento fallido por SSH se indexa pero no se tría, así que la fuerza bruta va contra el sensor de
+servicios de red, que sí publica los intentos. Los sensores no tienen salida a internet, y una
+descarga apunta a una dirección de documentación, así que aunque saliera no llegaría a nadie; el
+sensor registra igual el comando y la descarga que no se concreta. El sensor de acceso remoto no
+ejecuta lo que recibe, así que se mide cómo se clasifica lo que el atacante escribe y no su efecto.
 
-Tres restricciones del entorno moldean los escenarios, y ninguna es un defecto a corregir:
-
-- Al motor solo llegan los eventos que publica el bus: autenticaciones exitosas, cualquier
-  autenticación contra el sensor de servicios de red, comandos y archivos. Un intento fallido por
-  SSH se indexa pero no se tría, así que un escenario de fuerza bruta se arma contra el sensor de
-  servicios de red, que sí publica los intentos.
-- Los sensores no tienen salida a internet. Una descarga apunta a una dirección de documentación
-  (no sale del servidor, y aunque saliera no llegaría a nadie) y el sensor la registra igual: el
-  comando como proceso y la descarga que no se concreta como archivo.
-- El sensor de acceso remoto no ejecuta de verdad lo que recibe. Se mide cómo se clasifica lo que
-  el atacante escribe, no el efecto del comando.
-
-Se corre en el servidor con `make campana`. Con `--seco` imprime los escenarios y lo esperado sin
-tocar la red; con `--comparar` lee las decisiones de la última corrida y arma la comparación.
+Se corre en el servidor con `make campana`. Con `--seco` imprime lo esperado sin tocar la red, y
+con `--comparar` enfrenta las decisiones de la última corrida con lo esperado.
 """
 
 from __future__ import annotations
@@ -55,8 +47,8 @@ CORRIDA_FILE = Path("data/processed/campana.json")
 # que cada comando de root agote el plazo entero antes de mandar el siguiente.
 INDICADOR = [re.compile(rb"[#$] $")]
 
-# Cómo cierra el ejecutor cada sesión. El sensor lo registra como un comando más, pero lo escribe la
-# campaña y no el escenario, así que la comparación lo cuenta aparte.
+# El comando con el que el ejecutor cierra cada sesión. El sensor lo registra como uno más, pero lo
+# escribe la campaña y no el escenario, así que la comparación lo cuenta aparte.
 CIERRE = "exit"
 
 # Los dos sensores, por el nombre con el que el pipeline los etiqueta.

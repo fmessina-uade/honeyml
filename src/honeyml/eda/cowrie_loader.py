@@ -39,14 +39,10 @@ def load_cowrie(
     pattern: str = "cowrie.json*",
     drop_local: bool = True,
 ) -> pd.DataFrame:
-    """Lee todos los cowrie.json* de un directorio y los junta en un DataFrame.
+    """Lee los archivos de `logs_dir` que coinciden con `pattern` y los junta en un DataFrame.
 
-    Parámetros
-    ----------
-    logs_dir : el directorio donde están los cowrie.json*.
-    pattern : qué archivos leer.
-    drop_local : si es True, descarta los eventos de direcciones internas (los healthcheck del
-        contenedor y las pruebas propias), que no son ataques.
+    Con `drop_local` se descartan los eventos de direcciones internas (los healthcheck del
+    contenedor y las pruebas propias), que no son ataques.
     """
     logs_dir = Path(logs_dir)
     rows: list[dict[str, Any]] = []
@@ -71,7 +67,7 @@ def load_cowrie(
 
 if __name__ == "__main__":
     df = load_cowrie()
-    print(f"External events loaded: {len(df):,}")
-    print(f"Time range: {df['timestamp'].min()}  ->  {df['timestamp'].max()}")
-    print(f"Unique IPs: {df['src_ip'].nunique():,}")
+    print(f"Eventos externos cargados: {len(df):,}")
+    print(f"Rango temporal: {df['timestamp'].min()} a {df['timestamp'].max()}")
+    print(f"Direcciones únicas: {df['src_ip'].nunique():,}")
     print(df["eventid"].value_counts().head(10))

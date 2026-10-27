@@ -21,8 +21,8 @@ from cowrie.shell.fs import A_TYPE, T_LINK
 
 commands = {}
 
-# El sistema simulado entero, sin bajar por los enlaces, tiene unas 29.000 entradas, así que una
-# búsqueda desde la raíz entra completa. El tope solo frena un árbol que creciera por otro lado.
+# El sistema simulado entero, sin bajar por los enlaces, no llega a treinta mil entradas, así que
+# una búsqueda desde la raíz entra completa. El tope solo frena un árbol que crezca por otro lado.
 TOPE_DE_ENTRADAS = 40000
 
 

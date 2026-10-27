@@ -191,8 +191,8 @@ def reparto_por_puerto(
 ) -> list[dict[str, Any]]:
     """Qué tácticas trae cada uno de los puertos más frecuentes del corpus.
 
-    Un puerto que aparece en cientos de miles de filas y siempre con la misma táctica no es una
-    regularidad de los ataques: es cómo estaba montado el laboratorio que grabó el corpus.
+    Un puerto que aparece en cientos de miles de filas, siempre con la misma táctica, refleja cómo
+    se montó el laboratorio que grabó el corpus antes que una regularidad de los ataques.
     """
     tabla = pd.crosstab(x[PUERTO], y)
     filas: list[dict[str, Any]] = []
@@ -266,7 +266,7 @@ def main() -> None:
     x, y = cargar()
     if args.rapido:
         x, _, y, _ = train_test_split(x, y, train_size=0.1, stratify=y, random_state=RANDOM_STATE)
-        print("  MODO RÁPIDO: submuestreado, los números son solo orientativos\n")
+        print("  Modo rápido: submuestreado, los números son solo orientativos\n")
 
     particion = partir(x, y)
     x_tr, x_te, y_tr, y_te = particion

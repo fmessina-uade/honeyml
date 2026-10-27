@@ -2,29 +2,19 @@
 
 Todo camino del grafo termina acá, incluidos los que no produjeron decisión. Un evento que llegó al
 motor y no aparece en ningún lado es peor que uno mal clasificado: el segundo se puede discutir, el
-primero no se puede ni contar. Así el panel lo muestra como no concluyente y pendiente, en vez de
-simplemente no listarlo.
+primero no se puede ni contar. Así el panel lo muestra como no concluyente y pendiente.
 
-Qué se guarda, además del nivel. La justificación y la evidencia, porque una decisión de triaje que
-no se puede releer es una opinión. El piso y el techo que la escala calculó para ese evento, así
-quien audite verifica que el nivel era defendible sin tener que recalcularlos. Los reproches, que
-cuentan si el modelo acertó de una o hubo que corregirlo. Qué modelo contestó y cuánto costó, que
-es la única forma de responder después si convino la política de escalar recién al reintentar. Y
-qué consultas del contexto fallaron, porque una decisión tomada sin el historial de la dirección
-no vale lo mismo que una tomada con él.
+Además del nivel se guardan la justificación y la evidencia, porque una decisión que no se puede
+releer es una opinión; el piso y el techo de la escala, para verificar que el nivel era defendible
+sin recalcularlos; los reproches, que cuentan si hubo que corregir al modelo; qué modelo contestó y
+cuánto costó, para evaluar la política de escalar al reintentar; y qué consultas fallaron, porque
+una decisión tomada sin el historial de la dirección no vale lo mismo. Un ciclo no concluyente o con
+consultas fallidas deja la decisión marcada para revisión, y lo que decida quien opera el panel va
+a un índice aparte, así la del motor queda intacta y se puede medir en qué se equivocó.
 
-Esas dos cosas, que el ciclo no concluya o que concluya con consultas fallidas, dejan la decisión
-marcada para revisión. La decisión final sobre esos casos la toma quien opera el panel, y queda en
-un índice aparte: la del motor no se toca, así se puede medir después en qué se equivocó.
-
-Una cosa que este nodo decide y no acepta: `concluyente`. El modo estricto del proveedor obliga al
-modelo a emitir ese campo, así que viene con un valor, pero describe cómo terminó el ciclo y no algo
-que el modelo pueda saber. Lo escribe el motor a partir de `resultado_del_ciclo`. Dejar pasar el del
-modelo permitiría una decisión válida marcada como no concluyente, o peor, un corte por esquema
-inválido que se presenta como concluyente.
-
-Si el almacén no responde, el nodo levanta. Misma regla que en contexto y en inferencia: la
-excepción sale del grafo, el consumidor no confirma, y otro lo reclama cuando Elasticsearch vuelva.
+`concluyente` lo escribe el motor a partir de `resultado_del_ciclo`, porque describe cómo terminó
+el ciclo y el modelo no puede saberlo. Si el almacén no responde, el nodo levanta, igual que
+contexto e inferencia: el consumidor no confirma y otro lo reclama cuando Elasticsearch vuelva.
 Confirmar un evento cuya decisión no se pudo guardar lo perdería para siempre, y en silencio.
 """
 

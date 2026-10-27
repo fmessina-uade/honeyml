@@ -1,7 +1,6 @@
 """La forma del grafo y el nodo de contexto, sin Elasticsearch y sin proveedor.
 
-Lo que vale la pena fijar acá no es que el código corra, sino las pocas decisiones que después es
-fácil revertir sin querer.
+Acá quedan escritas las pocas decisiones que después es fácil revertir sin querer.
 
 Una respuesta inutilizable igual llega a persistencia en vez de desaparecer. Un índice inalcanzable
 corta el ciclo en lugar de producir una decisión confiada sobre nada. Una consulta que simplemente
@@ -49,9 +48,9 @@ def _evento(**kw: Any) -> EventoDelBus:
 def _decision() -> Decision:
     """Una decisión válida para el evento de `_evento()`, que es de categoría `process`.
 
-    El nivel no es decorativo: con `MEDIO` esta decisión quedaba por debajo del piso del evento y
-    el grafo la rechaza, con razón: es exactamente el defecto que la guardia de límites existe
-    para atrapar.
+    El nivel importa: con `MEDIO` esta decisión quedaría por debajo del piso del evento y el grafo
+    la rechazaría con razón, porque es justo el defecto que la guardia de límites existe para
+    atrapar.
     """
     return Decision(
         severidad=Severidad.ALTO,
@@ -289,11 +288,11 @@ def test_una_correccion_a_tiempo_corta_el_bucle() -> None:
 
 
 def test_un_borrador_con_varios_problemas_igual_se_reintenta() -> None:
-    """La regresión que buscábamos: cuatro problemas agotaban el presupuesto sin reintentar.
+    """Un borrador con cuatro problemas gasta una sola ronda del presupuesto, no cuatro.
 
     La validación junta todos los problemas de un borrador en una sola pasada, así que una ronda
-    puede dejar cuatro reproches. Mientras el presupuesto se medía contando reproches, esa ronda se
-    leía como cuatro intentos gastados y el modelo no llegaba nunca a corregir.
+    puede dejar cuatro reproches. Si el presupuesto contara reproches, esa ronda se leería como
+    cuatro intentos gastados y el modelo no llegaría nunca a corregir.
     """
     visitados, final = _recorrer(
         {

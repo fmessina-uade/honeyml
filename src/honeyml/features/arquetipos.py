@@ -1,25 +1,20 @@
 """Arquetipos de atacante: agrupamiento no supervisado de las direcciones observadas por conducta.
 
-Las huellas de sesión ya agrupan ataques por secuencias de comandos byte a byte idénticas. Es un
-criterio estricto, así que no agrupa nada por casualidad y cada familia que encuentra es real, pero
-también significa que un carácter distinto parte una familia en dos, y no dice absolutamente nada de
-las direcciones que nunca ejecutaron un comando.
+Las huellas de sesión agrupan ataques por secuencias de comandos idénticas byte a byte. Ese criterio
+no junta nada por casualidad, pero un carácter distinto parte una familia en dos y las direcciones
+que nunca ejecutaron un comando quedan afuera. Este módulo toma las características de conducta
+calculadas por dirección (las que sobreviven a la poda por correlación) y deja que los datos marquen
+los límites, así que generaliza más allá de la coincidencia literal y cubre todas las direcciones.
 
-Esto trabaja al revés: toma las características de comportamiento calculadas por dirección, las que
-quedan después de la poda por correlación, y deja que los datos decidan dónde caen los límites.
-Generaliza más allá de la coincidencia literal y cubre todas las direcciones observadas, no solo las
-que llegaron a una consola.
+UWF-ZeekData24 trae etiquetas MITRE, pero describe flujos de red: bytes, paquetes, estado de
+conexión. Las características propias hablan de conducta (cuántas contraseñas se probaron, si se
+descargó un archivo, a qué hora y a qué ritmo), y como el conjunto de referencia no describe nada de
+eso, tampoco lo puede etiquetar. El agrupamiento no necesita etiquetas, y por eso encaja acá.
 
-Además llena un hueco que el conjunto de referencia no puede. UWF-ZeekData24 aporta etiquetas MITRE
-pero es telemetría de flujos de red: bytes, paquetes, estado de conexión. Las nuestras son de
-comportamiento: cuántas contraseñas se probaron, si se descargó un archivo, a qué hora, a qué ritmo.
-Nada en el benchmark describe eso, así que nada en el benchmark puede etiquetarlo. El agrupamiento
-no necesita etiquetas, y por eso encaja acá.
-
-Qué no es esto. Los grupos son descriptivos, no verdad de campo. No hay una clave externa que diga
-cuántos tipos de atacante existen, así que la cantidad de grupos es una elección hecha sobre un
-criterio medible y declarada como tal. Los nombres son una capa de interpretación escrita después de
-leer los perfiles, y se los rotula como interpretación en todos lados donde se muestran.
+Los grupos son descriptivos y no hay verdad de campo contra la cual medirlos: ninguna clave externa
+dice cuántos tipos de atacante existen, así que la cantidad de grupos se elige con un criterio
+medible y se declara como elección. Los nombres son una interpretación escrita después de leer los
+perfiles, y se rotulan así en todos los lugares donde se muestran.
 """
 
 from __future__ import annotations
@@ -42,12 +37,13 @@ RANDOM_STATE = 42
 # encima de 8 los grupos se vuelven demasiado chicos para describirlos con honestidad.
 KS = range(3, 9)
 
-# La silueta crece con el cuadrado de los puntos: sobre 14.000 puntos son 200 millones de pares. Se
-# calcula sobre una muestra, que es lo habitual y suficiente para comparar k entre sí.
+# La silueta crece con el cuadrado de los puntos, y con más de diez mil direcciones ya son más de
+# cien millones de pares. Se calcula sobre una muestra, que es lo habitual y alcanza para comparar
+# valores de k entre sí.
 MUESTRA_SILUETA = 5000
 
-# Cuántas características definen a cada grupo en su perfil. Con más de treinta, mostrarlas todas
-# no describe: esconde.
+# Cuántas características definen a cada grupo en su perfil. Con decenas de columnas, mostrarlas
+# todas tapa lo que distingue al grupo.
 RASGOS_POR_GRUPO = 5
 
 # Nombres legibles para las columnas, para que el perfil se pueda leer sin conocer el esquema.
@@ -113,9 +109,9 @@ def _legible(col: str) -> str:
 def elegir_k(x: np.ndarray) -> tuple[int, list[dict[str, Any]]]:
     """Elige la cantidad de grupos por silueta, y prefiere menos cuando la ganancia es marginal.
 
-    La silueta mide cuánto mejor encaja cada punto en su propio grupo que en el más cercano. No es
-    una verdad sino un criterio, pero es uno declarado, que es lo que importa: la alternativa es
-    elegir un número porque el resultado quedaba lindo.
+    La silueta mide cuánto mejor encaja cada punto en su propio grupo que en el más cercano. Es un
+    criterio, declarado de antemano, y eso es lo que importa: la alternativa es elegir un número
+    porque el resultado queda lindo.
     """
     rng = np.random.default_rng(RANDOM_STATE)
     idx = rng.choice(len(x), size=min(MUESTRA_SILUETA, len(x)), replace=False)
@@ -248,7 +244,7 @@ def main() -> None:
         ),
         encoding="utf-8",
     )
-    print(f"  Arquetipos -> {SALIDA}")
+    print(f"  Arquetipos guardados en {SALIDA}")
 
 
 if __name__ == "__main__":

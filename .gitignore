@@ -6,12 +6,11 @@ __pycache__/
 .Python
 build/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/
-# Anclados a la raíz: sin la barra también coinciden con dashboard/src/lib/ y dashboard/dist/, y
-# dejan afuera del commit el cliente de la API y la paleta del panel sin avisar.
+# Van anclados a la raíz porque, sin la barra, `lib/` también coincide con dashboard/src/lib/ y deja
+# afuera del commit, sin avisar, el cliente de la API y la paleta del panel.
 /lib/
 /lib64/
 /dist/
@@ -50,9 +49,6 @@ secrets/
 id_rsa
 id_rsa.pub
 id_ed25519
-
-# Helper local para cargar la clave SSH desde secrets
-scripts/load_ssh_key.sh
 id_ed25519.pub
 id_ecdsa
 id_ecdsa.pub
@@ -62,7 +58,10 @@ known_hosts
 ansible-vault-password
 vault_pass.txt
 
-# Docker: datos locales y overrides de entorno
+# Script local que carga la clave SSH desde secrets/
+scripts/load_ssh_key.sh
+
+# Docker: datos locales y archivos de compose que ajustan la configuración de una sola máquina
 docker-compose.override.yml
 docker-compose.local.yml
 .docker/
@@ -107,19 +106,17 @@ infra/elastic/snapshot/
 logs/
 /var/log/
 
-# Testing
+# Pruebas y cobertura
 .pytest_cache/
 .coverage
 htmlcov/
-.tox/
-.nox/
 coverage.xml
 *.cover
 *.py,cover
 junit.xml
 test-results/
 
-# Linters y type checkers
+# Caché de los linters y de mypy
 .mypy_cache/
 .dmypy.json
 dmypy.json
@@ -136,6 +133,8 @@ dmypy.json
 .settings/
 *.sublime-project
 *.sublime-workspace
+
+# Archivos que dejan macOS y Windows
 .DS_Store
 .DS_Store?
 ._*
@@ -145,91 +144,36 @@ ehthumbs.db
 Thumbs.db
 desktop.ini
 
-# Jupyter Notebooks
-.ipynb_checkpoints/
-
-# Terraform / Infraestructura como Código
-*.tfstate
-*.tfstate.backup
-.terraform/
-.terraform.lock.hcl
-terraform.tfvars
-*.auto.tfvars
-
 # Archivos de construcción y distribución
 *.tar.gz
 *.zip
 *.tar.bz2
 
-# Modelos de Machine Learning (scikit-learn, PyTorch, HuggingFace, llama.cpp)
-# Los modelos entrenados se distribuyen por otros medios (DVC, S3, HF Hub, etc.)
-# scikit-learn / joblib
+# Los modelos y arreglos serializados no se versionan: el supervisado se regenera con
+# `make modelo`, que lo exporta a models/ junto con su tarjeta.
 *.pkl
 *.pickle
 *.joblib
-# PyTorch
-*.pt
-*.pth
-# TensorFlow / Keras
-*.h5
-*.hdf5
-*.keras
-# ONNX (formato de intercambio entre frameworks)
-*.onnx
-# HuggingFace Safetensors (modelos grandes tipo LLM)
-*.safetensors
-# llama.cpp / Ollama (modelos cuantizados locales)
-*.gguf
-*.ggml
-*.bin
-# Numpy arrays (embeddings, features)
 *.npy
 *.npz
-# Directorios de modelos y checkpoints
 models/
-checkpoints/
-model_cache/
-hf_cache/
-.cache/huggingface/
 
-# Bases de datos vectoriales (RAG, búsqueda semántica)
-# ChromaDB
-chroma/
-chromadb/
-# FAISS
-*.faiss
-faiss_index/
-# LanceDB
-lancedb/
-# Qdrant local
-qdrant_storage/
-
-# LangGraph y LangChain: estado persistido y trazas
-# LangGraph checkpoints (SQLite local de estado de agentes)
-langgraph.db
-*.langgraph.db
-# LangSmith trazas locales
-langsmith/
-
-# Datasets y datos de entrenamiento
+# Conjuntos de datos
 data/raw/
 data/processed/
 data/external/
-# Lo que `make respaldar-decisiones` trae del servidor. Son decisiones con direcciones, comandos y
-# credenciales de atacantes: se respaldan, pero no se publican.
-data/respaldos/
 *.csv
 *.parquet
 *.arrow
-
-# Figuras generadas por el EDA (reproducibles con src/honeyml/eda/honeypot_eda.py)
-reports/figures/
 *.jsonl.gz
+# Las decisiones que `make respaldar-decisiones` baja del servidor llevan direcciones, comandos y
+# credenciales de atacantes: se respaldan, pero no se publican.
+data/respaldos/
 
-# Artefactos de CI/CD locales
-.act/
+# Figuras del análisis exploratorio, que se regeneran con src/honeyml/eda/honeypot_eda.py
+reports/figures/
 
-# Referencia a IP del VPS (no exponer en repo público)
+# Dirección y dominio del VPS, que no se publican
 .vps_ip
 .domain
 infra/vps/.env
@@ -240,7 +184,7 @@ docs/
 informe/
 contexto.md
 
-# Frontend (dashboard educativo)
+# Panel educativo: dependencias y compilación
 node_modules/
 dashboard/dist/
 .vite/

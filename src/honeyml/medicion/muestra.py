@@ -9,9 +9,9 @@ falso positivo y a falso negativo, y entran enteros si son chicos.
 
 La unidad es la conducta y no la decisión, porque todas las decisiones de una conducta comparten la
 misma clasificación: revisar dos veces la misma no agrega nada. La conducta se recalcula con la
-firma vigente, sobre el usuario y el comando completos del evento. Las decisiones viejas de un
-cargador que escribe un binario de a trozos se tomaron cuando cada trozo era una firma aparte, y
-sin recalcular, ese cargador se llevaría cientos de lugares de la muestra.
+firma vigente, sobre el usuario y el comando completos del evento, porque una decisión guardada
+puede venir de una firma anterior: con una firma por trozo, un cargador que escribe un binario de a
+trozos se llevaría cientos de lugares de la muestra.
 
 Se corre en el servidor, que es donde está el índice, con `make muestra`. Con `--seco` muestra los
 estratos sin escribir nada.

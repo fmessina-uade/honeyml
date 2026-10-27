@@ -55,8 +55,8 @@ TOPE_SIN_CONFIRMAR = 2000
 # Tokens de una llamada típica. Sirven para estimar el gasto antes de arrancar, no para
 # contabilizarlo: lo real lo lleva el adaptador y queda guardado en cada decisión.
 #
-# Salen de corridas contra datos reales y no de una cuenta a ojo. Una estimación que se queda corta
-# es el peor error para una guardia pensada justamente para avisar antes de gastar.
+# Salen de corridas contra datos reales, porque una estimación que se queda corta es el peor error
+# para una guardia pensada justamente para avisar antes de gastar.
 TOKENS_TIPICOS = (2545, 980)
 
 # Cada cuánto reintenta el motor cuando el proveedor se quedó sin saldo. Cinco minutos alcanzan para

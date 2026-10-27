@@ -1,27 +1,22 @@
 """Qué puede consultar el motor de triaje mientras razona sobre un evento.
 
 El mensaje del bus trae el disparador y nada más: una línea que dice que una dirección ejecutó un
-comando. Para saber si eso importa hacen falta las circunstancias, y estas son las consultas que las
-responden: si esa dirección ya estuvo antes, qué más hizo en la misma sesión, si la secuencia es una
-que el corpus ya vio mil veces.
+comando. Para saber si eso importa hacen falta las circunstancias, y estas consultas las responden:
+si esa dirección ya estuvo antes, qué más hizo en la misma sesión, si la secuencia es una que el
+corpus ya vio mil veces.
 
-Hay tres propiedades y las tres sostienen algo.
+Todas son de solo lectura y no salen de los datos del propio proyecto, porque la entrada es texto
+controlado por el atacante: un comando capturado puede incluir instrucciones dirigidas a quien lo
+lea, y entra al contexto del modelo por diseño. Un motor cuya caja de herramientas son puras
+consultas no puede ser convencido de hacer daño, porque no hay daño disponible; lo que actúe sobre
+el mundo va afuera de este módulo y detrás de una persona. Cada consulta tiene un tope (las
+constantes de abajo), porque una sesión puede correr más de mil comandos y entregada entera
+desplazaría al resto del contexto, que además se paga por token.
 
-Son de solo lectura. Nada de acá escribe, borra ni sale de los datos del propio proyecto. No es
-prolijidad: la entrada es texto controlado por el atacante. Un comando capturado por el señuelo
-puede decir cualquier cosa, incluidas instrucciones dirigidas a lo que sea que lo lea, y entra al
-contexto del modelo por diseño. Un motor cuya caja de herramientas son puras consultas no puede ser
-convencido de hacer daño, porque no hay daño disponible. Lo que actúe sobre el mundo va afuera de
-este módulo y detrás de una persona.
-
-Son acotadas. Cada consulta tiene tope. Una sesión del corpus corrió 1.400 comandos, y entregada
-entera desplazaría al resto del contexto y se paga por token. Los topes son las constantes de abajo.
-
-Y están cortadas en la marca temporal del propio evento. Historial significa lo que se sabía antes
-de este evento, no todo lo que hay en el índice al consultar. Sin el corte, el motor juzga un evento
-temprano con evidencia posterior, puntúa mejor de lo que jamás podría en vivo, y la campaña de
-validación adversaria termina midiendo un sistema que no puede existir. El horizonte es parámetro
-obligatorio de toda consulta histórica.
+Toda consulta histórica corta en la marca temporal del propio evento, y el horizonte es un parámetro
+obligatorio. Historial es lo que se sabía antes de este evento: sin el corte, el motor juzgaría un
+evento temprano con evidencia posterior y la campaña de validación mediría un sistema que no puede
+existir.
 """
 
 from __future__ import annotations
@@ -169,7 +164,7 @@ def familia_de_la_sesion(comandos: list[str]) -> dict[str, Any] | None:
 
     La coincidencia es byte a byte, el mismo criterio estricto con el que se armaron las familias.
     Que algo se parezca mucho no cuenta como coincidencia, y es a propósito: el valor de esta
-    consulta es que un acierto significa "otras 5.514 sesiones hicieron exactamente esto", y una
+    consulta es que un acierto significa "miles de otras sesiones hicieron exactamente esto", y una
     coincidencia difusa no significaría eso.
     """
     if not comandos:
@@ -288,8 +283,8 @@ def rafaga_en_la_ventana(
     if not desde:
         return {"disponible": False, "motivo": "el evento no trae marca temporal utilizable"}
 
-    # La ventana termina en el evento, no en ahora: ver el encabezado del módulo. Contar lo que pasó
-    # después sería preguntarle al futuro si esto era una campaña.
+    # La ventana termina en el evento y no al consultar (ver el encabezado del módulo). Contar lo
+    # que pasó después sería preguntarle al futuro si esto era una campaña.
     ventana: list[dict[str, Any]] = [
         {"range": {"@timestamp": {"gte": desde, "lt": evento.timestamp}}}
     ]
@@ -395,8 +390,8 @@ def arquetipos_del_corpus() -> dict[str, Any] | None:
     """La línea base de la población: cómo se reparten por conducta las direcciones observadas.
 
     No habla de este evento sino de todos, que es justamente lo que lo hace útil. "Ejecutó comandos
-    y entró" se lee como algo común hasta que uno sabe que solo el 1,5 % de las direcciones llega
-    ahí. Es el denominador el que convierte una observación en una severidad.
+    y entró" se lee como algo común hasta que uno sabe que solo una fracción mínima de las
+    direcciones llega ahí. Es el denominador el que convierte una observación en una severidad.
     """
     datos = arquetipos.load()
     if datos is None:

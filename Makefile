@@ -18,20 +18,20 @@ SSH_KEY      ?= ~/.ssh/honeyml_ed25519_v2
 
 help:
 	@echo ""
-	@echo "  HoneyML - Comandos de infraestructura"
+	@echo "  HoneyML, comandos de infraestructura"
 	@echo ""
 	@echo "  Calidad y validación:"
 	@echo "    make validate  Validación completa: config, contenedores, conectividad"
 	@echo "    make lint      Linting: shellcheck, yamllint, Python (ruff + mypy)"
-	@echo "    make test      Tests unitarios con pytest (Fases 2 y 3)"
+	@echo "    make test      Pruebas unitarias con pytest, sin las de integración"
 	@echo ""
 	@echo "  Desarrollo local (puertos seguros, sin tocar el sistema):"
 	@echo "    make dev-up    Levantar honeypots en local (Cowrie:2222, Dionaea:8080)"
 	@echo "    make dev-down  Detener entorno local"
-	@echo "    make dev-logs  Ver logs del entorno local"
+	@echo "    make dev-logs  Ver los registros del entorno local"
 	@echo ""
-	@echo "  Pipeline de datos (Fase 2 - Elastic Stack + ECS):"
-	@echo "    make pull-logs        Bajar logs reales del VPS a data/logs/"
+	@echo "  Pipeline de datos (Elastic Stack y ECS):"
+	@echo "    make pull-logs        Bajar los registros reales del VPS a data/logs/"
 	@echo "    make elastic-dev-up   Levantar Elasticsearch, Logstash y Filebeat en local"
 	@echo "    make elastic-dev-down Detener el stack local"
 	@echo "    make es-bootstrap     Aplicar plantilla componible ECS a Elasticsearch"
@@ -72,43 +72,43 @@ help:
 	@echo ""
 	@echo "  Variables:"
 	@echo "    VPS_IP    IP del VPS de DigitalOcean (o definir en .vps_ip)"
-	@echo "    SSH_PORT  Puerto SSH admin (default: 2200)"
-	@echo "    SSH_USER  Usuario SSH (default: honeyml)"
+	@echo "    SSH_PORT  Puerto SSH de administración (por defecto, 2200)"
+	@echo "    SSH_USER  Usuario SSH (por defecto, honeyml)"
 	@echo ""
 
-# quality & validation
+# calidad y validación
 
 validate:
 	@/bin/bash scripts/validate_local.sh
 
 lint:
-	@echo "--- shellcheck ---"
+	@echo "shellcheck:"
 	@# -S warning: los scripts de verificación usan `comando && ok ... || fallo ...` a propósito,
-	@# y shellcheck lo marca como nota de estilo (SC2015). Con el umbral por defecto la puerta
-	@# quedaba siempre en rojo por doce avisos cosméticos, que es la forma más segura de que nadie
-	@# vuelva a mirarla. Los errores y advertencias reales siguen deteniendo la corrida.
+	@# y shellcheck lo marca como nota de estilo (SC2015). Con el umbral por defecto la puerta queda
+	@# en rojo por avisos cosméticos, y una puerta siempre en rojo deja de mirarse. Los errores y las
+	@# advertencias de verdad detienen la corrida igual.
 	@if command -v shellcheck >/dev/null 2>&1; then \
 		shellcheck -S warning infra/vps/scripts/*.sh scripts/validate_local.sh && echo "  shellcheck OK"; \
 	else \
 		echo "  shellcheck no instalado (brew install shellcheck)"; \
 	fi
-	@echo "--- yamllint ---"
+	@echo "yamllint:"
 	@if command -v yamllint >/dev/null 2>&1; then \
 		yamllint infra/honeypots/docker-compose.yml infra/honeypots/docker-compose.dev.yml \
 			infra/analisis/docker-compose.yml && echo "  yamllint OK"; \
 	else \
 		echo "  yamllint no instalado (pip install yamllint)"; \
 	fi
-	@# Se usan los ejecutables del entorno del proyecto, no los del PATH: nadie activa el entorno
-	@# para correr make, y buscarlos en el PATH hacía que la comprobación se saltara en silencio
-	@# aunque estuvieran instalados.
-	@echo "--- ruff (Python) ---"
+	@# Se usan los ejecutables del entorno del proyecto y no los del PATH: nadie activa el entorno
+	@# para correr make, y buscados en el PATH la comprobación se saltearía en silencio aunque
+	@# estuvieran instalados.
+	@echo "ruff (Python):"
 	@if [ -x ./.venv/bin/ruff ]; then \
 		./.venv/bin/ruff check src/ scripts/ tests/ && ./.venv/bin/ruff format --check src/ scripts/ tests/; \
 	else \
 		echo "  ruff no instalado (pip install -e \".[dev]\")"; \
 	fi
-	@echo "--- mypy (tipos Python) ---"
+	@echo "mypy (tipos de Python):"
 	@if [ -x ./.venv/bin/mypy ]; then \
 		./.venv/bin/mypy src/; \
 	else \
@@ -116,12 +116,10 @@ lint:
 	fi
 
 test:
-	@# Sin `|| echo`: una suite que falla tiene que detener la corrida. Antes cualquier fallo se
-	@# convertía en "Sin tests todavía" y make devolvía éxito, con lo que la verificación existía
-	@# en el Makefile pero no en la práctica.
-	@# Las de integración quedan fuera por defecto: piden los sensores escuchando en la máquina
-	@# local, y los sensores viven en el servidor. Están marcadas desde que se escribieron, pero el
-	@# Makefile nunca usó la marca, así que corrían siempre y fallaban siempre.
+	@# Una suite que falla detiene la corrida: con un `|| echo` al final, make devolvería éxito
+	@# aunque fallara.
+	@# Las pruebas de integración quedan fuera: piden los sensores escuchando en la máquina local,
+	@# y los sensores viven en el servidor. Se corren aparte con `make test-integration`.
 	@if [ -x ./.venv/bin/pytest ]; then \
 		./.venv/bin/pytest tests/ -v --tb=short -m "not integration"; \
 	else \
@@ -137,12 +135,12 @@ dev-up:
 	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_DEV) up -d
 	@echo ""
 	@echo "Honeypots locales iniciados:"
-	@echo "  Cowrie SSH    -> ssh -p 2222 -o StrictHostKeyChecking=no root@localhost"
-	@echo "  Cowrie Telnet -> telnet localhost 2323"
-	@echo "  Dionaea HTTP  -> curl http://localhost:8080"
-	@echo "  Dionaea SMB   -> localhost:4445"
+	@echo "  Cowrie SSH:     ssh -p 2222 -o StrictHostKeyChecking=no root@localhost"
+	@echo "  Cowrie Telnet:  telnet localhost 2323"
+	@echo "  Dionaea HTTP:   curl http://localhost:8080"
+	@echo "  Dionaea SMB:    localhost:4445"
 	@echo ""
-	@echo "Logs: make dev-logs"
+	@echo "Para ver los registros: make dev-logs"
 
 dev-down:
 	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_DEV) down --remove-orphans
@@ -150,7 +148,7 @@ dev-down:
 dev-logs:
 	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_DEV) logs -f --tail=50
 
-# production (VPS)
+# producción (VPS)
 
 up:
 	docker compose -f $(COMPOSE_FILE) up -d
@@ -166,13 +164,13 @@ ps:
 	docker compose -f $(COMPOSE_FILE) ps
 
 status:
-	@echo "=== Contenedores ==="
+	@echo "Contenedores:"
 	@docker compose -f $(COMPOSE_FILE) ps 2>/dev/null || echo "Docker Compose no disponible"
 	@echo ""
-	@echo "=== Red honeypot_net ==="
+	@echo "Red honeypot_net:"
 	@docker network inspect honeypot_net 2>/dev/null | grep -E '"Name"|"IPv4Address"' || echo "Red no creada"
 	@echo ""
-	@echo "=== Últimas entradas Cowrie ==="
+	@echo "Últimas entradas de Cowrie:"
 	@docker exec cowrie cat /cowrie/cowrie-git/var/log/cowrie/cowrie.log 2>/dev/null | tail -5 || echo "Contenedor cowrie no activo"
 
 clean:
@@ -181,14 +179,14 @@ clean:
 
 # Lleva al servidor el último commit. El servidor no guarda credenciales de GitHub: la máquina que
 # recibe ataques no tiene con qué leer el repositorio. Se despliega lo commiteado y nada más, así lo
-# que corre allá siempre corresponde a un commit. --delete saca lo que ya no está en el repositorio,
-# salvo lo que solo existe en el servidor: las claves en los .env y los artefactos de data/.
+# que corre allá siempre corresponde a un commit. --delete saca del servidor lo que falta en el
+# repositorio, salvo lo que solo existe allá: las claves en los .env y los artefactos de data/.
 deploy-vps:
 ifndef VPS_IP
 	$(error VPS_IP no definido. Crear archivo .vps_ip o exportar: export VPS_IP=<ip>)
 endif
 	@if [ -n "$$(git status --porcelain)" ]; then \
-		echo "Aviso: hay cambios sin commitear, y no se despliegan."; \
+		echo "Hay cambios sin commitear: no se despliegan, solo va lo commiteado."; \
 	fi
 	@# mktemp crea el directorio con 700, y rsync le copiaría ese permiso a la raíz del repositorio en
 	@# el servidor: el usuario de administración dejaría de poder leerlo.
@@ -243,9 +241,9 @@ elastic-dev-up:
 	docker compose --env-file infra/elastic/.env -f $(ELASTIC_FILE) -f $(ELASTIC_DEV) up -d filebeat
 	@echo ""
 	@echo "Elastic Stack local iniciado:"
-	@echo "  Elasticsearch -> http://localhost:9200"
+	@echo "  Elasticsearch en http://localhost:9200"
 	@echo ""
-	@echo "Siguiente: make validate-indexing"
+	@echo "Para validar la indexación: make validate-indexing"
 
 elastic-dev-down:
 	docker compose -f $(ELASTIC_FILE) -f $(ELASTIC_DEV) down --remove-orphans
@@ -255,9 +253,9 @@ elastic-dev-logs:
 
 elastic-up:
 	@if [ ! -f infra/elastic/.env ]; then cp infra/elastic/.env.example infra/elastic/.env; fi
-	@# El orden importa. La plantilla ECS va antes que Filebeat, así los índices salen con los tipos
-	@# correctos. Y el bus va antes que Logstash: un evento que no se logra publicar se indexa igual,
-	@# marcado con _bus_publish_failed, pero el motor no lo recibe nunca.
+	@# La plantilla ECS va antes que Filebeat para que los índices salgan con los tipos correctos, y
+	@# el bus va antes que Logstash: un evento que no se logra publicar se indexa igual, marcado con
+	@# _bus_publish_failed, pero el motor no lo recibe nunca.
 	docker compose --env-file infra/elastic/.env -f $(ELASTIC_FILE) up -d elasticsearch
 	@ES_URL=http://localhost:9200 bash infra/elastic/scripts/es_bootstrap.sh
 	@$(MAKE) --no-print-directory bus-up
@@ -279,7 +277,7 @@ validate-indexing:
 
 # salida compacta para capturas de pantalla: sin lista de índices por día, direcciones ni usuarios.
 # Con HASTA cuenta solo hasta ese instante, para reproducir un corte de cifras.
-#   make validate-indexing-resumen HASTA=2026-10-03T22:00:59Z
+#   make validate-indexing-resumen HASTA=AAAA-MM-DDTHH:MM:SSZ
 validate-indexing-resumen:
 	@python3 infra/elastic/scripts/validate_indexing.py --es-url $${ES_URL:-http://localhost:9200} --resumen $(if $(HASTA),--hasta $(HASTA),)
 
@@ -518,13 +516,13 @@ clasificar:
 # No levanta el stack: primero hay que correr `make elastic-dev-up`. Mantenerlos separados hace que
 # un refresh no pueda levantar contenedores que uno no esperaba, y en silencio.
 refresh:
-	@echo "==> 1/3  Descargando registros de los sensores"
+	@echo "[1/3] Descargando registros de los sensores"
 	@$(MAKE) --no-print-directory pull-logs
 	@echo ""
-	@echo "==> 2/3  Esperando a que el pipeline ingiera lo nuevo"
+	@echo "[2/3] Esperando a que el pipeline ingiera lo nuevo"
 	@./.venv/bin/python scripts/wait_for_ingest.py
 	@echo ""
-	@echo "==> 3/3  Regenerando artefactos derivados"
+	@echo "[3/3] Regenerando artefactos derivados"
 	@$(MAKE) --no-print-directory artifacts
 
 # Telemetría consolidada: el primer eslabón de la cadena de artefactos derivados.
@@ -536,13 +534,11 @@ features:
 	@./.venv/bin/python -m honeyml.features.build_features
 	@./.venv/bin/python -m honeyml.features.command_encoding
 
-# Todo lo que lee del índice o de la tabla consolidada. El orden importa:
-# `consolidate` produce la tabla de la que dependen tanto la ingeniería de características como la
-# serie horaria, y `arquetipos` necesita las características ya calculadas.
-#
-# `arquetipos` faltaba en esta lista: una regeneración dejaba la tabla de características nueva y el
-# agrupamiento viejo, así que la sección de tipos de atacante mostraba números de otro corpus que el
-# resto del panel.
+# Todo lo que lee del índice o de la tabla consolidada. El orden importa: `consolidate` produce la
+# tabla de la que dependen tanto la ingeniería de características como la serie horaria, y
+# `arquetipos` necesita las características ya calculadas. Si quedara fuera de la lista, una
+# regeneración dejaría las características nuevas y el agrupamiento viejo, y la sección de tipos de
+# atacante mostraría números de otro corpus que el resto del panel.
 artifacts: consolidate features snapshot serie-horaria replays fingerprints passwords arquetipos
 	@echo ""
 	@echo "Artefactos al día."

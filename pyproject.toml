@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "honeyml"
 version = "0.1.0"
-description = "HoneyML - open-source threat intelligence platform: honeypots + Agentic AI"
+description = "HoneyML, plataforma open source de inteligencia de amenazas con honeypots e IA agéntica"
 # 3.12 es lo que corre en todos lados: el servidor (Ubuntu 24.04 trae 3.12.3), el entorno de
 # desarrollo, el hook de pre-commit y CI. Declarar una versión que no corre en ningún lado deja a la
 # verificación de tipos sin poder correr localmente.
@@ -39,7 +39,7 @@ agent = [
     # y recibirlo arrastrado por otra dependencia es una forma frágil de depender.
     "certifi>=2024.2",
 ]
-# Herramientas de verificación. Instalar con: pip install -e ".[dev]"
+# Herramientas de verificación. Se instala con: pip install -e ".[dev]"
 # Van como dependencia y no solo en la configuración de pytest y ruff: sin instalarlas, `make test`
 # responde "pytest no instalado" y la suite no corre.
 dev = [

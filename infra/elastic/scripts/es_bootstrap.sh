@@ -7,7 +7,7 @@ ES_URL="${ES_URL:-http://localhost:9200}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATE_FILE="${SCRIPT_DIR}/../templates/honeypot-ecs-template.json"
 
-echo "==> Esperando a Elasticsearch en ${ES_URL} ..."
+echo "Esperando a Elasticsearch en ${ES_URL}"
 for i in $(seq 1 30); do
   if curl -sf "${ES_URL}/_cluster/health" >/dev/null 2>&1; then
     break
@@ -19,12 +19,12 @@ for i in $(seq 1 30); do
   fi
 done
 
-echo "==> Aplicando plantilla componible honeypot-ecs ..."
+echo "Aplicando la plantilla componible honeypot-ecs"
 curl -sf -X PUT "${ES_URL}/_index_template/honeypot-ecs" \
   -H 'Content-Type: application/json' \
   --data-binary "@${TEMPLATE_FILE}" >/dev/null
 
-echo "==> Plantilla aplicada. Verificación:"
+echo "Plantilla aplicada, así la devuelve Elasticsearch:"
 curl -sf "${ES_URL}/_index_template/honeypot-ecs" \
   | python3 -c "import sys,json; t=json.load(sys.stdin)['index_templates'][0]; print('    nombre:', t['name']); print('    patrones:', t['index_template']['index_patterns']); print('    prioridad:', t['index_template']['priority'])"
 
@@ -32,7 +32,7 @@ curl -sf "${ES_URL}/_index_template/honeypot-ecs" \
 # en índices propios con mapeo estricto, uno por tipo de documento, y se aplican igual.
 for nombre in honeyml-decisiones honeyml-revisiones honeyml-usuarios honeyml-auditoria; do
   plantilla="${SCRIPT_DIR}/../templates/${nombre}-template.json"
-  echo "==> Aplicando plantilla componible ${nombre} ..."
+  echo "Aplicando la plantilla componible ${nombre}"
   curl -sf -X PUT "${ES_URL}/_index_template/${nombre}" \
     -H 'Content-Type: application/json' \
     --data-binary "@${plantilla}" >/dev/null
@@ -44,7 +44,7 @@ for nombre in honeyml-decisiones honeyml-revisiones honeyml-usuarios honeyml-aud
   # Elasticsearch rechaza el documento, con el evento ya sacado del bus. Agregar campos a un mapeo
   # vivo sí está permitido; cambiar el tipo de uno existente no, y ahí conviene que falle fuerte.
   if curl -sf -o /dev/null "${ES_URL}/${nombre}"; then
-    echo "    el índice ya existe: sincronizando su mapeo ..."
+    echo "    el índice ya existe: sincronizando su mapeo"
     python3 -c "import sys,json; print(json.dumps({'properties': json.load(open(sys.argv[1]))['template']['mappings']['properties']}))" \
       "${plantilla}" \
       | curl -sf -X PUT "${ES_URL}/${nombre}/_mapping" \
@@ -54,4 +54,4 @@ for nombre in honeyml-decisiones honeyml-revisiones honeyml-usuarios honeyml-aud
   fi
 done
 
-echo "==> Bootstrap completo."
+echo "Plantillas aplicadas."

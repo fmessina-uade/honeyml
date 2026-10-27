@@ -360,7 +360,7 @@ def _sin_esperas(monkeypatch: pytest.MonkeyPatch) -> None:
     """La espera del retroceso no se cumple en las pruebas.
 
     Lo que se verifica es cuántos viajes hace, no cuánto duerme entre ellos. Sin esto, estas cuatro
-    pruebas le agregaban dos segundos a cada corrida de la suite completa.
+    pruebas le agregarían dos segundos a cada corrida de la suite completa.
     """
     monkeypatch.setattr(almacen_mod.time, "sleep", lambda _segundos: None)
 

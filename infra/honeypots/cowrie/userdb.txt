@@ -1,11 +1,10 @@
 # userdb.txt de Cowrie: las credenciales que el sensor acepta.
-# Cada linea va como usuario:x:contrasena. El segundo campo no se usa y queda en x.
-# Un ! adelante de la contrasena la rechaza, y un * vale para cualquier usuario o contrasena.
-# Va en ASCII puro, sin tildes ni enies, porque Cowrie lo lee con el codec ascii.
+# Cada entrada va con la forma usuario:x:clave. El segundo campo no se usa y queda en x.
+# Un ! adelante de la clave la rechaza, y un * vale para cualquier usuario o clave.
+# Va en ASCII puro, sin acentos, porque Cowrie lo lee con el codec ascii.
 #
-# Son credenciales debiles y por defecto, las que mas aparecen en los intentos de fuerza bruta.
+# Son claves por defecto o triviales, las que se repiten en los intentos de fuerza bruta.
 # No abren nada real: solo dejan entrar a la consola emulada de Cowrie.
-# Cowrie never grants real access to the host system.
 
 root:x:root
 root:x:123456

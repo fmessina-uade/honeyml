@@ -1,16 +1,12 @@
-"""
-Tests de integración (smoke tests) para el stack de honeypots.
+"""Pruebas de humo de los sensores, contra los contenedores corriendo (make dev-up).
 
-Requieren que los contenedores estén corriendo (make dev-up).
-Ejecutar con: pytest tests/integration/ -v -m integration
+Se corren con `pytest tests/integration/ -v -m integration`. Llevan la marca `integration` para que
+CI, que no tiene Docker, las deje afuera corriendo solo `pytest tests/unit/ -v`.
 
-Marcados con @pytest.mark.integration para poder saltearse en CI
-sin Docker (pytest tests/unit/ -v).
-
-Si los sensores no están levantados en esta máquina, se saltean en lugar de fallar. La distinción
-importa: un sensor apagado es una precondición que no se cumple, no un defecto. Como los sensores
-viven en el servidor, fallar dejaría la suite de integración en rojo permanente por un motivo que no
-es un problema, y una puerta que siempre está roja deja de mirarse.
+Si los sensores no están levantados en esta máquina, se saltean en lugar de fallar: un sensor
+apagado es una precondición que no se cumple, y no un defecto. Como los sensores viven en el
+servidor, fallar dejaría la suite de integración en rojo permanente por algo que no es un problema,
+y una puerta que siempre está roja deja de mirarse.
 """
 
 import socket

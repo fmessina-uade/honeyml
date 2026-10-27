@@ -184,13 +184,8 @@ def load_events(
 ) -> pd.DataFrame:
     """Trae todos los eventos del índice a un DataFrame con las columnas ECS aplanadas.
 
-    Parámetros
-    ----------
-    es_url : URL base de Elasticsearch.
-    index : patrón de índice (honeypot-*, honeypot-cowrie-*, ...).
-    fields : campos ECS a traer; si no se pasan, DEFAULT_FIELDS.
-    page_size : tamaño de página del scroll.
-    max_docs : tope opcional de documentos, cómodo para pruebas rápidas.
+    `index` es un patrón como honeypot-* o honeypot-cowrie-*. Sin `fields` se traen los de
+    DEFAULT_FIELDS, y `max_docs` pone un tope opcional de documentos, cómodo para pruebas rápidas.
     """
     df: pd.DataFrame = load_table(es_url, index, fields, page_size, max_docs).to_pandas()
     return df
@@ -205,7 +200,7 @@ def main() -> None:
     pq.write_table(tabla, OUT_FILE)
 
     size_mb = OUT_FILE.stat().st_size / 1024 / 1024
-    print(f"Telemetría consolidada -> {OUT_FILE} ({size_mb:.0f} MB)")
+    print(f"Telemetría consolidada en {OUT_FILE} ({size_mb:.0f} MB)")
     print(f"  {tabla.num_rows:,} eventos, {tabla.num_columns} columnas".replace(",", "."))
     marcas = tabla.column("@timestamp").to_pandas()
     print(f"  ventana {marcas.min():%Y-%m-%d} a {marcas.max():%Y-%m-%d}")

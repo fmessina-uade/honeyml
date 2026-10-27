@@ -1,10 +1,10 @@
 name: CI
 
-# Corre en cada push y cada PR contra main. Mantiene honestas la infraestructura y las
-# configuraciones antes de que lleguen al VPS.
-# Cubre: linting de shell, yaml y compose, pruebas unitarias de Python, formato y tipos, y chequeos
-# de cordura sobre la configuración de los honeypots.
-# No cubre: las pruebas de integración, que necesitan Docker y sensores vivos.
+# Corre en cada push a main o develop y en cada PR contra main, para que una configuración rota de
+# los sensores o del pipeline aparezca antes de llegar al VPS. Revisa los scripts de shell, los
+# archivos YAML y los de compose, corre las pruebas unitarias, controla el formato y los tipos del
+# código Python y busca las trampas conocidas de la configuración de los honeypots. Las pruebas de
+# integración quedan afuera porque necesitan los sensores corriendo en Docker.
 
 on:
   push:
@@ -13,26 +13,26 @@ on:
     branches: [main]
 
 jobs:
-  # todo lo que no es Python: scripts de shell, yaml, archivos de compose
+  # todo lo que no es Python; el formato y los tipos de Python los revisa `quality`
   lint:
-    name: Lint
+    name: Lint de shell, YAML y compose
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: shellcheck (VPS scripts)
+      - name: shellcheck de los scripts del VPS
         uses: ludeeus/action-shellcheck@master
         with:
           scandir: ./infra/vps/scripts
           severity: warning
 
-      - name: shellcheck (project scripts)
+      - name: shellcheck de los scripts del proyecto
         uses: ludeeus/action-shellcheck@master
         with:
           scandir: ./scripts
           severity: warning
 
-      - name: shellcheck (Elastic Stack scripts)
+      - name: shellcheck de los scripts del Elastic Stack
         uses: ludeeus/action-shellcheck@master
         with:
           scandir: ./infra/elastic/scripts
@@ -51,7 +51,7 @@ jobs:
             infra/elastic/logstash/config/logstash.yml \
             .github/workflows/ci.yml
 
-      - name: compose files parse
+      - name: Archivos de compose válidos
         run: |
           docker compose \
             -f infra/honeypots/docker-compose.yml \
@@ -66,53 +66,51 @@ jobs:
             -f infra/elastic/docker-compose.dev.yml \
             config --quiet
 
-  # python unit tests, no Docker needed
+  # pruebas unitarias de Python, que no necesitan Docker
   unit-tests:
-    name: Unit Tests
+    name: Pruebas unitarias
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
+      - name: Preparar Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
 
-      # El proyecto con los extras que las pruebas importan de verdad, no solo pytest.
-      #
+      # Con pytest suelto, una prueba que importa el paquete falla por una dependencia faltante
+      # antes de llegar al código, así que se instala el proyecto con los extras que la suite usa.
       # `[agent]` trae langgraph, redis y pydantic; `[analysis]` trae numpy, pandas y scikit-learn,
-      # que entran por la cadena `agent/tools.py` a `features/arquetipos.py`; `[api]` trae FastAPI,
-      # que usan las pruebas de la API con su cliente de pruebas. Con pytest suelto, una prueba que
-      # importe el paquete falla por dependencias faltantes y no por el código. Las versiones son las
-      # mismas que corren en producción, así lo que se prueba es lo que se despliega.
-      - name: install
+      # que entran por la cadena de `agent/tools.py` a `features/arquetipos.py`; `[api]` trae
+      # FastAPI, de donde sale el cliente que usan las pruebas de la API. El archivo que va con
+      # `-c` fija las mismas versiones que corren en producción, así lo que se prueba es lo que se
+      # despliega.
+      - name: Instalar el proyecto con sus extras
         run: pip install -e ".[agent,analysis,api,dev]" -c infra/analisis/versiones.txt
 
       - name: pytest
         run: pytest tests/unit/ -v --tb=short
 
-  # Formato y tipos. El hook de pre-commit se puede saltear con --no-verify: sin este job, un commit
-  # sin verificar entraría a main sin que nada lo revise.
+  # El hook de pre-commit revisa el formato y los tipos, pero se puede saltear con
+  # `git commit --no-verify`. Este job los vuelve a revisar en cada push y en cada PR, así un commit
+  # que se salteó el hook igual queda revisado.
   quality:
-    name: Lint Python
+    name: Formato y tipos de Python
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
+      - name: Preparar Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
 
-      # Todos los extras que usa src/, para que mypy vea los mismos tipos que ve en local.
-      #
-      # Sin `[agent]` no hay langgraph, y entonces el grafo se verifica contra un módulo que mypy
-      # no puede leer: la puerta dice verificar tipos y verifica menos que la máquina de quien
-      # escribe. Con los extras completos, esto y `make lint` dan el mismo veredicto. Con las mismas
-      # versiones que producción.
-      - name: install
+      # Se instalan todos los extras que usa src/ para que mypy vea los mismos tipos que en local.
+      # Sin `[agent]` falta langgraph, el grafo se verifica contra un módulo que mypy no puede leer
+      # y el job termina revisando menos que `make lint`. Las versiones son las de producción.
+      - name: Instalar el proyecto con sus extras
         run: pip install -e ".[agent,analysis,api,dev]" types-requests -c infra/analisis/versiones.txt
 
       - name: ruff
@@ -120,36 +118,36 @@ jobs:
           ruff check src/ scripts/ tests/
           ruff format --check src/ scripts/ tests/
 
-      # Sin `--ignore-missing-imports` en la línea: ya está en [tool.mypy] de pyproject.toml, y
-      # repetirlo acá invitaba a que las dos configuraciones se separaran sin que nadie lo notara.
+      # La línea no repite `--ignore-missing-imports` porque ya está en [tool.mypy] de
+      # pyproject.toml, y con dos copias las configuraciones pueden separarse sin que nadie lo note.
       - name: mypy
         run: mypy src/
 
   # trampas de la configuración de los honeypots que rompen cosas en silencio si están mal
   config-validation:
-    name: Config Validation
+    name: Configuración de los honeypots
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
+      - name: Preparar Python
         uses: actions/setup-python@v5
 
-      # cowrie solo carga userdb.txt si es ascii puro
-      - name: userdb.txt is pure ascii
+      # cowrie solo carga userdb.txt si está en ASCII puro
+      - name: userdb.txt en ASCII puro
         run: |
           python3 -c "
           with open('infra/honeypots/cowrie/userdb.txt', 'rb') as f:
               data = f.read()
           bad = [(i, b) for i, b in enumerate(data) if b > 127]
           if bad:
-              print(f'FAIL: non-ascii byte 0x{bad[0][1]:02x} at position {bad[0][0]}')
+              print(f'FALLA: byte no ASCII 0x{bad[0][1]:02x} en la posición {bad[0][0]}')
               exit(1)
-          print('OK: userdb.txt is pure ascii')
+          print('OK: userdb.txt está en ASCII puro')
           "
 
-      # tienen que coincidir con el directorio de trabajo de cowrie, o el honeypot arranca vacío
-      - name: cowrie.cfg paths
+      # si las rutas no coinciden con el directorio de trabajo de cowrie, el honeypot arranca vacío
+      - name: Rutas de cowrie.cfg
         run: |
           python3 -c "
           import configparser, sys
@@ -157,17 +155,17 @@ jobs:
           cfg.read('infra/honeypots/cowrie/cowrie.cfg')
           errors = []
           if cfg.get('honeypot', 'contents_path', fallback='') != 'honeyfs':
-              errors.append('contents_path should be honeyfs')
+              errors.append('contents_path tiene que ser honeyfs')
           if cfg.get('honeypot', 'txtcmds_path', fallback='') != 'src/cowrie/data/txtcmds':
-              errors.append('txtcmds_path should be src/cowrie/data/txtcmds')
+              errors.append('txtcmds_path tiene que ser src/cowrie/data/txtcmds')
           if errors:
-              print('FAIL:', errors)
+              print('FALLA:', errors)
               sys.exit(1)
-          print('OK: cowrie.cfg paths look right')
+          print('OK: las rutas de cowrie.cfg son correctas')
           "
 
       # nunca dejar que se filtren claves ni malware capturado al repositorio
-      - name: .gitignore covers secrets
+      - name: .gitignore cubre los secretos
         run: |
           python3 -c "
           import sys
@@ -175,7 +173,7 @@ jobs:
           required = ['*.pkl', '*.pem', '*.key', '*.pcap', '.env', 'id_rsa']
           missing = [p for p in required if p not in content]
           if missing:
-              print('FAIL: .gitignore missing:', missing)
+              print('FALLA: a .gitignore le faltan', missing)
               sys.exit(1)
-          print('OK: .gitignore covers the sensitive patterns')
+          print('OK: .gitignore cubre los patrones sensibles')
           "

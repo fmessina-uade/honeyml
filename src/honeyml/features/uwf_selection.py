@@ -53,8 +53,9 @@ def build_pipeline() -> Pipeline:
     clf = RandomForestClassifier(
         n_estimators=120,
         max_depth=None,
-        max_samples=0.3,  # el bootstrap mantiene el ajuste manejable sobre 1,9 millones de filas
-        class_weight="balanced_subsample",  # muy desbalanceadas: none 50 % contra 0,03 %
+        max_samples=0.3,  # el bootstrap mantiene el ajuste manejable sobre millones de filas
+        # hace falta balancear: las clases van de la mitad del conjunto a una fracción ínfima
+        class_weight="balanced_subsample",
         n_jobs=-1,
         random_state=42,
     )
@@ -111,10 +112,10 @@ def main() -> None:
     Path("data/processed/uwf_metrics.json").write_text(
         json.dumps(metrics, indent=2, ensure_ascii=False), encoding="utf-8"
     )
-    print("\n-> métricas: data/processed/uwf_metrics.json")
+    print("\nMétricas en data/processed/uwf_metrics.json")
 
     ranking.to_frame("importance").to_parquet("data/processed/uwf_feature_ranking.parquet")
-    print("-> ranking: data/processed/uwf_feature_ranking.parquet")
+    print("Ranking en data/processed/uwf_feature_ranking.parquet")
 
 
 if __name__ == "__main__":

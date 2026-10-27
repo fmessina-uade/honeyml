@@ -2,7 +2,7 @@
 
 El bus puede recibir otra vez eventos decididos semanas antes: Filebeat relee desde el principio un
 archivo que cambia de identidad, algo que en desarrollo pasa al bajar registros con rsync. Las
-marcas de deduplicación del consumidor vencen a las 24 horas y ya no los reconocen, y con la
+marcas de deduplicación del consumidor vencen a las 24 horas y dejan de reconocerlos, y con la
 reutilización encendida el evento de origen de una firma se copiaría de sí mismo y pisaría la
 decisión razonada.
 
@@ -235,7 +235,7 @@ def test_si_ya_existia_no_registra_la_firma() -> None:
 
 
 def test_una_escritura_nueva_si_registra_la_firma() -> None:
-    """El control: sin repetición, la reutilización sigue funcionando igual que antes."""
+    """Sin repetición de por medio, la escritura registra la firma como cualquier otra."""
     repertorio = _Repertorio()
     salida = persistencia.guardar(
         _estado(firma="f1", decision=Decision.model_validate(DECISION)),
