@@ -18,7 +18,7 @@ from datetime import date
 from typing import Any
 
 from . import queries
-from .decisiones import DECISIONES, DEMORA_MS, REVISIONES, SIN_TACTICA, _buscar
+from .decisiones import DECISIONES, DEMORA_MS, REVISIONES, SIN_TACTICA, UMBRAL_ATRASO_MS, _buscar
 from .privacidad import credenciales_frecuentes, sin_direcciones
 
 FECHA = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -172,8 +172,15 @@ def _motor(desde: str | None, hasta: str | None, es_url: str) -> dict[str, Any] 
             "copiadas": {"filter": {"exists": {"field": "ciclo.reutilizada_de"}}},
             "costo": {"sum": {"field": "modelo.costo_usd"}},
             "requieren": {"filter": {"term": {"ciclo.requiere_revision": True}}},
+            # El mismo criterio que el panel: ni retriaje ni la tanda que vacía el atraso de una
+            # pausa, que traen eventos de días atrás y llevarían la mediana a días.
             "conclusion": {
-                "filter": {"bool": {"must_not": [{"term": {"ciclo.retriaje": True}}]}},
+                "filter": {
+                    "bool": {
+                        "filter": [{"range": {"demora_ms": {"lt": UMBRAL_ATRASO_MS}}}],
+                        "must_not": [{"term": {"ciclo.retriaje": True}}],
+                    }
+                },
                 "aggs": {
                     "percentiles": {"percentiles": {"field": "demora_ms", "percents": [50, 90]}}
                 },

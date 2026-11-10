@@ -94,6 +94,20 @@ MAX_EXPORTACION = 10_000
 # sobre el atraso tardan días por construcción, y mezcladas arruinarían la mediana.
 VENTANA_CONCLUSION = "now-7d"
 
+# Una decisión que tardó más que esto desde su evento no la tomó el motor andando: el evento esperó
+# en el bus mientras el motor estaba parado, por una pausa sin saldo o una caída, y la tanda que
+# vacía ese atraso tarda horas o días. Con el motor en marcha, hasta una decisión razonada con tres
+# intentos termina en minutos, así que una hora separa los dos casos sin tocar a ninguno.
+UMBRAL_ATRASO_MS = 3_600_000
+
+# Las decisiones que cuentan para el tiempo de conclusión: ni retriaje ni tanda sobre el atraso.
+_EN_MARCHA: dict[str, Any] = {
+    "bool": {
+        "filter": [{"range": {"demora_ms": {"lt": UMBRAL_ATRASO_MS}}}],
+        "must_not": [{"term": {"ciclo.retriaje": True}}],
+    }
+}
+
 # Los atributos normalizados que se muestran del evento, en el orden en que se leen. Se eligen en
 # lugar de devolver el documento entero porque la mitad son campos de servicio (versión de ECS,
 # etiquetas del pipeline, coordenadas) que no ayudan a revisar una clasificación.
@@ -254,9 +268,36 @@ def _cubos(agg: dict[str, Any]) -> list[dict[str, Any]]:
     return [{"key": b["key"], "count": b["doc_count"]} for b in agg["buckets"]]
 
 
+def _fin_en_marcha(es_url: str) -> str | None:
+    """Cuándo decidió por última vez el motor andando, o None si no se pudo saber.
+
+    Después de una pausa larga el motor pasa días vaciando el atraso, y en ese tiempo los últimos
+    siete días no tienen ninguna decisión en marcha. La ventana termina entonces en la última que
+    hubo, así la mediana sigue diciendo cuánto tarda el motor y no cuánto duró la pausa. Si la
+    consulta falla, la ventana vuelve a la de siempre: el pedido principal informa la falla.
+    """
+    try:
+        r = queries._search(
+            {
+                "size": 0,
+                "runtime_mappings": DEMORA_MS,
+                "query": _EN_MARCHA,
+                "aggs": {"ultima": {"max": {"field": "@timestamp"}}},
+            },
+            es_url,
+            index=DECISIONES,
+        )
+        ultima = r.get("aggregations", {}).get("ultima", {}).get("value_as_string")
+        return str(ultima) if ultima else None
+    except Exception:
+        return None
+
+
 def resumen(es_url: str = queries.ES_URL) -> dict[str, Any]:
     """Los números del motor: cuánto decidió, cómo, a qué costo y cuánto espera revisión."""
     revisados = ids_revisados(es_url)
+    hasta = _fin_en_marcha(es_url)
+    ventana = {"gte": f"{hasta}||-7d", "lte": hasta} if hasta else {"gte": VENTANA_CONCLUSION}
     cuerpo = {
         "size": 0,
         "track_total_hits": True,
@@ -304,15 +345,19 @@ def resumen(es_url: str = queries.ES_URL) -> dict[str, Any]:
                     },
                 },
             },
-            # Solo lo que decidió el motor al consumir el bus. Una decisión que se volvió a triar
-            # tiene la marca temporal del retriaje sobre un evento que pudo ocurrir semanas antes,
-            # y una sola tanda así lleva la mediana a días. La media va junto a la mediana porque la
+            # Solo lo que decidió el motor andando, al consumir el bus. Una decisión que se volvió a
+            # triar tiene la marca temporal del retriaje sobre un evento que pudo ocurrir semanas
+            # antes, y la tanda que vacía el atraso de una pausa trae eventos de días atrás: una
+            # sola tanda así lleva la mediana a días. La media va junto a la mediana porque la
             # métrica de conclusión se define como tiempo medio; la mediana dice lo típico y la
             # media deja ver si hay colas largas.
             "conclusion": {
                 "filter": {
                     "bool": {
-                        "filter": [{"range": {"@timestamp": {"gte": VENTANA_CONCLUSION}}}],
+                        "filter": [
+                            {"range": {"@timestamp": ventana}},
+                            {"range": {"demora_ms": {"lt": UMBRAL_ATRASO_MS}}},
+                        ],
                         "must_not": [{"term": {"ciclo.retriaje": True}}],
                     }
                 },
@@ -336,6 +381,19 @@ def resumen(es_url: str = queries.ES_URL) -> dict[str, Any]:
                         },
                     },
                 },
+            },
+            # Cuántas decisiones de la última semana quedaron afuera por ser de una tanda sobre el
+            # atraso: el panel lo dice al lado de la mediana, así se ve qué se excluyó.
+            "atrasadas": {
+                "filter": {
+                    "bool": {
+                        "filter": [
+                            {"range": {"@timestamp": {"gte": VENTANA_CONCLUSION}}},
+                            {"range": {"demora_ms": {"gte": UMBRAL_ATRASO_MS}}},
+                        ],
+                        "must_not": [{"term": {"ciclo.retriaje": True}}],
+                    }
+                }
             },
         },
     }
@@ -389,6 +447,10 @@ def resumen(es_url: str = queries.ES_URL) -> dict[str, Any]:
         },
         "conclusion": {
             "ventana_dias": 7,
+            # Dónde termina la ventana: la última decisión del motor andando. Si quedó lejos del
+            # momento actual, el motor está vaciando el atraso de una pausa.
+            "hasta": hasta,
+            "atrasadas": a.get("atrasadas", {}).get("doc_count", 0),
             "decisiones": a["conclusion"]["doc_count"],
             "mediana_s": _segundos(pct.get("50.0")),
             "p90_s": _segundos(pct.get("90.0")),

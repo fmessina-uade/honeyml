@@ -34,6 +34,26 @@ import RevisionACiegas from '../triaje/RevisionACiegas';
 import { ChipSeveridad, SIN_TACTICA, caminoDe, colorDeSeveridad } from '../triaje/comunes';
 
 const TAMANO = 25;
+
+// Una decisión que tardó más de una hora desde su evento salió de la tanda que vacía el atraso de
+// una pausa del motor. Es el mismo umbral con el que la API deja esas decisiones fuera del tiempo
+// de conclusión.
+const UMBRAL_ATRASO_MS = 3_600_000;
+
+/** El final de la ventana de la mediana, solo cuando quedó lejos del momento actual: el motor
+ *  está vaciando el atraso de una pausa y la ventana termina en su última decisión en marcha. */
+function finDeVentana(hasta: string | null | undefined): string | null {
+  if (!hasta) return null;
+  const fin = Date.parse(hasta);
+  if (Number.isNaN(fin) || Date.now() - fin < 86_400_000) return null;
+  return fechaHora(hasta);
+}
+
+/** Si la decisión llegó mucho después que su evento, que es lo que pasa con la tanda del atraso. */
+function decididaTarde(d: FilaDecision): boolean {
+  if (!d.decidida || !d.momento) return false;
+  return Date.parse(d.decidida) - Date.parse(d.momento) >= UMBRAL_ATRASO_MS;
+}
 const FILTROS_INICIALES: FiltrosDecisiones = { estado: 'todas', desde: 0, tamano: TAMANO };
 const CLAVE_GUIA = 'honeyml-panel-guia-triaje';
 
@@ -227,9 +247,18 @@ export default function Triage() {
                         resumen.conclusion.media_s != null
                           ? duracion(resumen.conclusion.media_s)
                           : null,
+                        finDeVentana(resumen.conclusion.hasta),
                       )
-                    : t.triage.conclusionNote(resumen.conclusion.ventana_dias)}
+                    : t.triage.conclusionNote(
+                        resumen.conclusion.ventana_dias,
+                        finDeVentana(resumen.conclusion.hasta),
+                      )}
                 </span>
+                {(resumen.conclusion.atrasadas ?? 0) > 0 && (
+                  <span className="text-white/35">
+                    {t.triage.conclusionBacklog(n(resumen.conclusion.atrasadas ?? 0))}
+                  </span>
+                )}
                 {resumen.conclusion.copiadas_s != null &&
                   resumen.conclusion.razonadas_s != null && (
                     <span className="text-white/35">
@@ -615,6 +644,11 @@ function Fila({
             <span className="flex items-center gap-2 flex-wrap text-[10px] text-white/40 mt-0.5">
               <span className="sm:hidden font-data">{fechaHora(d.momento)}</span>
               <span>{t.triage.engine.paths[camino.clave]}</span>
+              {decididaTarde(d) && (
+                <span className="font-data text-white/50">
+                  {t.triage.decidedAt(fechaHora(d.decidida))}
+                </span>
+              )}
               {pendiente && (
                 <span className="flex items-center gap-1 text-[var(--agent-coral)]">
                   <AlertCircle className="w-3 h-3" />

@@ -336,6 +336,35 @@ def test_el_tiempo_de_conclusion_deja_afuera_lo_vuelto_a_triar(
     assert {"term": {"ciclo.retriaje": True}} in filtro["must_not"]
 
 
+def test_el_tiempo_de_conclusion_deja_afuera_la_tanda_sobre_el_atraso(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Después de una pausa sin saldo, el motor decide sobre eventos de días atrás."""
+    pedidos: list[dict[str, Any]] = []
+
+    def falsa(body: dict[str, Any], es_url: str = "", index: str = "") -> dict[str, Any]:
+        if index == decisiones.REVISIONES:
+            return {"hits": {"hits": []}, "aggregations": {"v": {"buckets": []}}}
+        pedidos.append(body)
+        if "conclusion" not in body.get("aggs", {}):
+            return {"aggregations": {"ultima": {"value_as_string": "2026-10-30T18:00:00.000Z"}}}
+        raise RuntimeError("alcanza con el pedido")
+
+    monkeypatch.setattr(queries, "_search", falsa)
+    with pytest.raises(RuntimeError):
+        decisiones.resumen()
+
+    fin, principal = pedidos
+    atraso = {"range": {"demora_ms": {"lt": decisiones.UMBRAL_ATRASO_MS}}}
+    # La última decisión en marcha se busca con el mismo criterio que la mediana.
+    assert atraso in fin["query"]["bool"]["filter"]
+    filtro = principal["aggs"]["conclusion"]["filter"]["bool"]["filter"]
+    assert atraso in filtro
+    # La ventana termina en esa decisión y no en el momento actual.
+    ventana = {"gte": "2026-10-30T18:00:00.000Z||-7d", "lte": "2026-10-30T18:00:00.000Z"}
+    assert {"range": {"@timestamp": ventana}} in filtro
+
+
 def test_el_resumen_avisa_cuando_el_motor_esta_sin_saldo(monkeypatch: pytest.MonkeyPatch) -> None:
     marca = {"desde": "2026-10-13T10:00:00+00:00", "ultimo_intento": "2026-10-13T10:05:00+00:00"}
 

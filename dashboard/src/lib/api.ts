@@ -200,6 +200,11 @@ export interface ResumenTriaje {
   /** Desde que ocurrió el evento hasta que su decisión quedó guardada, en segundos. */
   conclusion: {
     ventana_dias: number;
+    /** Dónde termina la ventana: la última decisión del motor andando. Si quedó lejos del momento
+     *  actual, el motor está vaciando el atraso de una pausa. Opcional por las API anteriores. */
+    hasta?: string | null;
+    /** Decisiones de la última semana que quedaron afuera por ser de una tanda sobre el atraso. */
+    atrasadas?: number;
     decisiones: number;
     mediana_s: number | null;
     p90_s: number | null;
