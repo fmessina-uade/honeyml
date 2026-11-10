@@ -40,13 +40,9 @@ const TAMANO = 25;
 // de conclusión.
 const UMBRAL_ATRASO_MS = 3_600_000;
 
-/** El final de la ventana de la mediana, solo cuando quedó lejos del momento actual: el motor
- *  está vaciando el atraso de una pausa y la ventana termina en su última decisión en marcha. */
-function finDeVentana(hasta: string | null | undefined): string | null {
-  if (!hasta) return null;
-  const fin = Date.parse(hasta);
-  if (Number.isNaN(fin) || Date.now() - fin < 86_400_000) return null;
-  return fechaHora(hasta);
+/** Un borde de la ventana de la mediana, o null cuando la API no lo manda: últimos siete días. */
+function bordeDeVentana(borde: string | null | undefined): string | null {
+  return borde ? fechaHora(borde) : null;
 }
 
 /** Si la decisión llegó mucho después que su evento, que es lo que pasa con la tanda del atraso. */
@@ -54,6 +50,7 @@ function decididaTarde(d: FilaDecision): boolean {
   if (!d.decidida || !d.momento) return false;
   return Date.parse(d.decidida) - Date.parse(d.momento) >= UMBRAL_ATRASO_MS;
 }
+
 const FILTROS_INICIALES: FiltrosDecisiones = { estado: 'todas', desde: 0, tamano: TAMANO };
 const CLAVE_GUIA = 'honeyml-panel-guia-triaje';
 
@@ -247,11 +244,13 @@ export default function Triage() {
                         resumen.conclusion.media_s != null
                           ? duracion(resumen.conclusion.media_s)
                           : null,
-                        finDeVentana(resumen.conclusion.hasta),
+                        bordeDeVentana(resumen.conclusion.desde),
+                        bordeDeVentana(resumen.conclusion.hasta),
                       )
                     : t.triage.conclusionNote(
                         resumen.conclusion.ventana_dias,
-                        finDeVentana(resumen.conclusion.hasta),
+                        bordeDeVentana(resumen.conclusion.desde),
+                        bordeDeVentana(resumen.conclusion.hasta),
                       )}
                 </span>
                 {(resumen.conclusion.atrasadas ?? 0) > 0 && (

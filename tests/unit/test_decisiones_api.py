@@ -336,33 +336,64 @@ def test_el_tiempo_de_conclusion_deja_afuera_lo_vuelto_a_triar(
     assert {"term": {"ciclo.retriaje": True}} in filtro["must_not"]
 
 
-def test_el_tiempo_de_conclusion_deja_afuera_la_tanda_sobre_el_atraso(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Después de una pausa sin saldo, el motor decide sobre eventos de días atrás."""
+def _con_tanda(
+    monkeypatch: pytest.MonkeyPatch, despues: int
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Una tanda sobre el atraso y `despues` decisiones en marcha desde que terminó."""
     pedidos: list[dict[str, Any]] = []
+    principal: dict[str, Any] = {}
 
     def falsa(body: dict[str, Any], es_url: str = "", index: str = "") -> dict[str, Any]:
         if index == decisiones.REVISIONES:
             return {"hits": {"hits": []}, "aggregations": {"v": {"buckets": []}}}
+        aggs = body.get("aggs", {})
+        if "conclusion" in aggs:
+            principal.update(body)
+            raise RuntimeError("alcanza con el pedido")
         pedidos.append(body)
-        if "conclusion" not in body.get("aggs", {}):
+        if "inicio" in aggs:
+            return {
+                "aggregations": {
+                    "inicio": {"value_as_string": "2026-11-10T06:00:00.000Z"},
+                    "fin": {"value_as_string": "2026-11-10T14:00:00.000Z"},
+                }
+            }
+        if "ultima" in aggs:
             return {"aggregations": {"ultima": {"value_as_string": "2026-10-30T18:00:00.000Z"}}}
-        raise RuntimeError("alcanza con el pedido")
+        return {"hits": {"total": {"value": despues}}}
 
     monkeypatch.setattr(queries, "_search", falsa)
     with pytest.raises(RuntimeError):
         decisiones.resumen()
+    return pedidos, principal
 
-    fin, principal = pedidos
-    atraso = {"range": {"demora_ms": {"lt": decisiones.UMBRAL_ATRASO_MS}}}
-    # La última decisión en marcha se busca con el mismo criterio que la mediana.
-    assert atraso in fin["query"]["bool"]["filter"]
-    filtro = principal["aggs"]["conclusion"]["filter"]["bool"]["filter"]
-    assert atraso in filtro
-    # La ventana termina en esa decisión y no en el momento actual.
+
+def _filtro_de_conclusion(principal: dict[str, Any]) -> list[dict[str, Any]]:
+    filtro: list[dict[str, Any]] = principal["aggs"]["conclusion"]["filter"]["bool"]["filter"]
+    return filtro
+
+
+def test_recien_terminada_una_tanda_se_mide_la_semana_de_antes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Después de una pausa, ni la tanda ni la cola que se formó detrás miden al motor."""
+    _, principal = _con_tanda(monkeypatch, despues=3)
+    filtro = _filtro_de_conclusion(principal)
+    assert {"range": {"demora_ms": {"lt": decisiones.UMBRAL_ATRASO_MS}}} in filtro
     ventana = {"gte": "2026-10-30T18:00:00.000Z||-7d", "lte": "2026-10-30T18:00:00.000Z"}
     assert {"range": {"@timestamp": ventana}} in filtro
+    # Lo que se deja afuera es la tanda entera, con la hora de cola que sigue a su última decisión.
+    afuera = principal["aggs"]["atrasadas"]["filter"]["bool"]["filter"]
+    tanda = {"gte": "2026-11-10T06:00:00.000Z", "lte": "2026-11-10T15:00:00+00:00"}
+    assert afuera == [{"range": {"@timestamp": tanda}}]
+
+
+def test_con_decisiones_de_sobra_despues_de_la_tanda_se_mide_desde_ahi(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, principal = _con_tanda(monkeypatch, despues=decisiones.MIN_EN_MARCHA)
+    filtro = _filtro_de_conclusion(principal)
+    assert {"range": {"@timestamp": {"gt": "2026-11-10T15:00:00+00:00"}}} in filtro
 
 
 def test_el_resumen_avisa_cuando_el_motor_esta_sin_saldo(monkeypatch: pytest.MonkeyPatch) -> None:

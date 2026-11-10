@@ -485,12 +485,18 @@ const es = {
     cost: 'Costo de inferencia',
     correctedByEngine: 'corregidas tras un rechazo de la validación',
     conclusion: 'Tiempo de conclusión',
-    conclusionNote: (d: number, hasta: string | null) =>
-      `del evento a la decisión guardada, ${hasta ? `los ${d} días hasta el ${hasta}` : `últimos ${d} días`}`,
-    conclusionP90: (p90: string, d: number, media: string | null, hasta: string | null) =>
-      `${media ? `media de ${media}; ` : ''}nueve de cada diez, en menos de ${p90}. ${hasta ? `Los ${d} días hasta el ${hasta}` : `Últimos ${d} días`}`,
+    conclusionNote: (d: number, desde: string | null, hasta: string | null) =>
+      `del evento a la decisión guardada, ${desde ? `desde el ${desde}` : hasta ? `los ${d} días hasta el ${hasta}` : `últimos ${d} días`}`,
+    conclusionP90: (
+      p90: string,
+      d: number,
+      media: string | null,
+      desde: string | null,
+      hasta: string | null,
+    ) =>
+      `${media ? `media de ${media}; ` : ''}nueve de cada diez, en menos de ${p90}. ${desde ? `Desde el ${desde}` : hasta ? `Los ${d} días hasta el ${hasta}` : `Últimos ${d} días`}`,
     conclusionBacklog: (n: string) =>
-      `Sin las ${n} decisiones de la última semana que vaciaron el atraso de una pausa del motor.`,
+      `Sin las ${n} decisiones de la tanda que vació el atraso de una pausa del motor.`,
     decidedAt: (fecha: string) => `decidida ${fecha}`,
     conclusionSplit: (copiadas: string, razonadas: string, modelo: string) =>
       `copiadas ${copiadas}, razonadas ${razonadas} (la llamada al modelo, ${modelo})`,
@@ -1506,12 +1512,18 @@ const en: typeof es = {
     cost: 'Inference cost',
     correctedByEngine: 'corrected after a validation rejection',
     conclusion: 'Time to conclusion',
-    conclusionNote: (d: number, hasta: string | null) =>
-      `from the event to the stored decision, ${hasta ? `the ${d} days up to ${hasta}` : `last ${d} days`}`,
-    conclusionP90: (p90: string, d: number, media: string | null, hasta: string | null) =>
-      `${media ? `mean of ${media}; ` : ''}nine out of ten in under ${p90}. ${hasta ? `The ${d} days up to ${hasta}` : `Last ${d} days`}`,
+    conclusionNote: (d: number, desde: string | null, hasta: string | null) =>
+      `from the event to the stored decision, ${desde ? `since ${desde}` : hasta ? `the ${d} days up to ${hasta}` : `last ${d} days`}`,
+    conclusionP90: (
+      p90: string,
+      d: number,
+      media: string | null,
+      desde: string | null,
+      hasta: string | null,
+    ) =>
+      `${media ? `mean of ${media}; ` : ''}nine out of ten in under ${p90}. ${desde ? `Since ${desde}` : hasta ? `The ${d} days up to ${hasta}` : `Last ${d} days`}`,
     conclusionBacklog: (n: string) =>
-      `Excluding the ${n} decisions from the last week that drained the backlog of an engine pause.`,
+      `Excluding the ${n} decisions of the batch that drained the backlog of an engine pause.`,
     decidedAt: (fecha: string) => `decided ${fecha}`,
     conclusionSplit: (copiadas: string, razonadas: string, modelo: string) =>
       `copied ${copiadas}, reasoned ${razonadas} (model call, ${modelo})`,

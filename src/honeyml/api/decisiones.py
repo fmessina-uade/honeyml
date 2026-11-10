@@ -17,9 +17,9 @@ import json
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, NamedTuple
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -100,13 +100,28 @@ VENTANA_CONCLUSION = "now-7d"
 # intentos termina en minutos, así que una hora separa los dos casos sin tocar a ninguno.
 UMBRAL_ATRASO_MS = 3_600_000
 
-# Las decisiones que cuentan para el tiempo de conclusión: ni retriaje ni tanda sobre el atraso.
-_EN_MARCHA: dict[str, Any] = {
-    "bool": {
-        "filter": [{"range": {"demora_ms": {"lt": UMBRAL_ATRASO_MS}}}],
-        "must_not": [{"term": {"ciclo.retriaje": True}}],
+# Después de la última decisión de una tanda, en el bus quedan como mucho los eventos de la última
+# hora, que también esperaron su turno detrás del atraso, y el motor los termina de vaciar dentro de
+# esa hora. Recién pasado ese margen vuelve a decidir lo que llega apenas llega.
+MARGEN_TRAS_TANDA = timedelta(hours=1)
+
+# Cuántas decisiones en marcha hacen falta después de una tanda para medir solo con ellas. Con
+# menos, la mediana diría poco, y se mide en la última semana de antes de la tanda.
+MIN_EN_MARCHA = 50
+
+
+def _en_marcha(momento: dict[str, Any]) -> dict[str, Any]:
+    """Las decisiones del motor andando en ese rango de `@timestamp`: ni retriaje ni atraso."""
+    return {
+        "bool": {
+            "filter": [
+                {"range": {"@timestamp": momento}},
+                {"range": {"demora_ms": {"lt": UMBRAL_ATRASO_MS}}},
+            ],
+            "must_not": [{"term": {"ciclo.retriaje": True}}],
+        }
     }
-}
+
 
 # Los atributos normalizados que se muestran del evento, en el orden en que se leen. Se eligen en
 # lugar de devolver el documento entero porque la mitad son campos de servicio (versión de ECS,
@@ -268,36 +283,86 @@ def _cubos(agg: dict[str, Any]) -> list[dict[str, Any]]:
     return [{"key": b["key"], "count": b["doc_count"]} for b in agg["buckets"]]
 
 
-def _fin_en_marcha(es_url: str) -> str | None:
-    """Cuándo decidió por última vez el motor andando, o None si no se pudo saber.
+class Ventana(NamedTuple):
+    """Sobre qué decisiones se mide la conclusión, y qué tanda quedó afuera si hubo una."""
 
-    Después de una pausa larga el motor pasa días vaciando el atraso, y en ese tiempo los últimos
-    siete días no tienen ninguna decisión en marcha. La ventana termina entonces en la última que
-    hubo, así la mediana sigue diciendo cuánto tarda el motor y no cuánto duró la pausa. Si la
-    consulta falla, la ventana vuelve a la de siempre: el pedido principal informa la falla.
+    rango: dict[str, Any]
+    desde: str | None = None
+    hasta: str | None = None
+    tanda: dict[str, Any] | None = None
+
+
+def _ventana_de_conclusion(es_url: str) -> Ventana:
+    """El rango de `@timestamp` en el que el motor anduvo en marcha continua.
+
+    Sin una tanda sobre el atraso en la última semana, son los últimos siete días. Después de una
+    pausa el motor vacía el atraso, y mientras tanto hasta los eventos que llegan esperan su turno
+    en la cola: ninguna decisión de ese tramo dice cuánto tarda el motor. Se mide entonces desde que
+    terminó de ponerse al día, si desde ahí ya hubo suficientes decisiones, y si no, en la última
+    semana con decisiones de antes de la tanda. Si alguna consulta falla, la ventana vuelve a la de
+    siempre: el pedido principal informa la falla.
     """
-    try:
-        r = queries._search(
-            {
-                "size": 0,
-                "runtime_mappings": DEMORA_MS,
-                "query": _EN_MARCHA,
-                "aggs": {"ultima": {"max": {"field": "@timestamp"}}},
-            },
-            es_url,
-            index=DECISIONES,
+    siempre = Ventana({"gte": VENTANA_CONCLUSION})
+
+    def buscar(cuerpo: dict[str, Any]) -> dict[str, Any]:
+        return queries._search(
+            {"size": 0, "runtime_mappings": DEMORA_MS, **cuerpo}, es_url, index=DECISIONES
         )
-        ultima = r.get("aggregations", {}).get("ultima", {}).get("value_as_string")
-        return str(ultima) if ultima else None
+
+    try:
+        r = buscar(
+            {
+                "query": {
+                    "bool": {
+                        "filter": [
+                            {"range": {"@timestamp": {"gte": VENTANA_CONCLUSION}}},
+                            {"range": {"demora_ms": {"gte": UMBRAL_ATRASO_MS}}},
+                        ],
+                        "must_not": [{"term": {"ciclo.retriaje": True}}],
+                    }
+                },
+                "aggs": {
+                    "inicio": {"min": {"field": "@timestamp"}},
+                    "fin": {"max": {"field": "@timestamp"}},
+                },
+            }
+        )
+        aggs = r.get("aggregations", {})
+        inicio = aggs.get("inicio", {}).get("value_as_string")
+        fin = aggs.get("fin", {}).get("value_as_string")
+        if not inicio or not fin:
+            return siempre
+        al_dia = (datetime.fromisoformat(str(fin)) + MARGEN_TRAS_TANDA).isoformat()
+        tanda = {"gte": str(inicio), "lte": al_dia}
+
+        despues = buscar({"track_total_hits": True, "query": _en_marcha({"gt": al_dia})})
+        if despues.get("hits", {}).get("total", {}).get("value", 0) >= MIN_EN_MARCHA:
+            return Ventana({"gt": al_dia}, desde=al_dia, tanda=tanda)
+
+        antes = buscar(
+            {
+                "query": _en_marcha({"lt": str(inicio)}),
+                "aggs": {"ultima": {"max": {"field": "@timestamp"}}},
+            }
+        )
+        ultima = antes.get("aggregations", {}).get("ultima", {}).get("value_as_string")
+        if not ultima:
+            return Ventana({"gt": al_dia}, desde=al_dia, tanda=tanda)
+        return Ventana({"gte": f"{ultima}||-7d", "lte": ultima}, hasta=str(ultima), tanda=tanda)
     except Exception:
-        return None
+        return siempre
 
 
 def resumen(es_url: str = queries.ES_URL) -> dict[str, Any]:
     """Los números del motor: cuánto decidió, cómo, a qué costo y cuánto espera revisión."""
     revisados = ids_revisados(es_url)
-    hasta = _fin_en_marcha(es_url)
-    ventana = {"gte": f"{hasta}||-7d", "lte": hasta} if hasta else {"gte": VENTANA_CONCLUSION}
+    ventana = _ventana_de_conclusion(es_url)
+    # Sin tanda no hay nada que contar como afuera: un filtro que no deja pasar ninguna decisión.
+    filtro_tanda: list[dict[str, Any]] = (
+        [{"range": {"@timestamp": ventana.tanda}}]
+        if ventana.tanda
+        else [{"bool": {"must_not": [{"match_all": {}}]}}]
+    )
     cuerpo = {
         "size": 0,
         "track_total_hits": True,
@@ -355,7 +420,7 @@ def resumen(es_url: str = queries.ES_URL) -> dict[str, Any]:
                 "filter": {
                     "bool": {
                         "filter": [
-                            {"range": {"@timestamp": ventana}},
+                            {"range": {"@timestamp": ventana.rango}},
                             {"range": {"demora_ms": {"lt": UMBRAL_ATRASO_MS}}},
                         ],
                         "must_not": [{"term": {"ciclo.retriaje": True}}],
@@ -382,15 +447,12 @@ def resumen(es_url: str = queries.ES_URL) -> dict[str, Any]:
                     },
                 },
             },
-            # Cuántas decisiones de la última semana quedaron afuera por ser de una tanda sobre el
-            # atraso: el panel lo dice al lado de la mediana, así se ve qué se excluyó.
+            # Cuántas decisiones quedaron afuera por ser de la tanda sobre el atraso, cola incluida:
+            # el panel lo dice al lado de la mediana, así se ve qué se excluyó.
             "atrasadas": {
                 "filter": {
                     "bool": {
-                        "filter": [
-                            {"range": {"@timestamp": {"gte": VENTANA_CONCLUSION}}},
-                            {"range": {"demora_ms": {"gte": UMBRAL_ATRASO_MS}}},
-                        ],
+                        "filter": filtro_tanda,
                         "must_not": [{"term": {"ciclo.retriaje": True}}],
                     }
                 }
@@ -447,9 +509,10 @@ def resumen(es_url: str = queries.ES_URL) -> dict[str, Any]:
         },
         "conclusion": {
             "ventana_dias": 7,
-            # Dónde termina la ventana: la última decisión del motor andando. Si quedó lejos del
-            # momento actual, el motor está vaciando el atraso de una pausa.
-            "hasta": hasta,
+            # Los bordes de la ventana cuando no son los últimos siete días: `desde` si se mide
+            # después de una tanda, `hasta` si se mide en la semana de antes.
+            "desde": ventana.desde,
+            "hasta": ventana.hasta,
             "atrasadas": a.get("atrasadas", {}).get("doc_count", 0),
             "decisiones": a["conclusion"]["doc_count"],
             "mediana_s": _segundos(pct.get("50.0")),
