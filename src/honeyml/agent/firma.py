@@ -21,8 +21,14 @@ El comando entra con los bytes escritos como escapes reemplazados por una marca.
 logra descargar su binario lo escribe de a trozos, con `echo -ne '\x7f\x45\x4c...' >> archivo`, y
 cada trozo es un comando distinto: sin la marca, una sola descarga son cientos de firmas y cientos
 de llamadas para decidir lo mismo. Los bytes no cambian la conducta, que es escribir un binario en
-el señuelo. El archivo y la redirección se conservan, y un comando sin escapes firma igual que si
-la marca no existiera, así que el repertorio ya guardado sigue valiendo.
+el señuelo. El archivo y la redirección se conservan.
+
+Pasa lo mismo con los escáneres que comprueban si el shell es real: en cada intento mandan una marca
+al azar, como `check_` seguido de treinta y dos hexadecimales, o una cuenta con números al azar, y
+esperan verla de vuelta. La conducta es siempre comprobar el señuelo, así que las tiras
+hexadecimales largas y las cuentas también se vuelven marcas. Un comando que no tiene ninguna de las
+tres cosas firma igual que si las marcas no existieran, así que el repertorio ya guardado sigue
+valiendo.
 """
 
 from __future__ import annotations
@@ -47,6 +53,16 @@ SEPARADOR = "\x1f"
 ESCAPES_HEX = re.compile(r"(?:\\x[0-9a-fA-F]{2})+")
 MARCA_DE_BYTES = "<bytes>"
 
+# Dieciséis hexadecimales seguidos no son una palabra ni un número que alguien escribe: son un
+# identificador generado, y cambia en cada intento.
+HEX_LARGO = re.compile(r"[0-9a-fA-F]{16,}")
+MARCA_DE_HEX = "<hex>"
+
+# Números unidos por operadores, como `835*762+22`: la cuenta que el escáner pide resolver para ver
+# si el shell responde. Los números cambian en cada intento y la conducta no.
+CUENTA = re.compile(r"\d+(?:\s*[-+*/%]\s*\d+)+")
+MARCA_DE_CUENTA = "<cuenta>"
+
 # Cuántos caracteres del resumen se conservan. Dieciséis hexadecimales son 64 bits: con miles de
 # firmas, y aun con varios órdenes de magnitud más, la probabilidad de colisión es despreciable, y
 # la clave entra cómoda en un registro y en una consulta.
@@ -54,8 +70,14 @@ LARGO = 16
 
 
 def comando_firmado(comando: str) -> str:
-    """El comando como entra en la firma: los bytes escritos a mano quedan como una marca."""
-    return ESCAPES_HEX.sub(MARCA_DE_BYTES, comando)
+    """El comando como entra en la firma: bytes, identificadores y cuentas quedan como marcas.
+
+    Los escapes van primero porque también son hexadecimales: si no, un trozo largo de bytes
+    quedaría partido entre las dos marcas.
+    """
+    sin_bytes = ESCAPES_HEX.sub(MARCA_DE_BYTES, comando)
+    sin_hex = HEX_LARGO.sub(MARCA_DE_HEX, sin_bytes)
+    return CUENTA.sub(MARCA_DE_CUENTA, sin_hex)
 
 
 def de_evento(evento: EventoDelBus) -> str:

