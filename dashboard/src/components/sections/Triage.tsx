@@ -40,11 +40,6 @@ const TAMANO = 25;
 // de conclusión.
 const UMBRAL_ATRASO_MS = 3_600_000;
 
-/** Un borde de la ventana de la mediana, o null cuando la API no lo manda: últimos siete días. */
-function bordeDeVentana(borde: string | null | undefined): string | null {
-  return borde ? fechaHora(borde) : null;
-}
-
 /** Si la decisión llegó mucho después que su evento, que es lo que pasa con la tanda del atraso. */
 function decididaTarde(d: FilaDecision): boolean {
   if (!d.decidida || !d.momento) return false;
@@ -234,44 +229,7 @@ export default function Triage() {
                 <span className="prosa text-[13px] text-white/40">{t.triage.noData}</span>
               )
             }
-            sub={
-              <span className="flex flex-col gap-0.5">
-                <span>
-                  {resumen.conclusion.p90_s !== null
-                    ? t.triage.conclusionP90(
-                        duracion(resumen.conclusion.p90_s),
-                        resumen.conclusion.ventana_dias,
-                        resumen.conclusion.media_s != null
-                          ? duracion(resumen.conclusion.media_s)
-                          : null,
-                        bordeDeVentana(resumen.conclusion.desde),
-                        bordeDeVentana(resumen.conclusion.hasta),
-                      )
-                    : t.triage.conclusionNote(
-                        resumen.conclusion.ventana_dias,
-                        bordeDeVentana(resumen.conclusion.desde),
-                        bordeDeVentana(resumen.conclusion.hasta),
-                      )}
-                </span>
-                {(resumen.conclusion.atrasadas ?? 0) > 0 && (
-                  <span className="text-white/35">
-                    {t.triage.conclusionBacklog(n(resumen.conclusion.atrasadas ?? 0))}
-                  </span>
-                )}
-                {resumen.conclusion.copiadas_s != null &&
-                  resumen.conclusion.razonadas_s != null && (
-                    <span className="text-white/35">
-                      {t.triage.conclusionSplit(
-                        duracion(resumen.conclusion.copiadas_s),
-                        duracion(resumen.conclusion.razonadas_s),
-                        resumen.conclusion.modelo_s != null
-                          ? duracion(resumen.conclusion.modelo_s)
-                          : t.triage.noData,
-                      )}
-                    </span>
-                  )}
-              </span>
-            }
+            sub={t.triage.conclusionSub}
             color="var(--neural-teal)"
           />
         </Reveal>
