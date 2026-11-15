@@ -100,6 +100,37 @@ def test_un_evento_sin_comando_no_pregunta_por_comando(monkeypatch: pytest.Monke
     assert r["misma_accion"] == {"eventos": 3, "direcciones": 2}
 
 
+def test_un_comando_mas_largo_que_un_termino_no_rompe_el_conteo_por_accion(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Con el `term` adentro, Elasticsearch contesta 400 y el evento queda a revisión sin ráfaga.
+
+    El borde se cuenta en bytes y no en caracteres: una tilde ocupa dos.
+    """
+    pedidos: list[dict[str, Any]] = []
+
+    def falsa(body: dict[str, Any], es_url: str = "") -> dict[str, Any]:
+        pedidos.append(body)
+        aggs = {"por_accion": {"doc_count": 5, "direcciones": {"value": 4}}}
+        if "por_comando" in body["aggs"]:
+            aggs["por_comando"] = {"doc_count": 1, "direcciones": {"value": 1}}
+        return {"aggregations": aggs}
+
+    monkeypatch.setattr(tools, "_buscar", falsa)
+    justo = "a" * tools.LARGO_MAXIMO_DE_TERMINO
+    r_justo = tools.rafaga_en_la_ventana(_evento(command=justo))
+    r_largo = tools.rafaga_en_la_ventana(_evento(command=justo + "a"))
+    tildes = "á" * (tools.LARGO_MAXIMO_DE_TERMINO // 2 + 1)
+    r_tildes = tools.rafaga_en_la_ventana(_evento(command=tildes))
+
+    assert "por_comando" in pedidos[0]["aggs"]
+    assert r_justo["mismo_comando"] == {"eventos": 1, "direcciones": 1}
+    for pedido, r in ((pedidos[1], r_largo), (pedidos[2], r_tildes)):
+        assert "por_comando" not in pedido["aggs"]
+        assert r["misma_accion"] == {"eventos": 5, "direcciones": 4}
+        assert r["mismo_comando"]["disponible"] is False
+
+
 def test_una_marca_temporal_ilegible_no_tira_el_ciclo() -> None:
     r = tools.rafaga_en_la_ventana(_evento(timestamp="no es una fecha"))
     assert r["disponible"] is False

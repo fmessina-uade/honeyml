@@ -47,6 +47,12 @@ MAX_ACCIONES = 8
 # diarios) y deja de distinguir nada. Con una hora, una campaña lenta pasa desapercibida.
 VENTANA_RAFAGA_HORAS = 6
 
+# El largo máximo de un término en Lucene, en bytes. Un `term` sobre un campo `wildcard` busca el
+# comando entero como un solo término, y con uno más largo Elasticsearch rechaza la consulta
+# completa con un 400: se pierde también el conteo por acción, que no tiene nada que ver. Pasa con
+# los droppers que mandan un binario en base64 de una sola vez.
+LARGO_MAXIMO_DE_TERMINO = 32766
+
 
 def _restar_horas(marca: str, horas: int) -> str:
     """`marca` menos `horas`, en el mismo formato ISO que usa el índice. Cadena vacía si no parsea.
@@ -277,7 +283,9 @@ def rafaga_en_la_ventana(
     Van dos conteos porque contestan preguntas distintas. El de acción y protocolo está siempre
     disponible y dice si ese tipo de tráfico está en pico. El de comando existe solo para los
     eventos que traen uno, y es mucho más específico: el mismo comando byte a byte desde treinta
-    direcciones en una hora no es casualidad.
+    direcciones en una hora no es casualidad. Un comando más largo que un término de Lucene no se
+    puede comparar entero, así que ese conteo queda anotado como no disponible y el de acción se
+    consulta igual.
     """
     desde = _restar_horas(evento.timestamp, ventana_horas)
     if not desde:
@@ -302,7 +310,8 @@ def rafaga_en_la_ventana(
             "aggs": {"direcciones": {"cardinality": {"field": "source.ip"}}},
         }
     }
-    if evento.command:
+    comparable = len(evento.command.encode("utf-8", "surrogatepass")) <= LARGO_MAXIMO_DE_TERMINO
+    if evento.command and comparable:
         # `process.command_line` está mapeado como `wildcard`, que admite `term` exacto.
         aggs["por_comando"] = {
             "filter": {"term": {"process.command_line": evento.command}},
@@ -324,6 +333,11 @@ def rafaga_en_la_ventana(
         salida["mismo_comando"] = {
             "eventos": agg["por_comando"]["doc_count"],
             "direcciones": int(agg["por_comando"]["direcciones"]["value"]),
+        }
+    elif evento.command:
+        salida["mismo_comando"] = {
+            "disponible": False,
+            "motivo": "el comando es demasiado largo para compararlo entero",
         }
     return salida
 
