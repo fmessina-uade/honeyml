@@ -1,13 +1,19 @@
-# Ajustes para desarrollo local en macOS o Linux, que se suman a la composición de producción. Se
-# levanta con `make dev-up`, o con docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+# Ajustes para desarrollo local en macOS o Linux, que se aplican encima de la composición de
+# producción. Se levanta con `make dev-up`, o con
+# docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 #
 # Los puertos cambian porque en la máquina de desarrollo los reales suelen estar ocupados: macOS corre
 # su propio sshd en el 22 y comparte archivos por SMB en el 445, y puede haber un MySQL en el 3306 o
 # un servidor web en el 80.
+#
+# Las listas de puertos llevan !override porque Compose junta las listas de los dos archivos en vez
+# de reemplazarlas. Sin la etiqueta, los puertos de producción se publican igual en 0.0.0.0 al lado
+# de los de acá: los señuelos quedan abiertos en todas las interfaces de la máquina, o el arranque
+# falla porque el puerto ya está tomado. Con ella solo se publican los de 127.0.0.1.
 
 services:
   cowrie:
-    ports:
+    ports: !override
       - "127.0.0.1:2222:2222/tcp"   # honeypot SSH  (se prueba con: ssh -p 2222 root@localhost)
       - "127.0.0.1:2323:2223/tcp"   # honeypot Telnet
     # un núcleo entero en local, para que el tope no moleste mientras se desarrolla
@@ -15,7 +21,7 @@ services:
     mem_limit: 256m
 
   dionaea:
-    ports:
+    ports: !override
       - "127.0.0.1:2121:21/tcp"     # FTP
       - "127.0.0.1:8080:80/tcp"     # HTTP  (se prueba con: curl http://localhost:8080)
       - "127.0.0.1:8443:443/tcp"    # HTTPS
