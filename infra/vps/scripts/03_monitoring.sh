@@ -125,10 +125,14 @@ if docker inspect --format='{{.State.Status}}' elasticsearch >/dev/null 2>&1; th
 fi
 
 # Atraso del bus. Que el motor esté corriendo no alcanza: si deja de consumir, el contenedor sigue
-# en pie y lo único que lo delata es el atraso creciendo sin techo.
+# en pie y lo único que lo delata es el atraso creciendo sin techo. La consulta se autentica igual
+# que el healthcheck del compose, solo si hay clave. Va entre comillas simples para que la expanda
+# el shell del contenedor con su propio BUS_PASSWORD: así este script no necesita conocer la clave.
+# Sin autenticarse, valkey-cli contesta NOAUTH, sale con cero y el aviso no salta nunca.
 if docker inspect --format='{{.State.Status}}' valkey >/dev/null 2>&1; then
-    ATRASO=\$(docker exec valkey valkey-cli --raw XINFO GROUPS honeyml:events 2>/dev/null \
-        | awk '/^lag\$/{getline; print; exit}')
+    ATRASO=\$(docker exec valkey sh -c \
+        'valkey-cli \${BUS_PASSWORD:+-a "\$BUS_PASSWORD"} --no-auth-warning --raw XINFO GROUPS honeyml:events' \
+        2>/dev/null | awk '/^lag\$/{getline; print; exit}')
     if [[ "\$ATRASO" =~ ^[0-9]+\$ ]] && [[ "\$ATRASO" -ge $THRESHOLD_ATRASO ]]; then
         send_alert "aviso" "El motor no consume: \${ATRASO} eventos de atraso en el bus"
     fi

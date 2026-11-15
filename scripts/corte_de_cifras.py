@@ -2,8 +2,8 @@
 
 Corre adentro de la imagen de análisis, con la red del anfitrión, y usa las mismas consultas que la
 API y el panel, así cada cifra publicada coincide por construcción con la que muestra el panel. Lee
-también los artefactos derivados de data/processed y el repertorio del bus. Escribe un JSON por la
-salida estándar.
+también los artefactos derivados de data/processed y el repertorio del bus, con la clave de
+`BUS_PASSWORD` si el bus la exige. Escribe un JSON por la salida estándar.
 
     python scripts/corte_de_cifras.py > corte.json
     python scripts/corte_de_cifras.py --hasta 2026-10-03T22:00:59Z > corte_recontado.json
@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import datetime
 import json
+import os
 import sys
 import urllib.request
 from collections import Counter
@@ -283,7 +284,13 @@ def sesiones() -> dict[str, Any]:
 def motor() -> dict[str, Any]:
     r = decisiones.resumen()
     razonadas = r["razonadas"]
-    bus = redis.Redis(host="127.0.0.1", port=6379, decode_responses=True, socket_timeout=10)
+    bus = redis.Redis(
+        host="127.0.0.1",
+        port=6379,
+        password=os.getenv("BUS_PASSWORD") or None,
+        decode_responses=True,
+        socket_timeout=10,
+    )
     firmas = sum(1 for _ in bus.scan_iter(match="honeyml:firma:*", count=1000))
     indice = _es(f"/_cat/indices/{decisiones.DECISIONES}*?format=json&bytes=b")
     grupo = next((g for g in bus.xinfo_groups("honeyml:events") if g["name"] == "triaje"), {})
