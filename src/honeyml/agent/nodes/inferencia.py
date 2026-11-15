@@ -26,6 +26,7 @@ import json
 from typing import Any
 
 from ...education.annotations import TACTICAS_OBSERVABLES
+from .. import firma
 from ..adapters.inferencia import costo_de, esquema_estricto
 from ..adapters.servicio import AdaptadorDeInferencia, ServicioDeInferencia
 from ..severidad import para_el_proveedor
@@ -131,6 +132,25 @@ def seudonimo(ip: str) -> str:
     return "origen-" + hashlib.sha256(ip.encode()).hexdigest()[:8]
 
 
+def _compactar(valor: Any) -> Any:
+    """El valor con cada trozo de binario reemplazado por una marca con su largo.
+
+    Un binario escrito de a trozos, en base64 o con escapes, no le dice al modelo nada que no diga
+    su largo: la conducta es escribir un binario. Miles de caracteres de eso solo agrandan el
+    pedido hasta que el proveedor lo rechaza, y el evento no se tría nunca. El reemplazo es
+    determinístico, así lo que vio el modelo se puede reconstruir, y el evento queda entero en el
+    índice.
+    """
+    if isinstance(valor, str):
+        sin_bytes = firma.ESCAPES_HEX.sub(lambda m: f"<bytes, {len(m.group())} caracteres>", valor)
+        return firma.BASE64_LARGO.sub(lambda m: f"<base64, {len(m.group())} caracteres>", sin_bytes)
+    if isinstance(valor, dict):
+        return {clave: _compactar(v) for clave, v in valor.items()}
+    if isinstance(valor, list):
+        return [_compactar(v) for v in valor]
+    return valor
+
+
 def _pedido(estado: EstadoTriaje) -> str:
     """Arma el mensaje que lee el proveedor, a partir de la estructura del contexto.
 
@@ -151,7 +171,7 @@ def _pedido(estado: EstadoTriaje) -> str:
         "comando_ejecutado": ctx.comando,
         "momento": ctx.momento,
     }
-    evento = "\n".join(f"{k}: {v}" for k, v in campos.items() if v)
+    evento = "\n".join(f"{k}: {_compactar(v)}" for k, v in campos.items() if v)
     # La dirección de origen se reemplaza por su apodo en todo el texto del evento, no solo en su
     # campo: el resumen la trae embebida, y la real no tiene que llegar al proveedor.
     if ctx.origen:
@@ -162,7 +182,10 @@ def _pedido(estado: EstadoTriaje) -> str:
         # Con `indent` y sin escapar los acentos, porque esto lo va a leer una persona que audite la
         # decisión más adelante, no solo el modelo.
         partes.append(
-            _bloque("CONTEXTO RECUPERADO", json.dumps(ctx.hallazgos, indent=2, ensure_ascii=False))
+            _bloque(
+                "CONTEXTO RECUPERADO",
+                json.dumps(_compactar(ctx.hallazgos), indent=2, ensure_ascii=False),
+            )
         )
 
     # Se deduplican conservando el orden. El estado guarda la historia completa, que es lo que hay

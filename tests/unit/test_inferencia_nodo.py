@@ -191,6 +191,33 @@ def test_el_pedido_se_arma_desde_la_estructura_y_es_reproducible() -> None:
     assert s1.usuario == s2.usuario and s1.sistema == s2.sistema
 
 
+def test_los_trozos_de_un_binario_viajan_como_una_marca_con_su_largo() -> None:
+    """Miles de caracteres de base64 solo agrandan el pedido hasta que el proveedor lo rechaza."""
+    trozo = "f0VMRgIBAQAAAAAAAAAAAAIAPgABAAAAU+BAAAAAAABAAAAAAAAAAA" * 40
+    comando = f"printf '%s' '{trozo}' >> .x"
+    s = _ServicioFalso()
+    nodo.consultar(
+        _estado(
+            contexto=Contexto(
+                doc_id="abc123",
+                resumen=f"cowrie/process 203.0.113.7 ssh: {comando}",
+                sensor="cowrie",
+                protocolo="ssh",
+                origen="203.0.113.7",
+                comando=comando,
+                momento="2026-10-22T11:55:38Z",
+                hallazgos={"sesion": {"comandos": [comando, r"echo -ne '\x7f\x45\x4c'"]}},
+            )
+        ),
+        servicio=s,
+    )
+    assert trozo not in s.usuario
+    assert f"<base64, {len(trozo)} caracteres>" in s.usuario
+    assert "<bytes, 12 caracteres>" in s.usuario
+    # Lo que rodea al trozo se conserva: el modelo ve que se escribe en un archivo.
+    assert ">> .x" in s.usuario
+
+
 def test_la_direccion_de_origen_viaja_seudonimizada() -> None:
     """La dirección real no se le manda al proveedor: va un apodo estable, que alcanza para que el
     modelo vea que dos eventos comparten origen."""
