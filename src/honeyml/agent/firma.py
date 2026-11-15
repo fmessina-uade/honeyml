@@ -18,17 +18,16 @@ cualquier otro de la misma firma. La táctica sí puede oscilar entre repeticion
 como límite conocido.
 
 El comando entra con los bytes escritos como escapes reemplazados por una marca. Un dropper que no
-logra descargar su binario lo escribe de a trozos, con `echo -ne '\x7f\x45\x4c...' >> archivo`, y
-cada trozo es un comando distinto: sin la marca, una sola descarga son cientos de firmas y cientos
-de llamadas para decidir lo mismo. Los bytes no cambian la conducta, que es escribir un binario en
-el señuelo. El archivo y la redirección se conservan.
+logra descargar su binario lo escribe de a trozos, con `echo -ne '\x7f\x45\x4c...' >> archivo` o
+con `printf '%s' '<base64>'`, y cada trozo es un comando distinto: sin la marca, una sola descarga
+son cientos de firmas y cientos de llamadas para decidir lo mismo. Los bytes no cambian la conducta,
+que es escribir un binario en el señuelo. El archivo y la redirección se conservan.
 
 Pasa lo mismo con los escáneres que comprueban si el shell es real: en cada intento mandan una marca
 al azar, como `check_` seguido de treinta y dos hexadecimales, o una cuenta con números al azar, y
 esperan verla de vuelta. La conducta es siempre comprobar el señuelo, así que las tiras
-hexadecimales largas y las cuentas también se vuelven marcas. Un comando que no tiene ninguna de las
-tres cosas firma igual que si las marcas no existieran, así que el repertorio ya guardado sigue
-valiendo.
+hexadecimales largas y las cuentas también se vuelven marcas. Un comando sin nada de eso firma igual
+que si las marcas no existieran, así que el repertorio ya guardado sigue valiendo.
 """
 
 from __future__ import annotations
@@ -58,6 +57,12 @@ MARCA_DE_BYTES = "<bytes>"
 HEX_LARGO = re.compile(r"[0-9a-fA-F]{16,}")
 MARCA_DE_HEX = "<hex>"
 
+# Cuarenta caracteres seguidos del alfabeto de base64 no son texto escrito: son un trozo de un
+# binario codificado, que un dropper manda de a uno con `printf '%s' '...'`. Cada trozo trae otros
+# caracteres y la conducta es una sola, escribir un binario en el señuelo.
+BASE64_LARGO = re.compile(r"[A-Za-z0-9+/]{40,}={0,2}")
+MARCA_DE_BASE64 = "<base64>"
+
 # Números unidos por operadores, como `835*762+22`: la cuenta que el escáner pide resolver para ver
 # si el shell responde. Los números cambian en cada intento y la conducta no.
 CUENTA = re.compile(r"\d+(?:\s*[-+*/%]\s*\d+)+")
@@ -72,11 +77,12 @@ LARGO = 16
 def comando_firmado(comando: str) -> str:
     """El comando como entra en la firma: bytes, identificadores y cuentas quedan como marcas.
 
-    Los escapes van primero porque también son hexadecimales: si no, un trozo largo de bytes
-    quedaría partido entre las dos marcas.
+    Los escapes van primero porque también son hexadecimales, y el base64 antes que los
+    hexadecimales porque los contiene: en otro orden, un mismo trozo quedaría partido entre marcas.
     """
     sin_bytes = ESCAPES_HEX.sub(MARCA_DE_BYTES, comando)
-    sin_hex = HEX_LARGO.sub(MARCA_DE_HEX, sin_bytes)
+    sin_base64 = BASE64_LARGO.sub(MARCA_DE_BASE64, sin_bytes)
+    sin_hex = HEX_LARGO.sub(MARCA_DE_HEX, sin_base64)
     return CUENTA.sub(MARCA_DE_CUENTA, sin_hex)
 
 

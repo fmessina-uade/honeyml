@@ -20,7 +20,7 @@ clasificación estaría hecha a medias antes de que corra el clasificador.
 from __future__ import annotations
 
 from typing import Any
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 
 from .. import tools
 from ..state import SUFIJO_DE_FALLA, Contexto, EstadoTriaje
@@ -39,6 +39,16 @@ def _intentar(nombre: str, hallazgos: dict[str, Any], fn: Any, *args: Any) -> An
     """
     try:
         return fn(*args)
+    except HTTPError as exc:
+        # `HTTPError` hereda de `URLError`, pero un 4xx no es el índice caído: es Elasticsearch
+        # rechazando esta consulta, por ejemplo la de una sesión con comandos enormes. Tratarlo como
+        # caída devolvía el evento al bus una y otra vez hasta descartarlo. Un 5xx sí corta.
+        if exc.code >= 500:
+            raise
+        hallazgos[f"{nombre}{SUFIJO_DE_FALLA}"] = (
+            f"Elasticsearch rechazó la consulta (HTTP {exc.code})"
+        )
+        return None
     except SIN_INDICE:
         raise
     except Exception as exc:  # noqa: BLE001 - ver el docstring

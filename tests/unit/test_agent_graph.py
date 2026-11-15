@@ -13,8 +13,9 @@ como prueba en rojo sin este archivo.
 
 from __future__ import annotations
 
+from email.message import Message
 from typing import Any
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 
 import pytest
 from langgraph.errors import GraphRecursionError
@@ -409,6 +410,38 @@ def test_una_consulta_que_falla_queda_anotada(monkeypatch: pytest.MonkeyPatch) -
     ctx = nodo_contexto.construir({"evento": _evento()})["contexto"]
     assert "origen_falló" in ctx.hallazgos
     assert "KeyError" in ctx.hallazgos["origen_falló"]
+
+
+def test_una_consulta_rechazada_queda_anotada_y_no_corta_el_ciclo(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Un 400 de Elasticsearch es esta consulta, no el índice caído, aunque herede de `URLError`.
+
+    Tomarlo por caída devolvía el evento al bus hasta descartarlo: una sesión con comandos enormes
+    no se triaba nunca.
+    """
+
+    def rechaza(*_: Any) -> Any:
+        raise HTTPError("http://es/honeypot-*/_search", 400, "Bad Request", Message(), None)
+
+    monkeypatch.setattr(tools, "historial_de_direccion", lambda ip, hasta: {"conocida": False})
+    monkeypatch.setattr(tools, "origen_de_direccion", lambda ip: {})
+    monkeypatch.setattr(tools, "comandos_de_la_sesion", rechaza)
+    monkeypatch.setattr(tools, "arquetipos_del_corpus", lambda: None)
+
+    ctx = nodo_contexto.construir({"evento": _evento()})["contexto"]
+    assert "HTTP 400" in ctx.hallazgos["sesion_falló"]
+
+
+def test_un_error_del_servidor_de_elasticsearch_si_corta_el_ciclo(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def no_responde(*_: Any) -> Any:
+        raise HTTPError("http://es/honeypot-*/_search", 503, "Unavailable", Message(), None)
+
+    monkeypatch.setattr(tools, "historial_de_direccion", no_responde)
+    with pytest.raises(HTTPError):
+        nodo_contexto.construir({"evento": _evento()})
 
 
 def test_dionaea_no_pregunta_por_sesion(monkeypatch: pytest.MonkeyPatch) -> None:

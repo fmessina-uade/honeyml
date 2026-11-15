@@ -140,6 +140,13 @@ def test_las_comprobaciones_del_shell_con_marcas_al_azar_comparten_firma() -> No
     assert cuenta == otra_cuenta
 
 
+def test_los_trozos_en_base64_de_un_mismo_binario_comparten_firma() -> None:
+    """Un dropper que manda el binario en base64, de a un trozo por comando, es una conducta."""
+    uno = _evento(command="printf '%s' 'GKKx/2gAAAAAAAAAEAAAAFhTAgB0orH/DwAAAAAAAAAQAAAAAA=='")
+    otro = _evento(command="printf '%s' 'EAMDABxgtf82AAAAAEEOEIMCdA4IAAAAGAAAACwDAwBAYLXAAAA'")
+    assert modulo_firma.de_evento(uno) == modulo_firma.de_evento(otro)
+
+
 def test_lo_que_rodea_a_las_marcas_sigue_partiendo_la_firma() -> None:
     """Imprimir la marca con printf o con echo no es lo mismo: solo se ignora lo generado."""
     imprime = modulo_firma.de_evento(_evento(command="printf '%s' 'check_35e321f1a14afc5f'"))

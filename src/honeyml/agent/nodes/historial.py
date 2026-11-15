@@ -17,7 +17,7 @@ Igual que el nodo de contexto, acá no se pondera nada: se recupera y se anota.
 from __future__ import annotations
 
 from typing import Any
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 
 from .. import tools
 from ..state import SUFIJO_DE_FALLA, EstadoTriaje
@@ -30,6 +30,15 @@ SIN_INDICE = (URLError, ConnectionError, TimeoutError)
 def _intentar(nombre: str, hallazgos: dict[str, Any], fn: Any, *args: Any) -> Any:
     try:
         return fn(*args)
+    except HTTPError as exc:
+        # Un 4xx es una consulta rechazada y no el índice caído, aunque `HTTPError` herede de
+        # `URLError`. Ver el nodo de contexto.
+        if exc.code >= 500:
+            raise
+        hallazgos[f"{nombre}{SUFIJO_DE_FALLA}"] = (
+            f"Elasticsearch rechazó la consulta (HTTP {exc.code})"
+        )
+        return None
     except SIN_INDICE:
         raise
     except Exception as exc:  # noqa: BLE001 - ver el nodo de contexto
