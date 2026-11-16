@@ -213,7 +213,7 @@ class SinClasificacionError(ValueError):
 
 
 class RevisadaACiegasError(ValueError):
-    """Se quiso reemplazar una revisión a ciegas con un veredicto común."""
+    """Se quiso reemplazar una revisión a ciegas, con un veredicto común o con otra a ciegas."""
 
 
 class SinMuestraError(RuntimeError):
@@ -864,10 +864,19 @@ def revisar_a_ciegas(
     El veredicto lo calcula el servidor: confirma si coinciden la severidad y la táctica, corrige si
     no. Así no depende de lo que el analista piense después de ver la respuesta del motor, que es
     lo que la revisión a ciegas existe para evitar. None si el evento no tiene decisión del motor.
+
+    Por la misma razón, una revisión a ciegas no se reemplaza con otra: al guardar la primera, el
+    analista ya vio la clasificación del motor, y la segunda dejaría de ser a ciegas.
     """
     decision = _documento(DECISIONES, doc_id, es_url)
     if decision is None:
         return None
+    previa = _documento(REVISIONES, doc_id, es_url)
+    if previa and previa.get("a_ciegas"):
+        raise RevisadaACiegasError(
+            "Esta decisión ya tiene una revisión a ciegas. Es la referencia con la que se mide el "
+            "motor, y otra tomada después de ver su clasificación no la reemplaza."
+        )
 
     motor = _lo_que_dijo_el_motor(decision)
     coincide = clasificacion.severidad == motor["severidad"] and (

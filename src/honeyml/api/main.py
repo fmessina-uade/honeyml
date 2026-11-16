@@ -439,9 +439,12 @@ def put_revision_a_ciegas(
     doc_id: str, clasificacion: decisiones.ClasificacionACiegas, sesion: Analista
 ) -> dict[str, Any]:
     """La clasificación elegida a ciegas; la respuesta trae la del motor para mostrarla después."""
-    guardada = _en_vivo(
-        lambda: decisiones.revisar_a_ciegas(doc_id, clasificacion, usuario=sesion.usuario)
-    )
+    try:
+        guardada = _en_vivo(
+            lambda: decisiones.revisar_a_ciegas(doc_id, clasificacion, usuario=sesion.usuario)
+        )
+    except decisiones.RevisadaACiegasError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     if guardada is None:
         raise HTTPException(status_code=404, detail="Ese evento no tiene decisión del motor.")
     auditoria.registrar(

@@ -1,7 +1,7 @@
 """La revisión a ciegas, sin Elasticsearch.
 
 La clasificación del motor no puede llegar al panel antes de tiempo, el veredicto lo calcula el
-servidor y un veredicto común no pisa la referencia de la medición.
+servidor, y ni un veredicto común ni otra revisión a ciegas pisan la referencia de la medición.
 """
 
 from __future__ import annotations
@@ -158,6 +158,35 @@ def test_un_veredicto_comun_no_pisa_uno_a_ciegas(monkeypatch: pytest.MonkeyPatch
 
     assert r.status_code == 409
     assert guardados == []
+
+
+def test_una_revision_a_ciegas_no_pisa_otra(muestra: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """El panel no la ofrece dos veces, pero la API tiene que negarse igual a un pedido armado."""
+    guardados = _sin_red(monkeypatch, hechas={"d2"}, revision={"a_ciegas": True})
+
+    r = TestClient(app).put(
+        "/api/decisiones/d2/revision-a-ciegas",
+        json={"severidad": "alto", "tactica_mitre": "Ejecución"},
+    )
+
+    assert r.status_code == 409
+    assert guardados == []
+
+
+def test_una_revision_a_ciegas_si_reemplaza_un_veredicto_comun(
+    muestra: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """La a ciegas es la referencia de la medición: puede llegar después de un veredicto común."""
+    guardados = _sin_red(monkeypatch, hechas=set(), revision={"veredicto": "confirma"})
+
+    r = TestClient(app).put(
+        "/api/decisiones/d2/revision-a-ciegas",
+        json={"severidad": "critico", "tactica_mitre": "Ejecución"},
+    )
+
+    assert r.status_code == 200
+    [(_, _, cuerpo)] = guardados
+    assert cuerpo["a_ciegas"] is True
 
 
 def test_las_revisadas_a_ciegas_se_buscan_por_marca(monkeypatch: pytest.MonkeyPatch) -> None:
