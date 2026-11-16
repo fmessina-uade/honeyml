@@ -7,8 +7,8 @@ export interface Overview {
   logins_success: number;
   commands: number;
   by_sensor: Record<string, number>;
-  first_event: string;
-  last_event: string;
+  first_event: string | null;
+  last_event: string | null;
 }
 
 export interface Bucket {

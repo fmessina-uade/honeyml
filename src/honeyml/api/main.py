@@ -46,6 +46,11 @@ from .privacidad import credenciales_de_sesiones, sin_contrasenas, sin_direccion
 
 REPLAY_FILE = Path("data/processed/replay_sessions.json")
 
+SIN_EVENTOS = (
+    "Todavía no llegó ningún evento de los sensores a Elasticsearch. "
+    "Cuando entre el primero, recargá el panel."
+)
+
 
 def _live_or_frozen[T](fetch: Callable[[], T], key: str) -> T:
     """Corre la consulta en vivo y cae al respaldo congelado si no se alcanza a Elasticsearch.
@@ -55,6 +60,8 @@ def _live_or_frozen[T](fetch: Callable[[], T], key: str) -> T:
     """
     try:
         return fetch()
+    except queries.SinEventosError as exc:
+        raise HTTPException(status_code=503, detail=SIN_EVENTOS) from exc
     except (URLError, ConnectionError, TimeoutError) as exc:
         frozen = offline.load()
         if frozen is None or key not in frozen:
@@ -128,6 +135,9 @@ def health() -> dict[str, Any]:
     """Informa si lo que se está sirviendo es en vivo o sale del respaldo congelado."""
     try:
         queries.overview()
+        return {"status": "ok", "mode": "live"}
+    except queries.SinEventosError:
+        # Elasticsearch responde: está en vivo, solo que todavía vacío.
         return {"status": "ok", "mode": "live"}
     except (URLError, ConnectionError, TimeoutError):
         frozen = offline.load()
@@ -249,6 +259,8 @@ def get_snapshot() -> dict[str, Any]:
     """Todo junto: un solo viaje para la carga del panel y para cada refresco."""
     try:
         return _snapshot_reciente()
+    except queries.SinEventosError as exc:
+        raise HTTPException(status_code=503, detail=SIN_EVENTOS) from exc
     except (URLError, ConnectionError, TimeoutError) as exc:
         frozen = offline.load()
         if frozen is None:

@@ -139,13 +139,19 @@ export default function App() {
 
   useEffect(() => {
     if (!sesion) return;
-    Promise.all([api.snapshot(), api.replays()])
-      .then(([s, r]) => {
+    api
+      .snapshot()
+      .then((s) => {
         setSnapshot(s);
-        setReplays(r);
         setActualizado(Date.now());
       })
       .catch((e) => setError(String(e)));
+    // aparte de la telemetría: en una instalación nueva todavía no hay sesiones publicadas, y eso
+    // deja vacía una sola sección en lugar de todo el panel
+    api
+      .replays()
+      .then(setReplays)
+      .catch(() => setReplays([]));
     api
       .artefactos()
       .then(setArtefactos)

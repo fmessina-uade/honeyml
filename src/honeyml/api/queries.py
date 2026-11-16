@@ -38,6 +38,10 @@ def fijar_tope(instante: str | None) -> None:
     )
 
 
+class SinEventosError(LookupError):
+    """Elasticsearch responde, pero todavía no existe ningún índice de los sensores."""
+
+
 def _search(body: dict[str, Any], es_url: str = ES_URL, index: str = INDEX) -> dict[str, Any]:
     req = urllib.request.Request(
         f"{es_url}/{index}/_search",
@@ -47,7 +51,12 @@ def _search(body: dict[str, Any], es_url: str = ES_URL, index: str = INDEX) -> d
     )
     with urllib.request.urlopen(req, timeout=60) as resp:
         result: dict[str, Any] = json.load(resp)
-        return result
+    # Un patrón como `honeypot-*` que no coincide con ningún índice no es un error para
+    # Elasticsearch: contesta sin agregaciones. Pasa en una instalación nueva, antes del primer
+    # evento, y sin esto cada consulta se rompe con un KeyError que no dice qué falta.
+    if "aggs" in body and "aggregations" not in result:
+        raise SinEventosError("Todavía no hay eventos de los sensores en Elasticsearch.")
+    return result
 
 
 # Cada índice diario contesta solo sus primeros valores, y Elasticsearch suma esas respuestas. Un
@@ -131,8 +140,10 @@ def overview(es_url: str = ES_URL) -> dict[str, Any]:
         "logins_success": agg["logins_ok"]["doc_count"],
         "commands": agg["commands"]["doc_count"],
         "by_sensor": {b["key"]: b["doc_count"] for b in agg["sensors"]["buckets"]},
-        "first_event": agg["window"]["min_as_string"],
-        "last_event": agg["window"]["max_as_string"],
+        # Con cero eventos externos (por ejemplo, solo ataques desde la propia máquina, que el
+        # filtro deja afuera) Elasticsearch no manda las fechas.
+        "first_event": agg["window"].get("min_as_string"),
+        "last_event": agg["window"].get("max_as_string"),
     }
 
 
