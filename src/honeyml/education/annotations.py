@@ -211,6 +211,29 @@ RULES: list[tuple[re.Pattern[str], Annotation]] = [
             technique="T1070",
         ),
     ),
+    # Va antes que la regla de cuentas porque `\bpasswd\b` también coincide con la ruta del archivo,
+    # y leerlo no crea ni modifica ninguna cuenta. Una redirección o un `tee` hacia el archivo sí lo
+    # modifica, y por eso esos casos siguen de largo hasta la regla de abajo.
+    (
+        re.compile(
+            r"^(?!.*(?:>|\btee\b.*)\s*/etc/(?:passwd|group)\b).*/etc/(?:passwd|group)\b",
+            re.I | re.S,
+        ),
+        Annotation(
+            what="Lee la lista de cuentas del sistema.",
+            why="Averigua qué usuarios existen y cuáles tienen una consola asignada, para saber "
+            "con qué cuenta le conviene seguir. Solo lee el archivo: no crea ni cambia ninguna "
+            "cuenta.",
+            what_en="Reads the system's list of accounts.",
+            why_en=(
+                "Finds out which users exist and which of them have a login shell, to know which "
+                "account is worth pursuing. It only reads the file: it does not create or change "
+                "any account."
+            ),
+            tactic="Descubrimiento",
+            technique="T1087.001",
+        ),
+    ),
     (
         re.compile(r"\b(passwd|useradd|adduser|usermod)\b", re.I),
         Annotation(
