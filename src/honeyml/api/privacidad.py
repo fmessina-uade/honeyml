@@ -14,7 +14,11 @@ from __future__ import annotations
 import re
 from typing import Any
 
-DIRECCION = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
+# Alrededor de la dirección se pide que no haya otro dígito, y no un límite de palabra, porque para
+# la expresión regular el guion bajo y las letras son parte de la palabra. Con `\b` quedan sin tapar
+# la versión de cliente que manda un escáner (`MGLNDD_203.0.113.10_22`) y una dirección pegada a
+# texto, como en `Host: 198.51.100.7rnrn`.
+DIRECCION = re.compile(r"(?<!\d)(?:\d{1,3}\.){3}\d{1,3}(?!\d)")
 TAPADA = "x.x.x.x"
 
 # El host de una URL con esquema: desde `esquema://` hasta la barra, el signo de pregunta o el

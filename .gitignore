@@ -178,11 +178,12 @@ reports/figures/
 .domain
 infra/vps/.env
 
-# Documentación local: notas de trabajo, que no se versionan
+# Documentación local: notas de trabajo, que no se versionan. La excepción es el README de la raíz,
+# que es la guía para levantar el proyecto.
 *.md
+!/README.md
 docs/
 informe/
-contexto.md
 
 # Panel educativo: dependencias y compilación
 node_modules/
