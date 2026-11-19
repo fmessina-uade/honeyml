@@ -5,12 +5,14 @@ la dirección del honeypot, las de origen, y la infraestructura que aparece dent
 (un `wget` contra el servidor que reparte el binario). Alcanza con las direcciones IPv4, el host de
 una URL con esquema, y un dominio usado como host (seguido de una barra). Un dominio suelto sin ruta
 se deja, porque separarlo de un nombre de archivo como `config.json` sin tocar el comando no es
-confiable. Se tapa en el servidor y no en el panel, porque lo que no viaja no se puede ver por
-accidente.
+confiable. Una dirección escondida en base64 o en escapes hexadecimales también se tapa. Se tapa en
+el servidor y no en el panel, porque lo que no viaja no se puede ver por accidente.
 """
 
 from __future__ import annotations
 
+import base64
+import binascii
 import re
 from typing import Any
 
@@ -28,6 +30,17 @@ HOST_DE_URL = re.compile(r"\b([a-z][a-z0-9+.-]*://)[^/\s?#]+")
 # letras o más, así `x.x.x.x` (ya tapado) y nombres como `a.sh` sin barra no entran.
 DOMINIO_CON_RUTA = re.compile(r"\b(?:[a-z0-9-]+\.)+[a-z]{2,}(?=/)", re.IGNORECASE)
 HOST_TAPADO = "tapado"
+
+# Un comando puede esconder la dirección, como en `echo <base64> | base64 -d | sh` o en un `printf`
+# con escapes hexadecimales, y ahí el patrón de arriba no la ve. Cada bloque se decodifica, se le
+# tapa la dirección y se vuelve a codificar, así el comando sigue diciendo lo mismo sin ella.
+BLOQUE_BASE64 = re.compile(r"[A-Za-z0-9+/]{16,}={0,2}")
+BLOQUE_HEXA = re.compile(r"(?:\\x[0-9a-fA-F]{2})+")
+# El alfabeto del base64 también lo tienen los caminos largos y las huellas en hexadecimal, que
+# decodificados dan bytes al azar. Por eso un bloque cuenta solo si decodificado es texto. Los
+# escapes hexadecimales son siempre una codificación a propósito, y se miran aunque traigan un
+# binario: la dirección del servidor de control suele ir adentro.
+PROPORCION_DE_TEXTO = 0.9
 
 # Una credencial con forma de dirección es un fragmento de una IP que el atacante probó como usuario
 # o contraseña, y uno de esos fragmentos es parte de la dirección del propio servidor. Tres grupos
@@ -120,15 +133,43 @@ def sin_contrasenas(valor: Any) -> Any:
     return valor
 
 
+def _es_texto(datos: bytes) -> bool:
+    legibles = sum(32 <= b < 127 or b in (9, 10, 13) for b in datos)
+    return bool(datos) and legibles >= PROPORCION_DE_TEXTO * len(datos)
+
+
+def _base64_sin_direcciones(bloque: re.Match[str]) -> str:
+    original = bloque.group(0)
+    try:
+        datos = base64.b64decode(original + "=" * (-len(original) % 4))
+    except (binascii.Error, ValueError):
+        return original
+    texto = datos.decode("latin-1")
+    if not _es_texto(datos) or not DIRECCION.search(texto):
+        return original
+    return base64.b64encode(DIRECCION.sub(TAPADA, texto).encode("latin-1")).decode()
+
+
+def _hexa_sin_direcciones(bloque: re.Match[str]) -> str:
+    original = bloque.group(0)
+    texto = bytes.fromhex(original.replace("\\x", "")).decode("latin-1")
+    if not DIRECCION.search(texto):
+        return original
+    return "".join(f"\\x{b:02x}" for b in DIRECCION.sub(TAPADA, texto).encode("latin-1"))
+
+
 def _tapar_texto(texto: str) -> str:
     """Un texto con las direcciones, el host de las URL y los dominios con ruta tapados.
 
     Primero las IPv4, así una URL contra una dirección queda con el host ya tapado y el dominio no
-    la vuelve a tocar.
+    la vuelve a tocar. Los bloques codificados van al final: el base64 no tiene puntos ni `://`, así
+    que las sustituciones de antes no lo alteran.
     """
     texto = DIRECCION.sub(TAPADA, texto)
     texto = HOST_DE_URL.sub(rf"\1{HOST_TAPADO}", texto)
-    return DOMINIO_CON_RUTA.sub(HOST_TAPADO, texto)
+    texto = DOMINIO_CON_RUTA.sub(HOST_TAPADO, texto)
+    texto = BLOQUE_BASE64.sub(_base64_sin_direcciones, texto)
+    return BLOQUE_HEXA.sub(_hexa_sin_direcciones, texto)
 
 
 def sin_direcciones(valor: Any) -> Any:

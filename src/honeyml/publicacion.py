@@ -4,7 +4,8 @@ Sale de la telemetría normalizada, sin los orígenes internos, y con tres regla
 origen se reemplaza por un seudónimo hecho con HMAC y una clave privada del proyecto: un hash sin
 clave no alcanza, porque las direcciones IPv4 son pocas y se pueden probar todas. Un usuario o una
 contraseña solo queda si lo probaron al menos cinco direcciones distintas, con la misma regla que
-el panel. Y en cualquier texto se tapan las direcciones, el host de las URL y los dominios con ruta.
+el panel. Y en cualquier texto se tapan las direcciones, el host de las URL y los dominios con ruta,
+y también las direcciones escondidas en base64 o en escapes hexadecimales.
 
 Los campos salen de una lista blanca y no de una lista de lo que se saca: un campo nuevo en el
 índice no puede aparecer en la edición sin que alguien lo agregue a propósito. Quedan afuera, entre
@@ -269,7 +270,10 @@ def main() -> int:
                 f"{privacidad.MINIMO_DE_ORIGENES} direcciones distintas; si no, "
                 f"'{privacidad.CREDENCIAL_TAPADA}'"
             ),
-            "textos": "direcciones IPv4, host de las URL y dominios con ruta, tapados",
+            "textos": (
+                "direcciones IPv4, host de las URL y dominios con ruta, tapados; las direcciones "
+                "también dentro de bloques en base64 o en escapes hexadecimales"
+            ),
             "afuera": "orígenes internos, la dirección del servidor, el mensaje crudo, ciudad, "
             "región y coordenadas",
         },
