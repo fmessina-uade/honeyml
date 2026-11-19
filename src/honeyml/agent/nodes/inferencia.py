@@ -124,8 +124,11 @@ def seudonimo(ip: str) -> str:
 
     La misma dirección da siempre el mismo apodo, así el modelo todavía puede ver que dos eventos
     vienen del mismo origen, que es lo único que la dirección le aporta a la clasificación. El resto
-    del contexto sobre esa dirección ya viaja en conteos, no en la dirección misma. El apodo no se
-    puede volver dirección: es el principio de un SHA-256, que no se invierte.
+    del contexto sobre esa dirección ya viaja en conteos, no en la dirección misma. El apodo es el
+    principio de un SHA-256 sin clave, así que se puede volver a la dirección probando todas las
+    IPv4. Lo que evita es que la dirección viaje escrita en el pedido. Que el proveedor no se quede
+    con ella lo cuida el enrutador, que descarta a los que guardan los pedidos; con un proveedor
+    directo ese filtro no está.
     """
     if not ip:
         return ""
