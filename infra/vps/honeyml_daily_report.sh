@@ -59,6 +59,40 @@ del_ultimo_dia() {
     awk -v desde="$HACE_UN_DIA" 'substr($0, 2, 19) >= desde' "$1"
 }
 
+# Las líneas del vigilante de las últimas 24 horas que coinciden con el filtro, contadas por sensor.
+# Devuelve "total|Dionaea 2, Cowrie 1": el nombre es la palabra que sigue al prefijo.
+contar_vigilante() {
+    del_ultimo_dia "$WATCHDOG_LOG" | awk -v filtro="$1" -v prefijo="$2" '
+        $0 ~ filtro {
+            n = substr($0, index($0, prefijo) + length(prefijo)); sub(/[^a-z].*/, "", n)
+            c[n]++; total++
+        }
+        END {
+            s = ""
+            for (k in c) s = s (s == "" ? "" : ", ") toupper(substr(k, 1, 1)) substr(k, 2) " " c[k]
+            print total + 0 "|" s
+        }'
+}
+
+texto_vigilante() {
+    local l_total=${1%%|*} l_detalle=${1#*|} f_total=${2%%|*} f_detalle=${2#*|} partes=()
+    case "$l_total" in
+        0) ;;
+        1) partes+=("un reinicio automático (${l_detalle% 1})") ;;
+        *) partes+=("${l_total} reinicios automáticos (${l_detalle})") ;;
+    esac
+    case "$f_total" in
+        0) ;;
+        1) partes+=("un reinicio fallido (${f_detalle% 1})") ;;
+        *) partes+=("${f_total} reinicios fallidos (${f_detalle})") ;;
+    esac
+    case "${#partes[@]}" in
+        0) echo "sensores estables, sin reinicios automáticos" ;;
+        1) echo "${partes[0]}" ;;
+        *) echo "${partes[0]} y ${partes[1]}" ;;
+    esac
+}
+
 main() {
     local problemas=()
 
@@ -74,19 +108,19 @@ main() {
         "{\"query\":${ULTIMO_DIA}}" '"count":')
 
     if [[ -n "$cowrie" && -n "$dionaea" ]]; then
-        sensores="Sensores, últimas 24 horas: Cowrie $(miles "$cowrie") eventos y Dionaea $(miles "$dionaea"), desde $(miles "${direcciones:-?}") direcciones distintas"
+        sensores="Cowrie $(miles "$cowrie") eventos y Dionaea $(miles "$dionaea"), desde $(miles "${direcciones:-?}") direcciones distintas"
         if (( cowrie + dionaea == 0 )); then
             sensores+=". Ningún evento: revisar la ingesta"
             problemas+=("ningún evento de los sensores")
         fi
     else
-        sensores="Sensores: el índice no contestó"
+        sensores="el índice no contestó"
         problemas+=("el índice no contestó")
     fi
     if [[ -n "$decisiones" ]]; then
-        motor="Motor, últimas 24 horas: $(miles "$decisiones") decisiones"
+        motor="$(miles "$decisiones") decisiones"
     else
-        motor="Motor: el índice no contestó"
+        motor="el índice no contestó"
     fi
 
     # Con el demonio de Docker parado, cada consulta falla igual que la de un contenedor que no
@@ -103,37 +137,24 @@ main() {
                 frenados+=("$nombre")
             fi
         done
-        contenedores="Contenedores en marcha: ${en_marcha} de ${existentes}"
+        contenedores="${en_marcha} de ${existentes} en marcha"
         if (( ${#frenados[@]} > 0 )); then
             contenedores+=", sin correr: ${frenados[*]}"
             problemas+=("sin correr: ${frenados[*]}")
         fi
     else
-        contenedores="Contenedores: Docker no contesta"
+        contenedores="Docker no contesta"
         problemas+=("Docker no contesta")
     fi
 
     # El vigilante escribe "Reiniciando" antes de intentarlo, así que se cuentan los resultados: el
-    # reinicio logrado y el fallido.
-    local logrados fallidos vigilante partes=()
-    read -r logrados fallidos < <(del_ultimo_dia "$WATCHDOG_LOG" \
-        | awk '/OK: .* reiniciado/ {l++} /falló el reinicio/ {f++} END {print l + 0, f + 0}')
-    case "$logrados" in
-        0) ;;
-        1) partes+=("un reinicio por cuelgue") ;;
-        *) partes+=("${logrados} reinicios por cuelgue") ;;
-    esac
-    case "$fallidos" in
-        0) ;;
-        1) partes+=("un intento de reinicio fallido") ;;
-        *) partes+=("${fallidos} intentos de reinicio fallidos") ;;
-    esac
-    case "${#partes[@]}" in
-        0) vigilante="Vigilante, últimas 24 horas: ningún cuelgue" ;;
-        1) vigilante="Vigilante, últimas 24 horas: ${partes[0]}" ;;
-        *) vigilante="Vigilante, últimas 24 horas: ${partes[0]} y ${partes[1]}" ;;
-    esac
-    if (( fallidos > 0 )); then
+    # reinicio logrado y el fallido, cada uno por sensor, porque decir cuál se colgó sirve más que
+    # el total.
+    local vigilante logrados fallidos
+    logrados=$(contar_vigilante 'OK: [a-z]+ reiniciado' 'OK: ')
+    fallidos=$(contar_vigilante 'falló el reinicio de [a-z]+' 'falló el reinicio de ')
+    vigilante=$(texto_vigilante "$logrados" "$fallidos")
+    if [[ "${fallidos%%|*}" != "0" ]]; then
         problemas+=("el vigilante no pudo reiniciar un sensor")
     fi
 
@@ -143,40 +164,78 @@ main() {
     lineas_respaldo=$(del_ultimo_dia "$BACKUP_LOG")
     fallas=$(grep -c 'ERROR' <<< "$lineas_respaldo" || true)
     if ! grep -q 'OK:' <<< "$lineas_respaldo"; then
-        respaldo="Respaldo de la madrugada: no terminó"
+        respaldo="no terminó"
         problemas+=("el respaldo no terminó")
     elif (( fallas == 1 )); then
-        respaldo="Respaldo de la madrugada: terminó, con un volcado fallido"
+        respaldo="terminó, con un volcado fallido"
         problemas+=("el respaldo tuvo un volcado fallido")
     elif (( fallas > 1 )); then
-        respaldo="Respaldo de la madrugada: terminó, con ${fallas} volcados fallidos"
+        respaldo="terminó, con ${fallas} volcados fallidos"
         problemas+=("el respaldo tuvo volcados fallidos")
     elif grep -q 'no se volcó ninguna decisión' <<< "$lineas_respaldo"; then
-        respaldo="Respaldo de la madrugada: terminó, pero sin ninguna decisión volcada"
+        respaldo="terminó, pero sin ninguna decisión volcada"
         problemas+=("el respaldo no volcó decisiones")
     else
-        respaldo="Respaldo de la madrugada: completo"
+        respaldo="completo"
     fi
 
-    local dias memoria disco_uso="" disco_libre="" servidor
-    dias=$(awk '{print int($1 / 86400)}' /proc/uptime 2>/dev/null || true)
+    # Un reinicio del servidor en las últimas 24 horas es un hecho a contar; si no hubo, alcanza con
+    # decir desde cuándo está en marcha.
+    local segundos memoria disco_uso="" disco_libre="" servidor
+    segundos=$(awk '{print int($1)}' /proc/uptime 2>/dev/null || true)
     memoria=$(free 2>/dev/null | awk '/^Mem:/ {printf "%d", $3 * 100 / $2}' || true)
     read -r disco_uso disco_libre < <(df -hP / | awk 'NR == 2 {print $5, $4}') || true
-    servidor="Servidor: ${dias:-?} días en marcha, memoria al ${memoria:-?}%, disco al ${disco_uso:-?} (${disco_libre:-?} libres)"
+    if [[ -z "$segundos" ]]; then
+        servidor=""
+    elif (( segundos < 3600 )); then
+        servidor="reiniciado hace menos de una hora, "
+    elif (( segundos < 7200 )); then
+        servidor="reiniciado hace una hora, "
+    elif (( segundos < 86400 )); then
+        servidor="reiniciado hace $((segundos / 3600)) horas, "
+    elif (( segundos < 172800 )); then
+        servidor="en marcha hace un día, "
+    else
+        servidor="en marcha hace $((segundos / 86400)) días, "
+    fi
+    servidor+="memoria al ${memoria:-?}%, disco al ${disco_uso:-?} (${disco_libre:-?} libres)"
 
-    local anfitrion
+    local anfitrion color estado_resumen
     anfitrion=$(hostname -f 2>/dev/null || hostname)
-    local lineas=("HoneyML, reporte diario de ${anfitrion}" "$sensores" "$motor" "$contenedores" \
-        "$vigilante" "$respaldo" "$servidor")
+    local items=()
+    if (( ${#problemas[@]} > 0 )); then
+        local juntos
+        juntos=$(printf '%s; ' "${problemas[@]}")
+        juntos=${juntos%; }
+        # ámbar: es el nivel medio de la escala del panel, el de lo que hay que mirar
+        color="#D4860A"
+        estado_resumen="Para revisar: ${juntos}"
+        items+=("Para revisar" "$juntos")
+    else
+        # teal: en la paleta es el color del funcionamiento correcto
+        color="#00B894"
+        estado_resumen="Todo en orden"
+    fi
+    items+=("Sensores (últimas 24 hs)" "$sensores"
+        "Motor (últimas 24 hs)" "$motor"
+        "Contenedores" "$contenedores"
+        "Vigilante (últimas 24 hs)" "$vigilante"
+        "Respaldo de la madrugada" "$respaldo"
+        "Servidor" "$servidor")
 
     # a mano, desde una terminal, el reporte también se ve en pantalla
     if [[ -t 1 ]]; then
-        printf '%s\n' "${lineas[@]}"
+        printf 'Reporte diario %s\n' "$anfitrion"
+        printf '%s: %s\n' "${items[@]}"
     fi
 
+    local argumentos=(--titulo "Reporte diario ${anfitrion}" --color "$color" --resumen "$estado_resumen") i
+    for (( i = 0; i < ${#items[@]}; i += 2 )); do
+        argumentos+=(--item "${items[i]}" "${items[i + 1]}")
+    done
     local salida=0 respuesta=""
     if [[ -x "$AVISO" ]]; then
-        respuesta=$("$AVISO" "${lineas[@]}") || salida=$?
+        respuesta=$("$AVISO" "${argumentos[@]}") || salida=$?
     else
         salida=1
     fi
@@ -187,9 +246,7 @@ main() {
         *) log "AVISO: el reporte diario no llegó al canal (${respuesta}). ${resumen}" ;;
     esac
     if (( ${#problemas[@]} > 0 )); then
-        local juntos
-        juntos=$(printf '%s; ' "${problemas[@]}")
-        log "AVISO: el reporte diario encontró problemas: ${juntos%; }"
+        log "AVISO: el reporte diario encontró problemas: ${juntos}"
     fi
 }
 

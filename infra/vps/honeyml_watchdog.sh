@@ -40,16 +40,20 @@ TS=$(date -u '+%Y-%m-%d %H:%M:%S')
 log() { echo "[$TS] $*" >> "$LOG"; }
 
 # El aviso al canal es un agregado: si no hay webhook o el envío falla, el reinicio igual queda en
-# el registro, y eso no puede frenar al vigilante. Las opciones del envío, como --una-por-hora, van
-# antes de las líneas del mensaje.
+# el registro, y eso no puede frenar al vigilante. Un reinicio logrado va en ámbar y uno fallido en
+# coral, la escala del panel. Lo que sigue al mensaje, como --una-por-hora, pasa tal cual al envío.
 avisar() {
-    local opciones=()
-    if [[ "${1:-}" == "--una-por-hora" ]]; then
-        opciones=("$1" "$2")
-        shift 2
+    local severidad="$1" mensaje="$2" titulo color
+    shift 2
+    if [[ "$severidad" == "critico" ]]; then
+        titulo="Alerta crítica en $(hostname -f)"
+        color="#FF6B35"
+    else
+        titulo="Aviso en $(hostname -f)"
+        color="#D4860A"
     fi
     if [[ -x "$AVISO" ]]; then
-        "$AVISO" "${opciones[@]}" "HoneyML [aviso] en $(hostname -f), $TS UTC" "$@" >/dev/null 2>&1 || true
+        "$AVISO" "$@" --titulo "$titulo" --color "$color" --linea "$mensaje" >/dev/null 2>&1 || true
     fi
 }
 
@@ -153,11 +157,11 @@ revisar() {
     if docker restart "$nombre" >/dev/null 2>&1; then
         sleep 20
         log "OK: ${nombre} reiniciado; antigüedad del registro ahora $(edad_registro "$archivo")s"
-        avisar "El vigilante reinició ${nombre}: llevaba ${edad} s sin escribir. La pila quedó en ${DIAGNOSTICOS}."
+        avisar aviso "El vigilante reinició ${nombre}: llevaba ${edad} s sin escribir. La pila quedó en ${DIAGNOSTICOS}."
     else
         log "ERROR: falló el reinicio de ${nombre}"
-        avisar --una-por-hora "vigilante ${nombre} sin reiniciar" \
-            "${nombre} está colgado y el vigilante no pudo reiniciarlo: hay que entrar a mirar."
+        avisar critico "${nombre} está colgado y el vigilante no pudo reiniciarlo: hay que entrar a mirar." \
+            --una-por-hora "vigilante ${nombre} sin reiniciar"
     fi
 }
 

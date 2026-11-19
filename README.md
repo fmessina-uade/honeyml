@@ -2,7 +2,13 @@
   <img src=".github/assets/logo.png" alt="Logo de HoneyML, un panal de hexágonos" width="140">
 </p>
 
-<h1 align="center">HoneyML</h1>
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/nombre-oscuro.svg">
+    <source media="(prefers-color-scheme: light)" srcset=".github/assets/nombre-claro.svg">
+    <img alt="HoneyML" src=".github/assets/nombre-claro.svg" width="160">
+  </picture>
+</h1>
 
 <p align="center">
   Inteligencia de amenazas con honeypots y un motor de triaje con agentes.
@@ -11,7 +17,7 @@
 <p align="center">
   <a href="LICENSE"><img alt="Licencia MIT" src="https://img.shields.io/badge/licencia-MIT-D4860A"></a>
   <img alt="Python 3.12" src="https://img.shields.io/badge/python-3.12-00B894">
-  <a href="https://www.honeyml.com.ar"><img alt="Sitio del proyecto" src="https://img.shields.io/badge/sitio-honeyml.com.ar-0D1117"></a>
+  <a href="https://www.honeyml.com.ar"><img alt="Sitio del proyecto" src="https://img.shields.io/badge/sitio-honeyml.com.ar-94A3B8"></a>
 </p>
 
 HoneyML es una plataforma open source de inteligencia de amenazas construida sobre honeypots de baja

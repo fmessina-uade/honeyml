@@ -113,10 +113,15 @@ send_alert() {
     local message="\$2"
     log_entry "ALERTA [\$severity]: \$message"
 
-    local salida=0 respuesta=""
+    # Coral para lo crítico y ámbar para el aviso: la misma escala de severidad que usa el panel.
+    local salida=0 respuesta="" titulo="Aviso en \${HOSTNAME}" color="#D4860A"
+    if [[ "\$severity" == "critico" ]]; then
+        titulo="Alerta crítica en \${HOSTNAME}"
+        color="#FF6B35"
+    fi
     if [[ -x "\$AVISO" ]]; then
-        respuesta=\$("\$AVISO" --una-por-hora "\${severity} \${message}" \\
-            "HoneyML [\${severity}] en \${HOSTNAME}, \${TIMESTAMP} UTC" "\$message") || salida=\$?
+        respuesta=\$("\$AVISO" --una-por-hora "\${severity} \${message}" --titulo "\$titulo" \\
+            --color "\$color" --linea "\$message") || salida=\$?
     fi
     if [[ "\$salida" -eq 2 ]]; then
         log_entry "AVISO: la alerta no llegó al canal (\${respuesta})"
@@ -278,8 +283,8 @@ log ""
 # dirección, que resuelva el nombre del servicio y que pueda conectarse hacia afuera por HTTPS.
 # Probar la dirección desde otra máquina no comprueba nada de eso.
 salida=0
-respuesta=$("$AVISO_SCRIPT" "HoneyML: monitoreo instalado en $(hostname -f)." \
-    "Las alertas y el reporte diario de las 10 llegan a este canal.") || salida=$?
+respuesta=$("$AVISO_SCRIPT" --titulo "Monitoreo instalado en $(hostname -f)" --color "#00B894" \
+    --linea "Las alertas y el reporte diario de las 10 llegan a este canal.") || salida=$?
 case "$salida" in
     0) log "Webhook: el canal aceptó el mensaje de prueba." ;;
     1) log "Sin webhook: las alertas quedan solo en el registro. Para configurarlo, correr este script con --webhook." ;;
