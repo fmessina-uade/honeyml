@@ -61,17 +61,17 @@ command -v jq >/dev/null || { echo "falta jq para armar el mensaje"; exit 2; }
 
 # jq arma el JSON y escapa cada valor, así que ningún texto rompe la carga. Las partes llegan en
 # tríos (tipo, texto, valor): un ítem es una viñeta con el título destacado, y una línea es un
-# párrafo suelto, que es lo que usan las alertas. Cada valor termina en punto, y todos menos el
-# último con un salto, que deja un renglón de aire entre viñetas: Slack no tiene una opción de
-# espaciado, y un ítem vacío dibujaría una viñeta de más.
+# párrafo suelto, que es lo que usan las alertas. Cada valor termina en punto. Cada ítem va en su
+# propio bloque porque Slack separa los bloques con aire y no tiene una opción de espaciado dentro
+# de una lista: un salto al final del valor lo descarta, y un ítem vacío dibujaría otra viñeta.
 carga=$(jq -n --arg titulo "$titulo" --arg color "${color:-#94A3B8}" --arg resumen "$resumen" '
     def punto: if test("[.!?]$") then . else . + "." end;
     $ARGS.positional as $p
     | [range(0; $p | length; 3) as $i | {tipo: $p[$i], a: $p[$i + 1], b: $p[$i + 2]}] as $partes
-    | [$partes[] | select(.tipo == "item")] as $crudos
-    | [range(0; $crudos | length) as $i | $crudos[$i] | {type: "rich_text_section", elements: [
-        {type: "text", text: (.a + ":"), style: {bold: true, underline: true}},
-        {type: "text", text: (" " + (.b | punto) + (if $i < ($crudos | length) - 1 then "\n" else "" end))}]}] as $items
+    | [$partes[] | select(.tipo == "item") | {type: "rich_text", elements: [
+        {type: "rich_text_list", style: "bullet", elements: [{type: "rich_text_section", elements: [
+            {type: "text", text: (.a + ":"), style: {bold: true, underline: true}},
+            {type: "text", text: (" " + (.b | punto))}]}]}]}] as $items
     | [$partes[] | select(.tipo == "linea") | {type: "rich_text_section", elements: [
         {type: "text", text: (.a | punto)}]}] as $lineas
     | ([($resumen | if . == "" then . else punto end), $titulo] | map(select(. != "")) | first // "") as $primera
@@ -79,9 +79,9 @@ carga=$(jq -n --arg titulo "$titulo" --arg color "${color:-#94A3B8}" --arg resum
         | map(select(. != $primera)) | join("\n")) as $cuerpo
     | {text: ([$primera, $cuerpo] | map(select(. != "")) | join("\n")),
        blocks: (if $titulo == "" then [] else [{type: "header", text: {type: "plain_text", text: $titulo}}] end),
-       attachments: [{color: $color, blocks: [{type: "rich_text", elements: (
-           $lineas + (if ($items | length) > 0 then [{type: "rich_text_list", style: "bullet", elements: $items}] else [] end)
-       )}]}]}' --args "${partes[@]}")
+       attachments: [{color: $color, blocks: (
+           (if ($lineas | length) > 0 then [{type: "rich_text", elements: $lineas}] else [] end) + $items
+       )}]}' --args "${partes[@]}")
 
 respuesta=$(printf '%s' "$carga" | curl -s --proto =https --max-time 15 \
     -w '\n%{http_code}' -X POST -H 'Content-Type: application/json' --data-binary @- \
