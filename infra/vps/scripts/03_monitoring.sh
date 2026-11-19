@@ -113,10 +113,12 @@ done
 
 # Elasticsearch en rojo: hay fragmentos sin asignar, y ahí el índice deja de contestar parte de las
 # consultas. El amarillo no se avisa, porque con un solo nodo las réplicas quedan sin asignar por
-# diseño.
+# diseño. El || true va porque con set -e y pipefail una tubería que falla corta el script entero:
+# sin él, cuando Elasticsearch no contesta o rechaza la consulta, el chequeo terminaría acá mismo y
+# no llegaría a escribir el aviso de abajo, que es justo el que hace falta.
 if docker inspect --format='{{.State.Status}}' elasticsearch >/dev/null 2>&1; then
     ES_ESTADO=\$(curl -s --max-time 10 http://localhost:9200/_cluster/health 2>/dev/null \
-        | grep -o '"status":"[a-z]*"' | cut -d'"' -f4)
+        | grep -o '"status":"[a-z]*"' | cut -d'"' -f4 || true)
     if [[ "\$ES_ESTADO" == "red" ]]; then
         send_alert "critico" "Elasticsearch en rojo"
     elif [[ -z "\$ES_ESTADO" ]]; then
@@ -128,11 +130,12 @@ fi
 # en pie y lo único que lo delata es el atraso creciendo sin techo. La consulta se autentica igual
 # que el healthcheck del compose, solo si hay clave. Va entre comillas simples para que la expanda
 # el shell del contenedor con su propio BUS_PASSWORD: así este script no necesita conocer la clave.
-# Sin autenticarse, valkey-cli contesta NOAUTH, sale con cero y el aviso no salta nunca.
+# Sin autenticarse, valkey-cli contesta NOAUTH, sale con cero y el aviso no salta nunca. El || true
+# cumple el mismo papel que en Elasticsearch: con el bus caído, el chequeo sigue hasta el de sshd.
 if docker inspect --format='{{.State.Status}}' valkey >/dev/null 2>&1; then
     ATRASO=\$(docker exec valkey sh -c \
         'valkey-cli \${BUS_PASSWORD:+-a "\$BUS_PASSWORD"} --no-auth-warning --raw XINFO GROUPS honeyml:events' \
-        2>/dev/null | awk '/^lag\$/{getline; print; exit}')
+        2>/dev/null | awk '/^lag\$/{getline; print; exit}' || true)
     if [[ "\$ATRASO" =~ ^[0-9]+\$ ]] && [[ "\$ATRASO" -ge $THRESHOLD_ATRASO ]]; then
         send_alert "aviso" "El motor no consume: \${ATRASO} eventos de atraso en el bus"
     fi
