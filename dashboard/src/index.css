@@ -914,8 +914,7 @@ body {
 .enlace-barra[data-actual='si'] {
   color: rgb(var(--tinta));
 }
-/* Los enlaces del pie: tan discretos como el resto del pie hasta que se los señala, y entonces en
-   ámbar, el acento de la marca. El subrayado tenue avisa que son enlaces sin competir con la fecha. */
+/* Enlaces del pie: subrayado tenue para que se note que son enlaces sin robarle atención a la fecha. */
 .enlace-pie {
   color: rgb(var(--tinta) / 0.5);
   text-decoration: underline;

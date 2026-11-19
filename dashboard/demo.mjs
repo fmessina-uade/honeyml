@@ -9,8 +9,11 @@ import { preview } from 'vite';
 const PUERTO = 4173;
 const API = 'http://localhost:8000';
 
+// /api/health arma los contadores de la portada sobre el índice entero, y en frío puede tardar
+// varios segundos: con poco margen, el primer intento parece un túnel caído.
+console.log('\n  Comprobando la API a través del túnel...');
 try {
-  const r = await fetch(`${API}/api/health`, { signal: AbortSignal.timeout(4000) });
+  const r = await fetch(`${API}/api/health`, { signal: AbortSignal.timeout(30000) });
   if (!r.ok) throw new Error(String(r.status));
 } catch {
   console.error(

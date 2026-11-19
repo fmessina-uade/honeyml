@@ -15,7 +15,7 @@ x-analisis: &analisis
   networks:
     - elastic_net
   volumes:
-    # los artefactos derivados se generan en la estación de trabajo y se publican al servidor
+    # los artefactos derivados se generan aparte, con el corte de cifras, y acá solo se leen
     - ../../data/processed:/app/data/processed:ro
   read_only: true
   tmpfs:
@@ -56,10 +56,8 @@ services:
     <<: *analisis
     container_name: api
     hostname: api
-    # Usuario y grupo propios, y no el grupo que deja la imagen: useradd --system le asigna el 999,
-    # que en el servidor es systemd-journal, y con /var/log montado la API podría leer el journal
-    # entero. Va entre comillas porque YAML 1.1 lee dos números separados por dos puntos como un
-    # sexagesimal.
+    # Grupo propio: el que deja la imagen es el 999, que en el servidor es el del journal, y con
+    # /var/log montado la API lo podría leer. Va entre comillas para que YAML no lo tome como número.
     user: "10001:10001"
     command: ["uvicorn", "honeyml.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
     # La clave del bus entra por el mismo archivo que la del motor, resuelto contra la ubicación del
@@ -77,8 +75,8 @@ services:
       # Los registros que escriben los scripts del anfitrión, para la auditoría del superadmin. Va el
       # directorio entero porque Docker crea un directorio en el lugar de un archivo que todavía no
       # existe, y eso rompería al script que después quiera escribirlo. La API corre sin privilegios
-      # y solo abre los que nombra registros.py. Igual alcanza lo que /var/log deja legible para
-      # cualquier usuario; dejarla afuera de eso pide que los scripts escriban en un directorio propio.
+      # y solo abre los que nombra registros.py, aunque igual puede leer lo que /var/log deja abierto
+      # para cualquier usuario.
       - /var/log:/registros-del-servidor:ro
     ports:
       - "127.0.0.1:8000:8000"

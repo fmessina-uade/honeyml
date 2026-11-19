@@ -1,29 +1,20 @@
 #!/usr/bin/env bash
-# honeyml_aviso.sh: manda un mensaje al canal de avisos. Lo usan el chequeo de salud, el reporte
+# honeyml_aviso.sh: manda un mensaje al canal de Slack. Lo usan el chequeo de salud, el reporte
 # diario, el vigilante y el instalador.
 #
-#     honeyml_aviso.sh --titulo "Reporte diario" --color "#00B894" --resumen "Todo en orden" \
-#         --item "Contenedores" "8 de 8 en marcha" --linea "texto suelto"
+#     honeyml_aviso.sh --titulo "Reporte diario" --color "#00B894" --item "Contenedores" "8 de 8"
 #
-# --item y --linea se repiten las veces que haga falta. El mensaje lleva un encabezado, una franja
-# con la escala de severidad del panel (teal cuando todo anda, ámbar para revisar, coral para lo
-# crítico) y una lista con el título de cada ítem en negrita y subrayado. Ese formato y las viñetas
-# salen de los bloques de Slack, así que el texto no lleva marcas. La notificación del teléfono
-# muestra solo el texto de respaldo, y por eso empieza por el resumen.
+# La dirección del webhook se lee de un archivo que solo root puede leer, así no queda en los
+# scripts ni en la lista de procesos. Con --una-por-hora el mismo aviso no se repite antes de una
+# hora, porque el chequeo de salud corre cada cinco minutos.
 #
-# --una-por-hora clave es para lo que persiste: el chequeo de salud corre cada cinco minutos y no
-# recuerda lo que ya avisó. En la clave los dígitos no cuentan: "disco al 81%" y "disco al 82%" son
-# el mismo aviso. La dirección del webhook vive en un archivo que solo root lee, y nunca va como
-# argumento de un proceso ni sale por la salida de este script, que termina en registros del panel.
-#
-# Sale con 0 si el canal aceptó el mensaje o si se omitió por repetido, con 1 si no hay webhook
-# configurado y con 2 si el envío falló; en ese caso imprime el código y la respuesta.
+# Sale con 0 si el mensaje llegó o se omitió por repetido, con 1 si no hay webhook y con 2 si el
+# envío falló.
 
 set -euo pipefail
 
 WEBHOOK_FILE="/etc/honeyml/webhook"
 ENVIADOS="/var/lib/honeyml/avisos"
-# el mismo patrón con que el instalador valida la dirección antes de guardarla
 PATRON='^https://[A-Za-z0-9._~:/?#@!$&+,;=%-]+$'
 
 archivo_clave="" titulo="" color="" resumen=""
@@ -51,19 +42,14 @@ fi
 url=""
 read -r url < "$WEBHOOK_FILE" || true
 [[ -n "$url" ]] || exit 1
-# Un archivo editado a mano no pasó por la validación del instalador. Una comilla rompería la línea
-# de configuración que recibe curl, y otro esquema mandaría el aviso sin cifrar.
+# por si el archivo se editó a mano: una comilla rompería la configuración que lee curl
 if [[ ! "$url" =~ $PATRON ]]; then
     echo "la dirección guardada en $WEBHOOK_FILE no es una dirección https válida"
     exit 2
 fi
 command -v jq >/dev/null || { echo "falta jq para armar el mensaje"; exit 2; }
 
-# jq arma el JSON y escapa cada valor, así que ningún texto rompe la carga. Las partes llegan en
-# tríos (tipo, texto, valor): un ítem es una viñeta con el título destacado, y una línea es un
-# párrafo suelto, que es lo que usan las alertas. Cada valor termina en punto. Cada ítem va en su
-# propio bloque porque Slack separa los bloques con aire y no tiene una opción de espaciado dentro
-# de una lista: un salto al final del valor lo descarta, y un ítem vacío dibujaría otra viñeta.
+# Cada ítem va en un bloque aparte para que Slack deje espacio entre las viñetas.
 carga=$(jq -n --arg titulo "$titulo" --arg color "${color:-#94A3B8}" --arg resumen "$resumen" '
     def punto: if test("[.!?]$") then . else . + "." end;
     $ARGS.positional as $p

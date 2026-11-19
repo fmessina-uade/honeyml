@@ -39,9 +39,7 @@ UMBRAL_SIN_CPU=1800
 TS=$(date -u '+%Y-%m-%d %H:%M:%S')
 log() { echo "[$TS] $*" >> "$LOG"; }
 
-# El aviso al canal es un agregado: si no hay webhook o el envío falla, el reinicio igual queda en
-# el registro, y eso no puede frenar al vigilante. Un reinicio logrado va en ámbar y uno fallido en
-# coral, la escala del panel. Lo que sigue al mensaje, como --una-por-hora, pasa tal cual al envío.
+# Avisar a Slack es un extra: si falla, el reinicio igual queda en el registro.
 avisar() {
     local severidad="$1" mensaje="$2" titulo color
     shift 2
@@ -126,8 +124,7 @@ diagnosticar() {
 revisar() {
     local nombre="$1" archivo="$2"
     local edad arranque cpu clavada pids
-    # Un sensor bajado a propósito, por ejemplo para reconstruir su imagen, no existe como
-    # contenedor: su registro envejece y reiniciarlo fallaría en cada corrida.
+    # un sensor bajado a propósito no existe como contenedor, y se intentaría reiniciarlo cada vez
     if ! docker inspect "$nombre" >/dev/null 2>&1; then
         return
     fi

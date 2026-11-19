@@ -1,14 +1,8 @@
 #!/usr/bin/env bash
-# honeyml_daily_report.sh: el resumen del día. Lo corre cron a las 10 de Argentina y lo manda al
-# canal de avisos.
-#
-# Además de resumir, hace de latido. Las alertas salen solo cuando algo falla, así que un canal
-# callado no distingue un servidor sano de uno caído, o de un chequeo que dejó de correr. Este
-# mensaje llega todos los días, y el día que no aparece hay que entrar a mirar.
-#
-# Los conteos salen del índice y no de los registros crudos de los sensores: así cubren las últimas
-# 24 horas justas y de paso confirman que la ingesta sigue andando. Al canal van solo números,
-# ninguna dirección.
+# honeyml_daily_report.sh: el resumen diario que llega a Slack a las 10 de Argentina. Las alertas
+# solo salen cuando algo falla, así que este mensaje es el que confirma que el servidor sigue
+# andando: si un día no llega, hay que entrar a mirar. Los conteos salen del índice, así también se
+# nota si la ingesta se cortó.
 
 set -euo pipefail
 
@@ -17,22 +11,19 @@ LOG="/var/log/honeyml_health.log"
 WATCHDOG_LOG="/var/log/honeyml_watchdog.log"
 BACKUP_LOG="/var/log/honeyml_backup.log"
 AVISO="/usr/local/bin/honeyml_aviso.sh"
-# los mismos que revisa el chequeo de salud; el que no existe en este servidor no se cuenta
+# los mismos que revisa el chequeo de salud
 CONTENEDORES=(cowrie dionaea elasticsearch logstash filebeat valkey motor api)
 ULTIMO_DIA='{"range":{"@timestamp":{"gte":"now-24h"}}}'
 
 TS=$(date -u '+%Y-%m-%d %H:%M:%S')
 HACE_UN_DIA=$(date -u -d '24 hours ago' '+%Y-%m-%d %H:%M:%S')
 
-# Va directo al registro del chequeo de salud, con el mismo formato, porque el panel lo muestra en la
-# vista de auditoría. Esa vista marca como alerta toda línea que contenga alert, error, aviso, fallo,
-# cuelgue o reinici, en mayúsculas o minúsculas. Por eso la línea de un reporte sano no usa esas
-# palabras, y la de uno con problemas empieza con AVISO.
+# El panel muestra este registro y marca en rojo las líneas con palabras como error o aviso, por
+# eso la línea de un día normal no las usa.
 log() { echo "[$TS] $*" >> "$LOG"; }
 
-# El número que sigue a la clave en la respuesta del índice, o nada si el índice no contesta. Una
-# respuesta con fragmentos fallidos también se descarta: Elasticsearch la devuelve con código 200 y
-# el conteo de los fragmentos que sí contestaron, que pasaría por un total.
+# Si Elasticsearch no contesta o falla algún fragmento, no devuelve nada en vez de un conteo
+# incompleto.
 consultar() {
     local ruta="$1" cuerpo="$2" clave="$3" respuesta
     respuesta=$(curl -s --max-time 30 -X POST -H 'Content-Type: application/json' \
@@ -52,15 +43,13 @@ miles() {
     echo "${n}${resto}"
 }
 
-# las líneas de un registro escritas en las últimas 24 horas, que empiezan con la hora UTC entre
-# corchetes y por eso se comparan como texto
+# las líneas de las últimas 24 horas; como empiezan con la hora, alcanza con comparar texto
 del_ultimo_dia() {
     [[ -f "$1" ]] || return 0
     awk -v desde="$HACE_UN_DIA" 'substr($0, 2, 19) >= desde' "$1"
 }
 
-# Las líneas del vigilante de las últimas 24 horas que coinciden con el filtro, contadas por sensor.
-# Devuelve "total|Dionaea 2, Cowrie 1": el nombre es la palabra que sigue al prefijo.
+# devuelve el total y el detalle por sensor, por ejemplo "3|Dionaea 2, Cowrie 1"
 contar_vigilante() {
     del_ultimo_dia "$WATCHDOG_LOG" | awk -v filtro="$1" -v prefijo="$2" '
         $0 ~ filtro {
@@ -123,8 +112,7 @@ main() {
         motor="el índice no contestó"
     fi
 
-    # Con el demonio de Docker parado, cada consulta falla igual que la de un contenedor que no
-    # existe, y el conteo saldría "0 de 0" como si nada.
+    # con Docker caído, cada contenedor parecería no existir y el conteo daría 0 de 0
     local contenedores nombre estado en_marcha=0 existentes=0 frenados=()
     if docker info >/dev/null 2>&1; then
         for nombre in "${CONTENEDORES[@]}"; do
@@ -147,9 +135,7 @@ main() {
         problemas+=("Docker no contesta")
     fi
 
-    # El vigilante escribe "Reiniciando" antes de intentarlo, así que se cuentan los resultados: el
-    # reinicio logrado y el fallido, cada uno por sensor, porque decir cuál se colgó sirve más que
-    # el total.
+    # se cuentan los reinicios hechos y los fallidos, no los intentos
     local vigilante logrados fallidos
     logrados=$(contar_vigilante 'OK: [a-z]+ reiniciado' 'OK: ')
     fallidos=$(contar_vigilante 'falló el reinicio de [a-z]+' 'falló el reinicio de ')
@@ -158,8 +144,7 @@ main() {
         problemas+=("el vigilante no pudo reiniciar un sensor")
     fi
 
-    # El respaldo corre una vez por día, así que en las últimas 24 horas tiene que haber dejado su
-    # línea final. Si Elasticsearch no le contestó, igual la deja, pero sin ninguna decisión volcada.
+    # si Elasticsearch no le contestó, el respaldo termina igual, pero sin decisiones
     local respaldo lineas_respaldo fallas
     lineas_respaldo=$(del_ultimo_dia "$BACKUP_LOG")
     fallas=$(grep -c 'ERROR' <<< "$lineas_respaldo" || true)
@@ -179,8 +164,6 @@ main() {
         respaldo="completo"
     fi
 
-    # Un reinicio del servidor en las últimas 24 horas es un hecho a contar; si no hubo, alcanza con
-    # decir desde cuándo está en marcha.
     local segundos memoria disco_uso="" disco_libre="" servidor
     segundos=$(awk '{print int($1)}' /proc/uptime 2>/dev/null || true)
     memoria=$(free 2>/dev/null | awk '/^Mem:/ {printf "%d", $3 * 100 / $2}' || true)
@@ -203,16 +186,15 @@ main() {
     local anfitrion color estado_resumen
     anfitrion=$(hostname -f 2>/dev/null || hostname)
     local items=()
+    # los colores siguen la escala del panel: teal si todo anda, ámbar si hay algo para revisar
     if (( ${#problemas[@]} > 0 )); then
         local juntos
         juntos=$(printf '%s; ' "${problemas[@]}")
         juntos=${juntos%; }
-        # ámbar: es el nivel medio de la escala del panel, el de lo que hay que mirar
         color="#D4860A"
         estado_resumen="Para revisar: ${juntos}"
         items+=("Para revisar" "$juntos")
     else
-        # teal: en la paleta es el color del funcionamiento correcto
         color="#00B894"
         estado_resumen="Todo en orden"
     fi

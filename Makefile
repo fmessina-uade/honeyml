@@ -313,7 +313,8 @@ analisis-logs:
 	docker compose -f $(ANALISIS_FILE) logs -f --tail=100
 
 # El motor y la API del servidor leen los artefactos derivados (familias de comandos, arquetipos,
-# replays, índice de contraseñas) de solo lectura. Se generan acá con `make artifacts` y se publican.
+# replays, índice de contraseñas) de solo lectura. Los del servidor salen del corte de cifras y se
+# generaron allá; este objetivo los pisa con los de esta máquina aunque sean más viejos.
 publicar-artefactos:
 ifndef VPS_IP
 	$(error VPS_IP no definido. Crear archivo .vps_ip o exportar: export VPS_IP=<ip>)

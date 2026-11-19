@@ -62,8 +62,7 @@ const PRESENTACION_PROPIA = new Set<SectionId>([
 // minuto, así que pedirlo más seguido no trae nada nuevo.
 const REFRESCO_MS = 60_000;
 
-// Los enlaces del pie solo navegan: el panel no carga nada de esos sitios, y por eso no les deja ver
-// desde dónde se llega (rel="noreferrer").
+// rel="noreferrer": los sitios enlazados en el pie no ven desde qué dirección del panel se llega.
 const SITIO = 'https://www.honeyml.com.ar';
 const REPOSITORIO = 'https://github.com/fmessina-uade/honeyml';
 

@@ -1,16 +1,15 @@
 #!/bin/bash
 # 03_monitoring.sh
-# Monitoreo básico de salud del VPS. Instala el chequeo periódico con alertas por webhook (Slack,
-# o Discord con /slack al final de la dirección), el reporte diario, el watchdog de los sensores, el
-# respaldo y la purga de muestras, y los deja programados en cron. Sin webhook, las alertas quedan
-# solo en el registro.
+# Monitoreo básico de salud del VPS. Instala el chequeo periódico con alertas a Slack, el reporte
+# diario, el watchdog de los sensores, el respaldo y la purga de muestras, y los deja programados en
+# cron. Sin webhook, las alertas quedan solo en el registro.
 #
 #     sudo bash 03_monitoring.sh              instala y conserva el webhook que ya estuviera
 #     sudo bash 03_monitoring.sh --webhook    además pide la dirección del webhook y la guarda
 #
-# La dirección se pide sin mostrarla y no se acepta como argumento, para que no quede en el
-# historial del shell ni en la lista de procesos. Se guarda en un archivo que solo root lee; para
-# dejar de mandar avisos alcanza con borrarlo.
+# La dirección se pide sin mostrarla, para que no quede en el historial ni en la lista de procesos,
+# y se guarda en /etc/honeyml/webhook, que solo lee root. Para dejar de mandar avisos alcanza con
+# borrar ese archivo.
 
 set -euo pipefail
 
@@ -45,9 +44,8 @@ log() {
 
 [[ $EUID -eq 0 ]] || { echo "Ejecutar como root." >&2; exit 1; }
 
-# Todo lo que se instala desde el repositorio se busca antes de tocar nada. Si falta un archivo (un
-# commit que no lo incluyó, un despliegue a medias), el instalador cortaría en el medio con el
-# chequeo de salud ya reescrito y el cron viejo, y ninguna alerta saldría del servidor.
+# Antes de tocar nada se verifica que estén todos los archivos: si faltara uno, el instalador
+# cortaría a mitad de camino y no saldría ninguna alerta.
 for origen in honeyml_aviso.sh honeyml_daily_report.sh honeyml_watchdog.sh honeyml_backup.sh \
     honeyml_purga_muestras.sh pyspy/Dockerfile; do
     if [[ ! -f "$REPO_VPS/$origen" ]]; then
@@ -64,9 +62,7 @@ case "${1:-}" in
             exit 1
         fi
         echo
-        # Se rechaza lo que no sea una dirección https limpia. Una comilla o un espacio colados al
-        # copiar rompen cada envío, y conviene frenarlo acá, con la persona adelante, y no
-        # enterarse después por el registro.
+        # mejor rechazar acá una dirección mal copiada que enterarse después de que no llega nada
         patron='^https://[A-Za-z0-9._~:/?#@!$&+,;=%-]+$'
         if [[ ! "$url" =~ $patron ]]; then
             echo "Eso no parece la dirección de un webhook: tiene que empezar con https:// y no llevar espacios ni comillas." >&2
@@ -104,16 +100,14 @@ log_entry() {
     echo "[\$TIMESTAMP] \$*" >> "\$LOG"
 }
 
-# La alerta queda siempre en el registro. Al canal va como mucho una vez por hora mientras dure,
-# porque este chequeo corre cada cinco minutos y no recuerda lo que ya avisó. Si además no llega,
-# se anota por qué: un webhook revocado no puede pasar desapercibido, porque es el único camino por
-# el que las alertas salen.
+# La alerta siempre queda en el registro. A Slack va como mucho una vez por hora, y si no llega se
+# anota por qué, por ejemplo si se revocó el webhook.
 send_alert() {
     local severity="\$1"
     local message="\$2"
     log_entry "ALERTA [\$severity]: \$message"
 
-    # Coral para lo crítico y ámbar para el aviso: la misma escala de severidad que usa el panel.
+    # coral para lo crítico y ámbar para el resto, como en el panel
     local salida=0 respuesta="" titulo="Aviso en \${HOSTNAME}" color="#D4860A"
     if [[ "\$severity" == "critico" ]]; then
         titulo="Alerta crítica en \${HOSTNAME}"
@@ -145,8 +139,7 @@ if [[ "\$MEM_PCT" -ge "\$THRESHOLD_MEM" ]]; then
     send_alert "aviso" "Memoria al \${MEM_PCT}% (umbral: \${THRESHOLD_MEM}%)"
 fi
 
-# Discos de verdad nada más: Docker monta una capa por cada contenedor en marcha, que df lista con
-# el mismo porcentaje que el disco raíz, y un disco lleno saldría repetido una vez por contenedor.
+# sin las capas de Docker, que df lista con el mismo porcentaje del disco y repetirían el aviso
 while IFS= read -r line; do
     PCT=\$(echo "\$line" | awk '{print \$5}' | tr -d '%')
     MOUNT=\$(echo "\$line" | awk '{print \$6}')
@@ -155,8 +148,7 @@ while IFS= read -r line; do
     fi
 done < <(df -hP -x tmpfs -x devtmpfs -x overlay -x squashfs | tail -n +2)
 
-# Con el demonio de Docker parado, cada consulta de abajo falla igual que la de un contenedor que no
-# existe, y el chequeo los saltearía a todos en silencio.
+# con Docker caído, el chequeo de abajo saltearía todos los contenedores sin avisar
 if ! docker info >/dev/null 2>&1; then
     send_alert "critico" "Docker no contesta: los sensores y el análisis pueden estar caídos"
 fi
@@ -242,8 +234,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 # chequeo de salud cada 5 minutos
 */5 * * * * root $HEALTHCHECK_SCRIPT >> $HEALTHCHECK_LOG 2>&1
 
-# reporte diario a las 10:00 de Argentina, que son las 13:00 UTC todo el año porque Argentina no
-# cambia la hora en verano
+# reporte diario a las 10:00 de Argentina (13:00 UTC)
 0 13 * * * root $DAILY_REPORT_SCRIPT >> $HEALTHCHECK_LOG 2>&1
 
 # watchdog de los sensores cada 5 minutos
@@ -279,9 +270,7 @@ log "  Registro del monitoreo:         $HEALTHCHECK_LOG"
 log ""
 log "Para probar a mano: sudo $HEALTHCHECK_SCRIPT, o sudo $DAILY_REPORT_SCRIPT para el reporte."
 log ""
-# El mensaje de prueba recorre el camino entero desde este servidor: que lea el archivo con la
-# dirección, que resuelva el nombre del servicio y que pueda conectarse hacia afuera por HTTPS.
-# Probar la dirección desde otra máquina no comprueba nada de eso.
+# El mensaje de prueba confirma que el servidor llega a Slack, no solo que la dirección es válida.
 salida=0
 respuesta=$("$AVISO_SCRIPT" --titulo "Monitoreo instalado en $(hostname -f)" --color "#00B894" \
     --linea "Las alertas y el reporte diario de las 10 llegan a este canal.") || salida=$?
