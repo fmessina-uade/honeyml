@@ -62,6 +62,11 @@ const PRESENTACION_PROPIA = new Set<SectionId>([
 // minuto, así que pedirlo más seguido no trae nada nuevo.
 const REFRESCO_MS = 60_000;
 
+// Los enlaces del pie solo navegan: el panel no carga nada de esos sitios, y por eso no les deja ver
+// desde dónde se llega (rel="noreferrer").
+const SITIO = 'https://www.honeyml.com.ar';
+const REPOSITORIO = 'https://github.com/fmessina-uade/honeyml';
+
 // El rol mínimo de cada vista de administración. Si la sesión no lo tiene, la vista vuelve al resumen.
 const ROL_DE: Partial<Record<SectionId, Rol>> = {
   cuentas: 'admin',
@@ -433,12 +438,31 @@ export default function App() {
             )}
 
             {snapshot && (
-              <footer className="mt-12 pt-5 border-t border-white/5 flex flex-wrap items-center justify-between gap-3 text-[11px] text-white/35">
+              <footer className="mt-12 pt-5 border-t border-white/5 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 text-[11px] text-white/35">
                 <span className="flex items-center gap-2">
                   <img src="/favicon.png" alt="" aria-hidden className="w-4 h-4 rounded" />
                   <Marca className="font-mono-display" />
                   <span className="geist text-[12px] text-white/40">{t.brand.subtitle}</span>
                 </span>
+                <nav
+                  aria-label={t.footer.links}
+                  className="flex flex-wrap items-center gap-x-4 gap-y-1 geist text-[12px]"
+                >
+                  <a className="enlace-pie" href={SITIO} target="_blank" rel="noreferrer">
+                    {t.footer.site}
+                  </a>
+                  <a className="enlace-pie" href={REPOSITORIO} target="_blank" rel="noreferrer">
+                    {t.footer.source}
+                  </a>
+                  <a
+                    className="enlace-pie"
+                    href={`${REPOSITORIO}/blob/main/LICENSE`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {t.footer.license}
+                  </a>
+                </nav>
                 <span className="font-data">{t.footer.range(desde, hasta)}</span>
               </footer>
             )}

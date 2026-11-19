@@ -17,6 +17,10 @@ const es = {
     frozenShort: 'Respaldo',
     frozenTitle: 'Snapshot tomado el',
     range: (desde: string, hasta: string) => `${desde} al ${hasta}`,
+    links: 'Enlaces del proyecto',
+    site: 'Sitio del proyecto',
+    source: 'Código fuente',
+    license: 'Licencia MIT',
   },
   loading: 'Cargando...',
   error: {
@@ -1039,6 +1043,10 @@ const en: typeof es = {
     frozenShort: 'Snapshot',
     frozenTitle: 'Snapshot taken on',
     range: (desde: string, hasta: string) => `${desde} to ${hasta}`,
+    links: 'Project links',
+    site: 'Project site',
+    source: 'Source code',
+    license: 'MIT license',
   },
   loading: 'Loading...',
   error: {

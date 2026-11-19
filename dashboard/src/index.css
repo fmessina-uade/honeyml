@@ -914,6 +914,23 @@ body {
 .enlace-barra[data-actual='si'] {
   color: rgb(var(--tinta));
 }
+/* Los enlaces del pie: tan discretos como el resto del pie hasta que se los señala, y entonces en
+   ámbar, el acento de la marca. El subrayado tenue avisa que son enlaces sin competir con la fecha. */
+.enlace-pie {
+  color: rgb(var(--tinta) / 0.5);
+  text-decoration: underline;
+  text-decoration-color: rgb(var(--tinta) / 0.15);
+  text-underline-offset: 3px;
+  transition:
+    color 0.2s ease,
+    text-decoration-color 0.2s ease;
+}
+.enlace-pie:hover,
+.enlace-pie:focus-visible {
+  color: var(--honey-amber);
+  text-decoration-color: currentColor;
+}
+
 /* La sección actual en la barra: un trazo de luz que se apaga hacia los costados, con la marca del
    logo encendida en el medio, como un nodo sobre la línea. */
 .enlace-barra[aria-current='page']::after,
