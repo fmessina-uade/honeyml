@@ -23,7 +23,7 @@ jobs:
       - name: shellcheck de los scripts del VPS
         uses: ludeeus/action-shellcheck@master
         with:
-          scandir: ./infra/vps/scripts
+          scandir: ./infra/vps
           severity: warning
 
       - name: shellcheck de los scripts del proyecto

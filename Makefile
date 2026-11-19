@@ -88,7 +88,7 @@ lint:
 	@# en rojo por avisos cosméticos, y una puerta siempre en rojo deja de mirarse. Los errores y las
 	@# advertencias de verdad detienen la corrida igual.
 	@if command -v shellcheck >/dev/null 2>&1; then \
-		shellcheck -S warning infra/vps/scripts/*.sh scripts/validate_local.sh && echo "  shellcheck OK"; \
+		shellcheck -S warning infra/vps/*.sh infra/vps/scripts/*.sh scripts/validate_local.sh && echo "  shellcheck OK"; \
 	else \
 		echo "  shellcheck no instalado (brew install shellcheck)"; \
 	fi

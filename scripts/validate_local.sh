@@ -47,7 +47,7 @@ echo ""
 echo "[ 2 ] Linting de scripts de shell"
 
 if command -v shellcheck &>/dev/null; then
-    for script in infra/vps/scripts/*.sh scripts/validate_local.sh; do
+    for script in infra/vps/*.sh infra/vps/scripts/*.sh scripts/validate_local.sh; do
         if bash -n "$script" 2>/dev/null; then
             ok "Sintaxis bash OK: $script"
         else
@@ -56,7 +56,7 @@ if command -v shellcheck &>/dev/null; then
     done
 else
     info "shellcheck no disponible: solo se valida la sintaxis de bash"
-    for script in infra/vps/scripts/*.sh; do
+    for script in infra/vps/*.sh infra/vps/scripts/*.sh; do
         if bash -n "$script" 2>/dev/null; then
             ok "Sintaxis bash OK: $script"
         else

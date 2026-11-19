@@ -27,6 +27,7 @@ COWRIE_LOG="/var/lib/docker/volumes/honeypots_cowrie_logs/_data/cowrie.json"
 LOG="/var/log/honeyml_watchdog.log"
 DIAGNOSTICOS="/var/log/honeyml_diagnosticos"
 IMAGEN_PYSPY="honeyml-pyspy"
+AVISO="/usr/local/bin/honeyml_aviso.sh"
 
 # segundos sin escribir que alcanzan cuando la CPU supera LIMITE_CPU (en porcentaje del tope del
 # contenedor)
@@ -37,6 +38,20 @@ UMBRAL_SIN_CPU=1800
 
 TS=$(date -u '+%Y-%m-%d %H:%M:%S')
 log() { echo "[$TS] $*" >> "$LOG"; }
+
+# El aviso al canal es un agregado: si no hay webhook o el envío falla, el reinicio igual queda en
+# el registro, y eso no puede frenar al vigilante. Las opciones del envío, como --una-por-hora, van
+# antes de las líneas del mensaje.
+avisar() {
+    local opciones=()
+    if [[ "${1:-}" == "--una-por-hora" ]]; then
+        opciones=("$1" "$2")
+        shift 2
+    fi
+    if [[ -x "$AVISO" ]]; then
+        "$AVISO" "${opciones[@]}" "HoneyML [aviso] en $(hostname -f), $TS UTC" "$@" >/dev/null 2>&1 || true
+    fi
+}
 
 edad_registro() {
     local archivo="$1"
@@ -107,6 +122,11 @@ diagnosticar() {
 revisar() {
     local nombre="$1" archivo="$2"
     local edad arranque cpu clavada pids
+    # Un sensor bajado a propósito, por ejemplo para reconstruir su imagen, no existe como
+    # contenedor: su registro envejece y reiniciarlo fallaría en cada corrida.
+    if ! docker inspect "$nombre" >/dev/null 2>&1; then
+        return
+    fi
     edad=$(edad_registro "$archivo")
     if [[ "$edad" -lt 0 ]]; then
         log "AVISO: no existe el registro de ${nombre} (${archivo})"
@@ -133,8 +153,11 @@ revisar() {
     if docker restart "$nombre" >/dev/null 2>&1; then
         sleep 20
         log "OK: ${nombre} reiniciado; antigüedad del registro ahora $(edad_registro "$archivo")s"
+        avisar "El vigilante reinició ${nombre}: llevaba ${edad} s sin escribir. La pila quedó en ${DIAGNOSTICOS}."
     else
         log "ERROR: falló el reinicio de ${nombre}"
+        avisar --una-por-hora "vigilante ${nombre} sin reiniciar" \
+            "${nombre} está colgado y el vigilante no pudo reiniciarlo: hay que entrar a mirar."
     fi
 }
 

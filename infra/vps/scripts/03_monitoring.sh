@@ -1,16 +1,24 @@
 #!/bin/bash
 # 03_monitoring.sh
 # Monitoreo básico de salud del VPS. Instala el chequeo periódico con alertas por webhook (Slack,
-# Discord o el que sea), el reporte diario, el watchdog de los sensores, el respaldo y la purga de
-# muestras, y los deja programados en cron. Sin webhook, las alertas quedan solo en el registro.
+# o Discord con /slack al final de la dirección), el reporte diario, el watchdog de los sensores, el
+# respaldo y la purga de muestras, y los deja programados en cron. Sin webhook, las alertas quedan
+# solo en el registro.
 #
-# Uso: sudo bash 03_monitoring.sh [url_del_webhook]
-# Ejemplo: sudo bash 03_monitoring.sh "https://hooks.slack.com/services/..."
+#     sudo bash 03_monitoring.sh              instala y conserva el webhook que ya estuviera
+#     sudo bash 03_monitoring.sh --webhook    además pide la dirección del webhook y la guarda
+#
+# La dirección se pide sin mostrarla y no se acepta como argumento, para que no quede en el
+# historial del shell ni en la lista de procesos. Se guarda en un archivo que solo root lee; para
+# dejar de mandar avisos alcanza con borrarlo.
 
 set -euo pipefail
 
-WEBHOOK_URL="${1:-}"
 LOG_FILE="/var/log/honeyml_setup.log"
+WEBHOOK_DIR="/etc/honeyml"
+WEBHOOK_FILE="$WEBHOOK_DIR/webhook"
+AVISO_SCRIPT="/usr/local/bin/honeyml_aviso.sh"
+DAILY_REPORT_SCRIPT="/usr/local/bin/honeyml_daily_report.sh"
 HEALTHCHECK_SCRIPT="/usr/local/bin/honeyml_health.sh"
 HEALTHCHECK_LOG="/var/log/honeyml_health.log"
 THRESHOLD_CPU=85
@@ -37,6 +45,44 @@ log() {
 
 [[ $EUID -eq 0 ]] || { echo "Ejecutar como root." >&2; exit 1; }
 
+# Todo lo que se instala desde el repositorio se busca antes de tocar nada. Si falta un archivo (un
+# commit que no lo incluyó, un despliegue a medias), el instalador cortaría en el medio con el
+# chequeo de salud ya reescrito y el cron viejo, y ninguna alerta saldría del servidor.
+for origen in honeyml_aviso.sh honeyml_daily_report.sh honeyml_watchdog.sh honeyml_backup.sh \
+    honeyml_purga_muestras.sh pyspy/Dockerfile; do
+    if [[ ! -f "$REPO_VPS/$origen" ]]; then
+        echo "Falta $REPO_VPS/$origen: el despliegue está incompleto y no se tocó nada." >&2
+        exit 1
+    fi
+done
+
+case "${1:-}" in
+    "") ;;
+    --webhook)
+        if ! read -rsp "Dirección del webhook (no se muestra al pegarla): " url < /dev/tty; then
+            echo "Hace falta una terminal para pedir la dirección: conectarse con ssh -t." >&2
+            exit 1
+        fi
+        echo
+        # Se rechaza lo que no sea una dirección https limpia. Una comilla o un espacio colados al
+        # copiar rompen cada envío, y conviene frenarlo acá, con la persona adelante, y no
+        # enterarse después por el registro.
+        patron='^https://[A-Za-z0-9._~:/?#@!$&+,;=%-]+$'
+        if [[ ! "$url" =~ $patron ]]; then
+            echo "Eso no parece la dirección de un webhook: tiene que empezar con https:// y no llevar espacios ni comillas." >&2
+            exit 1
+        fi
+        install -d -m 700 -o root -g root "$WEBHOOK_DIR"
+        (umask 077 && printf '%s\n' "$url" > "$WEBHOOK_FILE.tmp")
+        mv "$WEBHOOK_FILE.tmp" "$WEBHOOK_FILE"
+        unset url
+        ;;
+    *)
+        echo "Opción desconocida: $1. Sin opciones conserva el webhook; con --webhook lo pide." >&2
+        exit 1
+        ;;
+esac
+
 log "HoneyML: monitoreo de salud"
 
 log "[1/4] Creando el chequeo de salud en $HEALTHCHECK_SCRIPT..."
@@ -46,8 +92,8 @@ cat > "$HEALTHCHECK_SCRIPT" << HEALTH_SCRIPT
 
 set -euo pipefail
 
-WEBHOOK_URL="${WEBHOOK_URL}"
 LOG="${HEALTHCHECK_LOG}"
+AVISO="${AVISO_SCRIPT}"
 THRESHOLD_CPU=${THRESHOLD_CPU}
 THRESHOLD_MEM=${THRESHOLD_MEM}
 THRESHOLD_DISK=${THRESHOLD_DISK}
@@ -58,16 +104,22 @@ log_entry() {
     echo "[\$TIMESTAMP] \$*" >> "\$LOG"
 }
 
+# La alerta queda siempre en el registro. Al canal va como mucho una vez por hora mientras dure,
+# porque este chequeo corre cada cinco minutos y no recuerda lo que ya avisó. Si además no llega,
+# se anota por qué: un webhook revocado no puede pasar desapercibido, porque es el único camino por
+# el que las alertas salen.
 send_alert() {
     local severity="\$1"
     local message="\$2"
     log_entry "ALERTA [\$severity]: \$message"
 
-    if [[ -n "\$WEBHOOK_URL" ]]; then
-        curl -s -X POST "\$WEBHOOK_URL" \
-            -H 'Content-Type: application/json' \
-            -d "{\"text\":\"HoneyML [\${severity}] en \${HOSTNAME}, \${TIMESTAMP}\\n\${message}\"}" \
-            > /dev/null 2>&1 || true
+    local salida=0 respuesta=""
+    if [[ -x "\$AVISO" ]]; then
+        respuesta=\$("\$AVISO" --una-por-hora "\${severity} \${message}" \\
+            "HoneyML [\${severity}] en \${HOSTNAME}, \${TIMESTAMP} UTC" "\$message") || salida=\$?
+    fi
+    if [[ "\$salida" -eq 2 ]]; then
+        log_entry "AVISO: la alerta no llegó al canal (\${respuesta})"
     fi
 }
 
@@ -88,14 +140,21 @@ if [[ "\$MEM_PCT" -ge "\$THRESHOLD_MEM" ]]; then
     send_alert "aviso" "Memoria al \${MEM_PCT}% (umbral: \${THRESHOLD_MEM}%)"
 fi
 
-# disco
+# Discos de verdad nada más: Docker monta una capa por cada contenedor en marcha, que df lista con
+# el mismo porcentaje que el disco raíz, y un disco lleno saldría repetido una vez por contenedor.
 while IFS= read -r line; do
     PCT=\$(echo "\$line" | awk '{print \$5}' | tr -d '%')
     MOUNT=\$(echo "\$line" | awk '{print \$6}')
     if [[ "\${PCT:-0}" -ge "\$THRESHOLD_DISK" ]]; then
         send_alert "aviso" "Disco \${MOUNT} al \${PCT}% (umbral: \${THRESHOLD_DISK}%)"
     fi
-done < <(df -h | tail -n +2 | grep -v tmpfs)
+done < <(df -hP -x tmpfs -x devtmpfs -x overlay -x squashfs | tail -n +2)
+
+# Con el demonio de Docker parado, cada consulta de abajo falla igual que la de un contenedor que no
+# existe, y el chequeo los saltearía a todos en silencio.
+if ! docker info >/dev/null 2>&1; then
+    send_alert "critico" "Docker no contesta: los sensores y el análisis pueden estar caídos"
+fi
 
 # Contenedores de las dos zonas. Se pregunta por los que existen y no por los que corren: con
 # 'docker ps' un contenedor frenado no figura en la lista, y la comprobación se saltearía justo en
@@ -152,46 +211,9 @@ HEALTH_SCRIPT
 chmod +x "$HEALTHCHECK_SCRIPT"
 log "  Script creado."
 
-log "[2/4] Creando el reporte diario..."
-DAILY_REPORT_SCRIPT="/usr/local/bin/honeyml_daily_report.sh"
-cat > "$DAILY_REPORT_SCRIPT" << 'DAILY_SCRIPT'
-#!/usr/bin/env bash
-# honeyml_daily_report.sh: resumen diario de actividad de los honeypots.
-set -euo pipefail
-
-WEBHOOK_URL="${WEBHOOK_URL:-}"
-DATE=$(date '+%Y-%m-%d')
-COWRIE_LOG="/var/lib/docker/volumes/honeypots_cowrie_logs/_data/cowrie.json"
-
-# contadores de actividad de Cowrie
-SSH_ATTEMPTS=0
-SUCCESSFUL_LOGINS=0
-UNIQUE_IPS=0
-
-if [[ -f "$COWRIE_LOG" ]]; then
-    SSH_ATTEMPTS=$(grep -c '"eventid":"cowrie.login.failed"' "$COWRIE_LOG" 2>/dev/null || echo 0)
-    SUCCESSFUL_LOGINS=$(grep -c '"eventid":"cowrie.login.success"' "$COWRIE_LOG" 2>/dev/null || echo 0)
-    UNIQUE_IPS=$(grep '"src_ip"' "$COWRIE_LOG" 2>/dev/null | grep -oP '"src_ip":"[^"]*"' | sort -u | wc -l || echo 0)
-fi
-
-UPTIME=$(uptime -p 2>/dev/null || uptime)
-MEM_FREE=$(free -h | grep Mem | awk '{print $4}')
-DISK_FREE=$(df -h / | tail -1 | awk '{print $4}')
-
-REPORT="HoneyML, reporte del ${DATE}
-Sistema: en marcha ${UPTIME}, memoria libre ${MEM_FREE}, disco libre ${DISK_FREE}
-Cowrie: ${SSH_ATTEMPTS} ingresos fallidos, ${SUCCESSFUL_LOGINS} exitosos, ${UNIQUE_IPS} direcciones distintas"
-
-echo "$REPORT"
-
-if [[ -n "$WEBHOOK_URL" ]]; then
-    curl -s -X POST "$WEBHOOK_URL" \
-        -H 'Content-Type: application/json' \
-        -d "{\"text\":\"$REPORT\"}" > /dev/null 2>&1 || true
-fi
-DAILY_SCRIPT
-
-chmod +x "$DAILY_REPORT_SCRIPT"
+log "[2/4] Instalando el reporte diario y el envío de avisos..."
+install -m 755 "$REPO_VPS/honeyml_aviso.sh" "$AVISO_SCRIPT"
+install -m 755 "$REPO_VPS/honeyml_daily_report.sh" "$DAILY_REPORT_SCRIPT"
 
 log "[3/4] Instalando el watchdog, el respaldo y la purga..."
 install -m 755 "$REPO_VPS/honeyml_watchdog.sh" "$WATCHDOG_SCRIPT"
@@ -215,8 +237,9 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 # chequeo de salud cada 5 minutos
 */5 * * * * root $HEALTHCHECK_SCRIPT >> $HEALTHCHECK_LOG 2>&1
 
-# reporte diario a las 07:00 de Argentina (UTC-3, o 10:00 UTC)
-0 10 * * * root $DAILY_REPORT_SCRIPT >> $HEALTHCHECK_LOG 2>&1
+# reporte diario a las 10:00 de Argentina, que son las 13:00 UTC todo el año porque Argentina no
+# cambia la hora en verano
+0 13 * * * root $DAILY_REPORT_SCRIPT >> $HEALTHCHECK_LOG 2>&1
 
 # watchdog de los sensores cada 5 minutos
 */5 * * * * root $WATCHDOG_SCRIPT >> $WATCHDOG_LOG 2>&1
@@ -243,15 +266,22 @@ log "Monitoreo configurado."
 log ""
 log "Scripts instalados:"
 log "  Chequeo de salud, cada 5 min:   $HEALTHCHECK_SCRIPT"
-log "  Reporte diario, 07:00 (UTC-3):  $DAILY_REPORT_SCRIPT"
+log "  Reporte diario, 10:00 (UTC-3):  $DAILY_REPORT_SCRIPT"
 log "  Watchdog, cada 5 min:           $WATCHDOG_SCRIPT"
 log "  Respaldo, 03:00 UTC:            $BACKUP_SCRIPT"
 log "  Purga, 05:00 UTC:               $PURGA_SCRIPT"
 log "  Registro del monitoreo:         $HEALTHCHECK_LOG"
 log ""
-log "Para probar manualmente: bash $HEALTHCHECK_SCRIPT"
-if [[ -z "$WEBHOOK_URL" ]]; then
-    log ""
-    log "No se configuró WEBHOOK_URL: las alertas quedan solo en el registro."
-    log "Para mandarlas afuera, cargar WEBHOOK_URL en $HEALTHCHECK_SCRIPT."
-fi
+log "Para probar a mano: sudo $HEALTHCHECK_SCRIPT, o sudo $DAILY_REPORT_SCRIPT para el reporte."
+log ""
+# El mensaje de prueba recorre el camino entero desde este servidor: que lea el archivo con la
+# dirección, que resuelva el nombre del servicio y que pueda conectarse hacia afuera por HTTPS.
+# Probar la dirección desde otra máquina no comprueba nada de eso.
+salida=0
+respuesta=$("$AVISO_SCRIPT" "HoneyML: monitoreo instalado en $(hostname -f)." \
+    "Las alertas y el reporte diario de las 10 llegan a este canal.") || salida=$?
+case "$salida" in
+    0) log "Webhook: el canal aceptó el mensaje de prueba." ;;
+    1) log "Sin webhook: las alertas quedan solo en el registro. Para configurarlo, correr este script con --webhook." ;;
+    *) log "AVISO: el canal no aceptó el mensaje de prueba (${respuesta}). Revisar la dirección con --webhook." ;;
+esac
