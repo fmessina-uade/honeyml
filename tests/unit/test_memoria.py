@@ -76,8 +76,12 @@ class RepertorioFalso:
 
 def test_la_firma_ignora_quien_y_cuando() -> None:
     """Dos direcciones distintas haciendo lo mismo comparten firma. Es todo el punto."""
-    uno = _evento(source_ip="1.1.1.1", session="a", doc_id="x", timestamp="2026-01-01T00:00:00Z")
-    otro = _evento(source_ip="2.2.2.2", session="b", doc_id="y", timestamp="2026-09-09T23:00:00Z")
+    uno = _evento(
+        source_ip="203.0.113.10", session="a", doc_id="x", timestamp="2026-01-01T00:00:00Z"
+    )
+    otro = _evento(
+        source_ip="198.51.100.20", session="b", doc_id="y", timestamp="2026-09-09T23:00:00Z"
+    )
     assert modulo_firma.de_evento(uno) == modulo_firma.de_evento(otro)
 
 
@@ -187,12 +191,15 @@ def test_el_piso_no_depende_de_nada_que_la_firma_deje_afuera(
     hora, esta prueba falla y la reutilización deja de ser legítima.
     """
     uno = _evento(
-        category=categoria, outcome=resultado, source_ip="1.1.1.1", timestamp="2026-01-01T00:00:00Z"
+        category=categoria,
+        outcome=resultado,
+        source_ip="203.0.113.10",
+        timestamp="2026-01-01T00:00:00Z",
     )
     otro = _evento(
         category=categoria,
         outcome=resultado,
-        source_ip="9.9.9.9",
+        source_ip="203.0.113.99",
         session="otra",
         doc_id="otro",
         timestamp="2026-09-09T23:59:00Z",

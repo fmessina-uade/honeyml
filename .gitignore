@@ -52,6 +52,13 @@ id_ed25519
 id_ed25519.pub
 id_ecdsa
 id_ecdsa.pub
+*_ed25519
+honeyml_ed25519_v[0-9]
+ssh_host_*_key
+credentials.json
+secrets.json
+.netrc
+*.kdbx
 authorized_keys
 known_hosts
 *.vault
@@ -158,7 +165,9 @@ desktop.ini
 *.npz
 models/
 
-# Conjuntos de datos
+# Conjuntos de datos. data/ entero: ahí terminan registros, respaldos y tablas con direcciones,
+# comandos y credenciales de atacantes, y ninguno se publica.
+/data/
 data/raw/
 data/processed/
 data/external/
