@@ -185,6 +185,8 @@ interface Arrastre {
   tilt: number;
   /** Ancho del elemento al empezar: el gesto se mide en fracciones de él, no en píxeles. */
   ancho: number;
+  /** El país del marcador sobre el que empezó el gesto, si empezó sobre uno. */
+  pais: string | null;
 }
 
 interface Props {
@@ -202,8 +204,8 @@ export default function Globe({ countries, selected, onSelect }: Props) {
   const rafRef = useRef<number | undefined>(undefined);
   const modoRef = useRef<Modo>('auto');
   const arrastreRef = useRef<Arrastre | null>(null);
-  // Sobrevive al pointerup a propósito: el clic del navegador llega después, y es ahí donde hay que
-  // saber si el gesto fue un clic o el final de un arrastre.
+  // Si el gesto pasó el umbral de movimiento: al soltar decide si fue un clic sobre un marcador o el
+  // final de un arrastre.
   const movidoRef = useRef(false);
   const [arrastrando, setArrastrando] = useState(false);
 
@@ -285,12 +287,14 @@ export default function Globe({ countries, selected, onSelect }: Props) {
 
   const alBajar = (e: EventoPuntero<SVGSVGElement>) => {
     const ancho = e.currentTarget.getBoundingClientRect().width || 1;
+    const marcador = (e.target as Element).closest('[data-pais]');
     arrastreRef.current = {
       x: e.clientX,
       y: e.clientY,
       rot: rotRef.current,
       tilt: tiltRef.current,
       ancho,
+      pais: marcador?.getAttribute('data-pais') ?? null,
     };
     movidoRef.current = false;
     modoRef.current = 'libre';
@@ -317,6 +321,7 @@ export default function Globe({ countries, selected, onSelect }: Props) {
   };
 
   const alSoltar = (e: EventoPuntero<SVGSVGElement>) => {
+    const pais = arrastreRef.current?.pais ?? null;
     arrastreRef.current = null;
     setArrastrando(false);
     if (e.currentTarget.hasPointerCapture(e.pointerId)) {
@@ -325,6 +330,14 @@ export default function Globe({ countries, selected, onSelect }: Props) {
     // Sin país elegido el giro continuo se retoma desde donde quedó, porque es la animación de
     // fondo de la sección. Con uno elegido se respeta el encuadre: para eso el usuario lo movió.
     if (!selected) modoRef.current = 'auto';
+
+    // El clic sobre un marcador se resuelve acá y no con un onClick en el marcador: como el globo
+    // toma la captura del puntero al bajar, el navegador le entrega el clic al globo entero y el
+    // marcador nunca se entera. Un gesto que se movió es un giro y no elige nada, aunque termine
+    // encima de otro país.
+    if (e.type === 'pointerup' && pais && !movidoRef.current) {
+      onSelect(selected === pais ? null : pais);
+    }
   };
 
   const lineas = graticula(rotLon, tilt);
@@ -417,13 +430,7 @@ export default function Globe({ countries, selected, onSelect }: Props) {
         return (
           <g
             key={c.country}
-            /* Soltar el arrastre encima de un marcador no lo selecciona: el clic del navegador
-               llega igual, y sin esta guardia girar el globo terminaba eligiendo un país al
-               azar, el que quedara bajo el cursor. */
-            onClick={() => {
-              if (movidoRef.current) return;
-              onSelect(esSel ? null : c.country);
-            }}
+            data-pais={c.country}
             style={{ cursor: 'pointer' }}
             opacity={0.35 + p.z * 0.65}
           >
