@@ -1622,6 +1622,11 @@ body {
   background-clip: text;
   color: transparent;
 }
+/* La cifra va sin el interletrado negativo del título: con él, en "7,7" la coma queda apretada
+   entre los dos sietes y se leen pegados. */
+.portada-titulo .degradado {
+  letter-spacing: 0;
+}
 .portada-bajada {
   max-width: 34rem;
   margin-top: 14px;
