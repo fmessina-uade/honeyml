@@ -11,7 +11,7 @@
 </h1>
 
 <p align="center">
-  Inteligencia de amenazas con honeypots y un motor de triaje con agentes.
+  Plataforma open source de inteligencia de amenazas en tiempo real mediante honeypots y Agentic AI.
 </p>
 
 <p align="center">
